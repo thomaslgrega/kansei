@@ -61,7 +61,6 @@ async def amain() -> None:
         total_passed += len(passed_jobs)
         total_failed += len(failed_jobs)
         
-    # total = sum(len(jobs) for jobs in boards.values())
     total = total_passed + total_failed
     print(f"{total} jobs from {len(boards)}/{len(results)} boards in {elapsed:.2f}s")
     for token, exc in failed.items():
@@ -71,3 +70,4 @@ async def amain() -> None:
 
 def main() -> None:
     asyncio.run(amain())
+
