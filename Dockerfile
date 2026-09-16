@@ -8,14 +8,13 @@ ENV UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 
 # Dependencies alone, in their own layer.
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,id=s/8c6b2f1b-1aec-42fe-84d7-3e6647dca13d-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 # Code
 COPY . /app
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=s/8c6b2f1b-1aec-42fe-84d7-3e6647dca13d-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --locked
 
 # ---- Stage 2: the image shipped -------------

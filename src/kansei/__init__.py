@@ -3,6 +3,8 @@ import httpx
 import time
 from datetime import datetime
 from pydantic import BaseModel, Field, ValidationError, HttpUrl
+from kansei.config import settings
+from openai import OpenAI
 
 
 class Location(BaseModel):
@@ -15,9 +17,6 @@ class JobPosting(BaseModel):
     updated_at: datetime
     location: Location
     education: str | None = None
-
-
-COMPANIES = ["stripe", "anthropic", "figma", "airtable", "discord", "gitlab", "ramp"]
 
 
 async def fetch_board(client: httpx.AsyncClient, token: str) -> list[dict]:
@@ -48,7 +47,7 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
 
 async def amain() -> None:
     started = time.perf_counter()
-    results = await fetch_all(COMPANIES)
+    results = await fetch_all(settings.companies)
     elapsed = time.perf_counter() - started
 
     boards = {t: r for t, r in results.items() if not isinstance(r, Exception)}
@@ -66,6 +65,10 @@ async def amain() -> None:
     for token, exc in failed.items():
         print(f"  skipped {token}: {type(exc).__name__}")
     print(f"{total_passed} validated, {total_failed} invalid")
+
+    key = settings.openai_api_key.get_secret_value()
+    OpenAI(api_key=key).models.list()
+    print(f"config ok - openai key present, {len(key)} chars")
 
 
 def main() -> None:
