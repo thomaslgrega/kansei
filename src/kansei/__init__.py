@@ -86,14 +86,15 @@ async def amain() -> None:
     elapsed = time.perf_counter() - started
 
     usage = response.usage
-    print(f"\n{response.output_text}\n")
-    print(f"Input: {usage.input_tokens}\n    cached tokens: {usage.input_tokens_details.cached_tokens}")
-    print(f"    cache write tokens: {usage.input_tokens_details.cache_write_tokens}\n")
-    print(f"Output: {usage.output_tokens}")
-    print(f"Reasoning tokens: {usage.output_tokens_details.reasoning_tokens}\n")
-    print(f"{elapsed:.2f}sec")
     cost = cost_usd(usage)
-    print(f"${cost:.6f}")
+    input_token_details = usage.input_tokens_details
+    print(f"\n{response.output_text}\n")
+    print(
+        f"{usage.input_tokens} in ({input_token_details.cached_tokens} cached, {input_token_details.cache_write_tokens} written)",
+        f" · {usage.output_tokens} out ({usage.output_tokens_details.reasoning_tokens} reasoning)",
+        f" · {elapsed:.2f}s",
+        f" · {cost:.6f}"
+    )
     print(f"x {total} postings = ${cost * total:.2f}")
 
 
