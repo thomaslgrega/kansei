@@ -15,6 +15,7 @@ class Settings(BaseSettings):
         "airtable", "discord", "gitlab", "ramp",
     ]
     request_timeout: float = 10.0
+    openai_model: str = "gpt-5.6-luna"
 
 
 settings = Settings()

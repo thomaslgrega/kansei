@@ -1,10 +1,14 @@
 import asyncio
+import html
 import httpx
 import time
+
 from datetime import datetime
 from pydantic import BaseModel, Field, ValidationError, HttpUrl
+from openai import AsyncOpenAI
+
 from kansei.config import settings
-from openai import OpenAI
+from kansei.llm import summarise, cost_usd
 
 
 class Location(BaseModel):
@@ -17,6 +21,13 @@ class JobPosting(BaseModel):
     updated_at: datetime
     location: Location
     education: str | None = None
+
+
+async def fetch_posting(client: httpx.AsyncClient, token: str, job_id: int) -> str:
+    url = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_id}"
+    response = await client.get(url)
+    response.raise_for_status()
+    return html.unescape(response.json()["content"])
 
 
 async def fetch_board(client: httpx.AsyncClient, token: str) -> list[dict]:
@@ -66,9 +77,24 @@ async def amain() -> None:
         print(f"  skipped {token}: {type(exc).__name__}")
     print(f"{total_passed} validated, {total_failed} invalid")
 
-    key = settings.openai_api_key.get_secret_value()
-    OpenAI(api_key=key).models.list()
-    print(f"config ok - openai key present, {len(key)} chars")
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        posting = await fetch_posting(client, "anthropic", 5390799008)
+
+    llm = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+    started = time.perf_counter()
+    response = await summarise(llm, posting)
+    elapsed = time.perf_counter() - started
+
+    usage = response.usage
+    print(f"\n{response.output_text}\n")
+    print(f"Input: {usage.input_tokens}\n    cached tokens: {usage.input_tokens_details.cached_tokens}")
+    print(f"    cache write tokens: {usage.input_tokens_details.cache_write_tokens}\n")
+    print(f"Output: {usage.output_tokens}")
+    print(f"Reasoning tokens: {usage.output_tokens_details.reasoning_tokens}\n")
+    print(f"{elapsed:.2f}sec")
+    cost = cost_usd(usage)
+    print(f"${cost:.6f}")
+    print(f"x {total} postings = ${cost * total:.2f}")
 
 
 def main() -> None:
