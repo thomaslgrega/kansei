@@ -1,14 +1,17 @@
 import asyncio
 import html
 import httpx
+import re
+import statistics
 import time
 
 from datetime import datetime
 from pydantic import BaseModel, Field, ValidationError, HttpUrl
 from openai import AsyncOpenAI
+from openai.types.responses import Response
 
 from kansei.config import settings
-from kansei.llm import summarise, cost_usd
+from kansei.llm import summarize, cost_usd
 
 
 class Location(BaseModel):
@@ -21,6 +24,12 @@ class JobPosting(BaseModel):
     updated_at: datetime
     location: Location
     education: str | None = None
+
+
+def is_candidate(job: JobPosting) -> bool:
+    engineering = re.compile(r"engineer|developer", re.IGNORECASE)
+    reachable = re.compile(r"japan|tokyo|remote", re.IGNORECASE)
+    return bool(engineering.search(job.title) and reachable.search(job.location.name))
 
 
 async def fetch_posting(client: httpx.AsyncClient, token: str, job_id: int) -> str:
@@ -38,7 +47,7 @@ async def fetch_board(client: httpx.AsyncClient, token: str) -> list[dict]:
 
 
 async def fetch_all(tokens: list[str]) -> dict[str, list[dict] | Exception]:
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
         results = await asyncio.gather(
             *(fetch_board(client, token) for token in tokens),
             return_exceptions=True,
@@ -56,6 +65,36 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
     return passed, failed
 
 
+async def summarize_one(
+    http: httpx.AsyncClient,
+    llm: AsyncOpenAI,
+    limit: asyncio.Semaphore,
+    token: str,
+    job: JobPosting,
+) -> tuple[Response, float]:
+    async with limit:
+        posting = await fetch_posting(http, token, job.id)
+        started = time.perf_counter()
+        response = await summarize(llm, posting)
+        return response, time.perf_counter() - started
+
+
+async def summarize_batch(
+    selected: list[tuple[str, JobPosting]],
+) -> dict[int, tuple[Response, float] | Exception]:
+    limit = asyncio.Semaphore(settings.llm_concurrency)
+    llm = AsyncOpenAI(
+        api_key=settings.openai_api_key.get_secret_value(),
+        timeout=settings.llm_timeout,
+    )
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
+        results = await asyncio.gather(
+            *(summarize_one(http, llm, limit, token, job) for token, job in selected),
+            return_exceptions=True,
+        )
+    return {job.id: result for (_, job), result in zip(selected, results)}
+
+
 async def amain() -> None:
     started = time.perf_counter()
     results = await fetch_all(settings.companies)
@@ -65,11 +104,13 @@ async def amain() -> None:
     failed = {t: r for t, r in results.items() if isinstance(r, Exception)}
 
     total_passed, total_failed = 0, 0
+    candidates: list[tuple[str, JobPosting]] = []
 
-    for _, jobs in boards.items():
+    for token, jobs in boards.items():
         passed_jobs, failed_jobs = validate(jobs)
         total_passed += len(passed_jobs)
         total_failed += len(failed_jobs)
+        candidates += [(token, job) for job in passed_jobs if is_candidate(job)]
         
     total = total_passed + total_failed
     print(f"{total} jobs from {len(boards)}/{len(results)} boards in {elapsed:.2f}s")
@@ -77,25 +118,36 @@ async def amain() -> None:
         print(f"  skipped {token}: {type(exc).__name__}")
     print(f"{total_passed} validated, {total_failed} invalid")
 
-    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-        posting = await fetch_posting(client, "anthropic", 5390799008)
+    selected = candidates[: settings.llm_max_postings]
+    print(f"{len(candidates)} candidates, sending {len(selected)} to {settings.openai_model}")
 
-    llm = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
     started = time.perf_counter()
-    response = await summarise(llm, posting)
-    elapsed = time.perf_counter() - started
+    summaries = await summarize_batch(selected)
+    wall = time.perf_counter() - started
 
-    usage = response.usage
-    cost = cost_usd(usage)
-    input_token_details = usage.input_tokens_details
-    print(f"\n{response.output_text}\n")
+    done = {i: r for i, r in summaries.items() if not isinstance(r, Exception)}
+    errors = {i: r for i, r in summaries.items() if isinstance(r, Exception)}
+
+    print(f"\n{len(done)}/{len(summaries)} summarised in {wall:.1f}s")
+    for job_id, exc in errors.items():
+        code = getattr(exc, "code", None) or ""
+        print(f"  failed {job_id}: {type(exc).__name__} {code}")
+    if len(done) < 2:
+        return
+
+    costs = [cost_usd(response.usage) for response, _ in done.values()]
+    latencies = [seconds for _, seconds in done.values()]
+    p95 = statistics.quantiles(latencies, n=20)[-1]
+
+    mean_cost = statistics.mean(costs)
     print(
-        f"{usage.input_tokens} in ({input_token_details.cached_tokens} cached, {input_token_details.cache_write_tokens} written)",
-        f" · {usage.output_tokens} out ({usage.output_tokens_details.reasoning_tokens} reasoning)",
-        f" · {elapsed:.2f}s",
-        f" · {cost:.6f}"
+        f"cost: ${sum(costs):.6f} total, ${mean_cost:.6f} mean, "
+        f"${mean_cost * len(candidates):.6f} projected for {len(candidates)} candidates"
     )
-    print(f"x {total} postings = ${cost * total:.2f}")
+    print(
+        f"latency: p50 {statistics.median(latencies):.2f}s, p95 {p95:.2f}s, "
+        f"sum {sum(latencies):.1f}s, wall {wall:.1f}s"
+    )
 
 
 def main() -> None:

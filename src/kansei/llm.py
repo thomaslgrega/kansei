@@ -10,7 +10,7 @@ Must-Have: <comma-separated>
 Japanese Required: <yes / no / unclear, and the level if stated>"""
 
 
-async def summarise(llm: AsyncOpenAI, posting: str) -> Response:
+async def summarize(llm: AsyncOpenAI, posting: str) -> Response:
     return await llm.responses.create(
         model=settings.openai_model,
         instructions=INSTRUCTIONS,
