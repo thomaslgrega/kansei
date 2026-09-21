@@ -8,10 +8,10 @@ import time
 from datetime import datetime
 from pydantic import BaseModel, Field, ValidationError, HttpUrl
 from openai import AsyncOpenAI
-from openai.types.responses import Response
+from openai.types.responses import ParsedResponse, Response
 
 from kansei.config import settings
-from kansei.llm import summarize, cost_usd
+from kansei.llm import PostingFacts, extract, cost_usd
 
 
 class Location(BaseModel):
@@ -65,23 +65,23 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
     return passed, failed
 
 
-async def summarize_one(
+async def extract_one(
     http: httpx.AsyncClient,
     llm: AsyncOpenAI,
     limit: asyncio.Semaphore,
     token: str,
     job: JobPosting,
-) -> tuple[Response, float]:
+) -> tuple[ParsedResponse[PostingFacts], float]:
     async with limit:
         posting = await fetch_posting(http, token, job.id)
         started = time.perf_counter()
-        response = await summarize(llm, posting)
+        response = await extract(llm, posting)
         return response, time.perf_counter() - started
 
 
-async def summarize_batch(
+async def extract_batch(
     selected: list[tuple[str, JobPosting]],
-) -> dict[int, tuple[Response, float] | Exception]:
+) -> dict[int, tuple[ParsedResponse[PostingFacts], float] | Exception]:
     limit = asyncio.Semaphore(settings.llm_concurrency)
     llm = AsyncOpenAI(
         api_key=settings.openai_api_key.get_secret_value(),
@@ -89,7 +89,7 @@ async def summarize_batch(
     )
     async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
         results = await asyncio.gather(
-            *(summarize_one(http, llm, limit, token, job) for token, job in selected),
+            *(extract_one(http, llm, limit, token, job) for token, job in selected),
             return_exceptions=True,
         )
     return {job.id: result for (_, job), result in zip(selected, results)}
@@ -122,7 +122,7 @@ async def amain() -> None:
     print(f"{len(candidates)} candidates, sending {len(selected)} to {settings.openai_model}")
 
     started = time.perf_counter()
-    summaries = await summarize_batch(selected)
+    summaries = await extract_batch(selected)
     wall = time.perf_counter() - started
 
     done = {i: r for i, r in summaries.items() if not isinstance(r, Exception)}
@@ -148,6 +148,11 @@ async def amain() -> None:
         f"latency: p50 {statistics.median(latencies):.2f}s, p95 {p95:.2f}s, "
         f"sum {sum(latencies):.1f}s, wall {wall:.1f}s"
     )
+
+    facts = [response.output_parsed for response, _ in done.values()]
+    needs_jp = sum(1 for f in facts if f.japanese_required == "yes")
+    remote = sum(1 for f in facts if f.remote_allowed)
+    print(f"{needs_jp}/{len(facts)} require Japanese, {remote}/{len(facts)} allow remote")
 
 
 def main() -> None:
