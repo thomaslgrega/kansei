@@ -9,14 +9,24 @@ from kansei import extract_one
 from kansei.llm import INSTRUCTIONS, PostingFacts
 
 
+FACTS = PostingFacts(
+    role_summary="Builds payment services.",
+    seniority="mid",
+    must_have_skills=["Python"],
+    japanese_required="no",
+    japanese_level=None,
+    remote_allowed=True,
+)
+
+
 class StubResponses:
-    def __init__(self, reply: str = "Role: backend\nMust-Have: Python\nJapanese Required: no"):
-        self.reply = reply
+    def __init__(self, reply: PostingFacts | None = None):
+        self.reply = reply or FACTS
         self.calls: list[dict] = []
 
     async def parse(self, **kwargs) -> SimpleNamespace:
         self.calls.append(kwargs)
-        return SimpleNamespace(output_text=self.reply, usage=None)
+        return SimpleNamespace(output_parsed=self.reply, usage=None)
 
 
 class StubLLM:
@@ -29,13 +39,13 @@ async def test_extract_one_sends_the_fetched_posting_to_the_model(make_posting, 
 
     async with make_board("We need a Python engineer in Tokyo.") as http:
         response, seconds = await extract_one(
-            http, llm, asyncio.Semaphore(1), "stripe", make_posting()
+            http, llm, asyncio.Semaphore(1), make_posting()
         )
 
     assert llm.responses.calls[0]["input"] == "We need a Python engineer in Tokyo."
     assert llm.responses.calls[0]["instructions"] == INSTRUCTIONS
-    assert llm.responses.calls[0]["text_format"] == PostingFacts
-    assert response.output_text.startswith("Role:")
+    assert llm.responses.calls[0]["text_format"] is PostingFacts
+    assert response.output_parsed is FACTS
     assert seconds >= 0.0
 
 
@@ -49,9 +59,23 @@ async def test_extract_one_lets_a_model_failure_escape(make_posting, make_board)
     async with make_board() as http:
         with pytest.raises(httpx.ConnectError):
             await extract_one(
-                http, llm, asyncio.Semaphore(1), "stripe", make_posting()
+                http, llm, asyncio.Semaphore(1), make_posting()
             )
 
+
+async def test_extract_one_skips_the_fetch_when_the_source_already_supplied_the_text(make_posting):
+    llm = StubLLM()
+
+    def explode(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"should not have fetched {request.url}")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(explode)) as http:
+        await extract_one(
+            http, llm, asyncio.Semaphore(1),
+            make_posting(source="lever", token="woven-by-toyota", description="ロボットのソフトウェア"),
+        )
+
+    assert llm.responses.calls[0]["input"] == "ロボットのソフトウェア"
 
 def test_every_field_is_required_so_no_default_can_ever_fire():
     schema = to_strict_json_schema(PostingFacts)

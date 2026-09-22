@@ -10,9 +10,10 @@ class Settings(BaseSettings):
     )
 
     openai_api_key: SecretStr
-    companies: list[str] = [
-        "stripe", "anthropic", "figma",
-        "airtable", "discord", "gitlab", "ramp",
+    boards: list[str] = [
+        "greenhouse:stripe", "greenhouse:anthropic", "greenhouse:figma",
+        "greenhouse:airtable", "greenhouse:discord", "greenhouse:gitlab", "greenhouse:ramp",
+        "lever:woven-by-toyota",
     ]
     request_timeout: float = 10.0
     openai_model: str = "gpt-5.6-luna"

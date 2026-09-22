@@ -9,50 +9,38 @@ from datetime import datetime
 from pydantic import BaseModel, Field, ValidationError, HttpUrl
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse, Response
+from typing import Literal
 
 from kansei.config import settings
 from kansei.llm import PostingFacts, extract, cost_usd
+from kansei.sources import SOURCES, fetch_posting
 
-
-class Location(BaseModel):
-    name: str
 
 class JobPosting(BaseModel):
-    id: int
-    title: str = Field(description="The title of the position")
-    absolute_url: HttpUrl
-    updated_at: datetime
-    location: Location
-    education: str | None = None
+    source: Literal["greenhouse", "lever"]
+    token: str
+    id: str
+    title: str
+    url: HttpUrl
+    posted_at: datetime
+    location: str
+    description: str | None = None
 
 
 def is_candidate(job: JobPosting) -> bool:
-    engineering = re.compile(r"engineer|developer", re.IGNORECASE)
-    reachable = re.compile(r"japan|tokyo|remote", re.IGNORECASE)
-    return bool(engineering.search(job.title) and reachable.search(job.location.name))
+    engineering = re.compile(r"engineer|developer|エンジニア|開発", re.IGNORECASE)
+    reachable = re.compile(r"japan|tokyo|remote|日本|東京", re.IGNORECASE)
+    return bool(engineering.search(job.title) and reachable.search(job.location))
 
 
-async def fetch_posting(client: httpx.AsyncClient, token: str, job_id: int) -> str:
-    url = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_id}"
-    response = await client.get(url)
-    response.raise_for_status()
-    return html.unescape(response.json()["content"])
-
-
-async def fetch_board(client: httpx.AsyncClient, token: str) -> list[dict]:
-    url = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
-    response = await client.get(url)
-    response.raise_for_status()
-    return response.json()["jobs"]
-
-
-async def fetch_all(tokens: list[str]) -> dict[str, list[dict] | Exception]:
+async def fetch_all(boards: list[str]) -> dict[str, list[dict] | Exception]:
+    parsed = [board.split(":", 1) for board in boards]
     async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
         results = await asyncio.gather(
-            *(fetch_board(client, token) for token in tokens),
+            *(SOURCES[source](client, token) for source, token in parsed),
             return_exceptions=True,
         )
-    return dict(zip(tokens, results))
+    return dict(zip(boards, results))
 
 
 def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]:
@@ -61,7 +49,7 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
         try:
             passed.append(JobPosting.model_validate(job))
         except ValidationError as exc:
-            failed.append((job.get("id", -1), exc.errors()[0]["msg"]))
+            failed.append((job.get("id", "unknown"), exc.errors()[0]["msg"]))
     return passed, failed
 
 
@@ -69,19 +57,18 @@ async def extract_one(
     http: httpx.AsyncClient,
     llm: AsyncOpenAI,
     limit: asyncio.Semaphore,
-    token: str,
     job: JobPosting,
 ) -> tuple[ParsedResponse[PostingFacts], float]:
     async with limit:
-        posting = await fetch_posting(http, token, job.id)
+        posting = job.description or await fetch_posting(http, job.token, job.id)
         started = time.perf_counter()
         response = await extract(llm, posting)
         return response, time.perf_counter() - started
 
 
 async def extract_batch(
-    selected: list[tuple[str, JobPosting]],
-) -> dict[int, tuple[ParsedResponse[PostingFacts], float] | Exception]:
+    selected: list[JobPosting],
+) -> dict[str, tuple[ParsedResponse[PostingFacts], float] | Exception]:
     limit = asyncio.Semaphore(settings.llm_concurrency)
     llm = AsyncOpenAI(
         api_key=settings.openai_api_key.get_secret_value(),
@@ -89,7 +76,7 @@ async def extract_batch(
     )
     async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
         results = await asyncio.gather(
-            *(extract_one(http, llm, limit, token, job) for token, job in selected),
+            *(extract_one(http, llm, limit, job) for job in selected),
             return_exceptions=True,
         )
     return {job.id: result for (_, job), result in zip(selected, results)}
@@ -97,14 +84,14 @@ async def extract_batch(
 
 async def amain() -> None:
     started = time.perf_counter()
-    results = await fetch_all(settings.companies)
+    results = await fetch_all(settings.boards)
     elapsed = time.perf_counter() - started
 
     boards = {t: r for t, r in results.items() if not isinstance(r, Exception)}
     failed = {t: r for t, r in results.items() if isinstance(r, Exception)}
 
     total_passed, total_failed = 0, 0
-    candidates: list[tuple[str, JobPosting]] = []
+    candidates: list[JobPosting] = []
 
     for token, jobs in boards.items():
         passed_jobs, failed_jobs = validate(jobs)

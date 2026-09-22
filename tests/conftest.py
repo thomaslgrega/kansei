@@ -6,14 +6,17 @@ from kansei import JobPosting
 
 @pytest.fixture
 def make_posting():
-    def build(title: str = "Software Engineer", location: str = "Tokyo, Japan") -> JobPosting:
-        return JobPosting(
-            id=1,
-            title=title,
-            absolute_url="https://example.com/1",
-            updated_at="2026-09-19T00:00:00Z",
-            location={"name": location},
-        )
+    def build(title: str = "Software Engineer", location: str = "Tokyo, Japan", **overrides) -> JobPosting:
+        return JobPosting(**{
+            "source": "greenhouse",
+            "token": "stripe",
+            "id": "1",
+            "title": title,
+            "url": "https://example.com/1",
+            "posted_at": "2026-09-19T00:00:00Z",
+            "location": location,
+            **overrides,
+        })
 
     return build
 

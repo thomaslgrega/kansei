@@ -13,6 +13,9 @@ from kansei import fetch_posting, is_candidate, validate
         ("Software Engineer", "Dublin, Ireland", False),
         ("SOFTWARE ENGINEER", "TOKYO", True),
         ("Engineering Manager", "Tokyo, Japan", True),
+        ("バックエンドエンジニア・Robot Platform", "東京都中央区", True),
+        ("シニア機械学習エンジニア・Energy Products", "東京都中央区", True),
+        ("カスタマーサクセスマネージャー", "東京都中央区", False),
     ],
 )
 def test_is_candidate(make_posting, title, location, expected):
@@ -21,15 +24,15 @@ def test_is_candidate(make_posting, title, location, expected):
 
 def test_validate_keeps_the_good_records_and_names_the_bad_one():
     jobs = [
-        {"id": 1, "title": "Software Engineer", "absolute_url": "https://example.com/1",
-         "updated_at": "2026-09-19T00:00:00Z", "location": {"name": "Tokyo"}},
-        {"id": 2, "title": "Data Engineer", "absolute_url": "not-a-url",
-         "updated_at": "2026-09-19T00:00:00Z", "location": {"name": "Tokyo"}},
+        {"source": "greenhouse", "token": "stripe", "id": "1", "title": "Software Engineer",
+         "url": "https://example.com/1", "posted_at": "2026-09-19T00:00:00Z", "location": "Tokyo"},
+        {"source": "greenhouse", "token": "stripe", "id": "2", "title": "Data Engineer",
+         "url": "not-a-url", "posted_at": "2026-09-19T00:00:00Z", "location": "Tokyo"},
     ]
     passed, failed = validate(jobs)
 
-    assert [job.id for job in passed] == [1]
-    assert [job_id for job_id, _ in failed] == [2]
+    assert [job.id for job in passed] == ["1"]
+    assert [job_id for job_id, _ in failed] == ["2"]
 
 
 def test_validate_attributes_a_failure_with_no_id_at_all():
@@ -37,7 +40,7 @@ def test_validate_attributes_a_failure_with_no_id_at_all():
 
     assert passed == []
     assert len(failed) == 1
-    assert failed[0][0] == -1
+    assert failed[0][0] == "unknown"
 
 
 async def test_fetch_posting_unescapes_html_entities():
