@@ -1,14 +1,13 @@
 import asyncio
-import html
 import httpx
 import re
 import statistics
 import time
 
 from datetime import datetime
-from pydantic import BaseModel, Field, ValidationError, HttpUrl
+from pydantic import BaseModel, ValidationError, HttpUrl
 from openai import AsyncOpenAI
-from openai.types.responses import ParsedResponse, Response
+from openai.types.responses import ParsedResponse
 from typing import Literal
 
 from kansei.config import settings
@@ -76,7 +75,7 @@ async def extract_batch(
     )
     async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
         results = await asyncio.gather(
-            *(extract_one(http, llm, limit, job) for job in selected),
+            *(extract_one(http, llm, limit, job) for _, job in selected),
             return_exceptions=True,
         )
     return {job.id: result for (_, job), result in zip(selected, results)}
@@ -115,7 +114,7 @@ async def amain() -> None:
     done = {i: r for i, r in summaries.items() if not isinstance(r, Exception)}
     errors = {i: r for i, r in summaries.items() if isinstance(r, Exception)}
 
-    print(f"\n{len(done)}/{len(summaries)} summarised in {wall:.1f}s")
+    print(f"\n{len(done)}/{len(summaries)} summarized in {wall:.1f}s")
     for job_id, exc in errors.items():
         code = getattr(exc, "code", None) or ""
         print(f"  failed {job_id}: {type(exc).__name__} {code}")
