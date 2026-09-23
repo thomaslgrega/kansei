@@ -1,17 +1,17 @@
 import asyncio
-import httpx
 import re
 import statistics
 import time
-
 from datetime import datetime
-from pydantic import BaseModel, ValidationError, HttpUrl
-from openai import AsyncOpenAI
-from openai.types.responses import ParsedResponse
 from typing import Literal
 
+import httpx
+from openai import AsyncOpenAI
+from openai.types.responses import ParsedResponse
+from pydantic import BaseModel, HttpUrl, ValidationError
+
 from kansei.config import settings
-from kansei.llm import PostingFacts, extract, cost_usd
+from kansei.llm import PostingFacts, cost_usd, extract
 from kansei.sources import SOURCES, fetch_posting
 
 
@@ -61,7 +61,7 @@ async def extract_one(
     async with limit:
         posting = job.description or await fetch_posting(http, job.token, job.id)
         started = time.perf_counter()
-        response = await extract(llm, posting)
+        response = await extract(llm, f"{job.title}\n\n{posting}")
         return response, time.perf_counter() - started
 
 
@@ -75,10 +75,10 @@ async def extract_batch(
     )
     async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
         results = await asyncio.gather(
-            *(extract_one(http, llm, limit, job) for _, job in selected),
+            *(extract_one(http, llm, limit, job) for job in selected),
             return_exceptions=True,
         )
-    return {job.id: result for (_, job), result in zip(selected, results)}
+    return {job.id: result for job, result in zip(selected, results)}
 
 
 async def amain() -> None:
@@ -96,7 +96,7 @@ async def amain() -> None:
         passed_jobs, failed_jobs = validate(jobs)
         total_passed += len(passed_jobs)
         total_failed += len(failed_jobs)
-        candidates += [(token, job) for job in passed_jobs if is_candidate(job)]
+        candidates += [job for job in passed_jobs if is_candidate(job)]
         
     total = total_passed + total_failed
     print(f"{total} jobs from {len(boards)}/{len(results)} boards in {elapsed:.2f}s")
@@ -118,6 +118,13 @@ async def amain() -> None:
     for job_id, exc in errors.items():
         code = getattr(exc, "code", None) or ""
         print(f"  failed {job_id}: {type(exc).__name__} {code}")
+    by_id = {job.id: job for job in selected}
+    for job_id, (response, _) in done.items():
+        facts = response.output_parsed
+        print(f"\n{by_id[job_id].title}")
+        print(f"  japanese: {facts.japanese_required} {facts.japanese_level or ''}")
+        print(f"  skills:   {', '.join(facts.must_have_skills) or '(none)'}")
+        print(f"  summary:  {facts.role_summary}")
     if len(done) < 2:
         return
 

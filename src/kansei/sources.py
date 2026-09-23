@@ -1,5 +1,37 @@
 import html
+from html.parser import HTMLParser
+
 import httpx
+
+
+class TextOnly(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        if tag in {"br", "p", "div", "li", "tr"}:
+            self.parts.append("\n")
+
+
+def html_to_text(fragment: str) -> str:
+    parser = TextOnly()
+    parser.feed(fragment)
+    lines = (line.strip() for line in "".join(parser.parts).splitlines())
+    return "\n".join(line for line in lines if line)
+
+
+def lever_text(raw: dict) -> str:
+    parts = [raw["descriptionPlain"]]
+    for section in raw.get("lists", []):
+        parts.append(section.get("text", ""))
+        parts.append(html_to_text(section.get("content", "")))
+    parts.append(raw.get("additionalPlain", ""))
+    return "\n\n".join(part for part in parts if part)
+
 
 GREENHOUSE_BOARD = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
 GREENHOUSE_JOB = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_id}"
@@ -28,7 +60,7 @@ def from_lever(raw: dict, token: str) -> dict:
         "url": raw["hostedUrl"],
         "posted_at": raw["createdAt"],
         "location": raw["categories"]["location"],
-        "description": raw["descriptionPlain"],
+        "description": lever_text(raw),
     }
 
 
@@ -36,7 +68,7 @@ async def fetch_posting(client: httpx.AsyncClient, token: str, job_id: str) -> s
     url = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_id}"
     response = await client.get(url)
     response.raise_for_status()
-    return html.unescape(response.json()["content"])
+    return html_to_text(html.unescape(response.json()["content"]))
 
 
 async def fetch_greenhouse(client: httpx.AsyncClient, token: str) -> list[dict]:

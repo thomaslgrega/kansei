@@ -1,8 +1,8 @@
+from typing import Literal
+
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse, ResponseUsage
 from pydantic import BaseModel, Field
-from typing import Literal
-
 
 from kansei.config import settings
 

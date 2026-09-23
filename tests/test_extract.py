@@ -1,13 +1,12 @@
-from openai.lib._pydantic import to_strict_json_schema
+import asyncio
 from types import SimpleNamespace
 
-import asyncio
 import httpx
 import pytest
+from openai.lib._pydantic import to_strict_json_schema
 
 from kansei import extract_one
 from kansei.llm import INSTRUCTIONS, PostingFacts
-
 
 FACTS = PostingFacts(
     role_summary="Builds payment services.",
@@ -42,7 +41,7 @@ async def test_extract_one_sends_the_fetched_posting_to_the_model(make_posting, 
             http, llm, asyncio.Semaphore(1), make_posting()
         )
 
-    assert llm.responses.calls[0]["input"] == "We need a Python engineer in Tokyo."
+    assert llm.responses.calls[0]["input"] == "Software Engineer\n\nWe need a Python engineer in Tokyo."
     assert llm.responses.calls[0]["instructions"] == INSTRUCTIONS
     assert llm.responses.calls[0]["text_format"] is PostingFacts
     assert response.output_parsed is FACTS
@@ -75,7 +74,7 @@ async def test_extract_one_skips_the_fetch_when_the_source_already_supplied_the_
             make_posting(source="lever", token="woven-by-toyota", description="ロボットのソフトウェア"),
         )
 
-    assert llm.responses.calls[0]["input"] == "ロボットのソフトウェア"
+    assert llm.responses.calls[0]["input"] == "Software Engineer\n\nロボットのソフトウェア"
 
 def test_every_field_is_required_so_no_default_can_ever_fire():
     schema = to_strict_json_schema(PostingFacts)

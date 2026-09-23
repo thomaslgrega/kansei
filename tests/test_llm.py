@@ -1,7 +1,9 @@
 import pytest
-
 from openai.types.responses import ResponseUsage
-from openai.types.responses.response_usage import InputTokensDetails, OutputTokensDetails
+from openai.types.responses.response_usage import (
+    InputTokensDetails,
+    OutputTokensDetails,
+)
 
 from kansei.llm import cost_usd
 

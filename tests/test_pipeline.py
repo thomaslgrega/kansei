@@ -43,7 +43,7 @@ def test_validate_attributes_a_failure_with_no_id_at_all():
     assert failed[0][0] == "unknown"
 
 
-async def test_fetch_posting_unescapes_html_entities():
+async def test_fetch_posting_returns_text_with_the_markup_removed():
     seen = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -54,7 +54,7 @@ async def test_fetch_posting_unescapes_html_entities():
     async with httpx.AsyncClient(transport=transport) as client:
         content = await fetch_posting(client, "stripe", 42)
 
-    assert content == "R&D team <b>Tokyo</b>"
+    assert content == "R&D team Tokyo"
     assert seen == ["https://boards-api.greenhouse.io/v1/boards/stripe/jobs/42"]
 
 
