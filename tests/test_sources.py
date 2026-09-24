@@ -1,6 +1,15 @@
+import httpx
 import pytest
+from bs4 import BeautifulSoup
 
-from kansei.sources import from_greenhouse, from_lever, html_to_text
+from kansei.sources import (
+    fetch_url,
+    from_greenhouse,
+    from_lever,
+    from_url,
+    html_to_text,
+    page_text,
+)
 
 GREENHOUSE_RAW = {
     "id": 4419,
@@ -24,8 +33,12 @@ LEVER_RAW = {
 }
 
 
-def test_the_two_adapters_produce_exactly_the_same_keys():
-    assert from_greenhouse(GREENHOUSE_RAW, "stripe").keys() == from_lever(LEVER_RAW, "woven-by-toyota").keys()
+def test_every_adapter_produces_exactly_the_same_keys():
+    assert (
+        from_greenhouse(GREENHOUSE_RAW, "stripe").keys()
+        == from_lever(LEVER_RAW, "woven-by-toyota").keys()
+        == from_url(PAGE_WITHOUT_LD, "https://example.com/1").keys()
+    )
 
 
 def test_from_lever_maps_the_fields_that_have_different_names():
@@ -60,3 +73,87 @@ def test_from_greenhouse_stringifies_the_integer_id():
 )
 def test_html_to_text_keeps_the_words_and_drops_the_markup(fragment, expected):
     assert html_to_text(fragment) == expected
+
+
+PAGE_WITH_LD = """
+<html><head><title>Woven by Toyota - バックエンドエンジニア</title>
+<style>.btn {background: #a80014;}</style>
+<script type="application/ld+json">
+{"@context": "http://schema.org", "@type": "JobPosting",
+ "title": "バックエンドエンジニア",
+ "datePosted": "2026-09-01",
+ "jobLocation": {"@type": "Place", "address": {"addressLocality": "東京都中央区"}},
+ "description": "<p>必須条件</p><ul><li>Pythonでの開発経験3年以上</li></ul>"}
+</script>
+<script>window.__STATE__ = {"applied": false};</script>
+</head>
+<body><h1>バックエンドエンジニア</h1>
+<p>必須条件</p><ul><li>Pythonでの開発経験3年以上</li></ul>
+<noscript>JavaScriptを有効にしてください</noscript>
+</body></html>
+"""
+
+PAGE_WITH_GRAPH = """
+<html><head><title>Wantedly</title>
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@graph": [
+  {"@type": "Organization", "name": "株式会社プラーナ"},
+  {"@type": "JobPosting", "title": "事業開発",
+   "datePosted": "2026-09-23T07:15:34.388Z",
+   "jobLocation": {"@type": "Place", "address": {"addressCountry": "JP"}},
+   "description": "心が動く仕事を選びませんか？"}]}
+</script></head>
+<body><h1>事業開発</h1><p>出店戦略と新業態を主導するポジションです。</p></body></html>
+"""
+
+PAGE_WITHOUT_LD = """
+<html><head><title>Job Application for AI Engineer at GitLab</title></head>
+<body><h1>AI Engineer</h1><p>Remote, Bangalore</p></body></html>
+"""
+
+
+def test_page_text_drops_everything_the_browser_never_shows():
+    text = page_text(BeautifulSoup(PAGE_WITH_LD, "html.parser"))
+
+    assert "Pythonでの開発経験3年以上" in text
+    assert "window.__STATE__" not in text
+    assert "@type" not in text
+    assert "#a80014" not in text
+    assert "JavaScriptを有効にしてください" not in text
+
+
+def test_from_url_reads_the_fields_the_page_declares():
+    posting = from_url(PAGE_WITH_LD, "https://jobs.lever.co/woven-by-toyota/abc123")
+
+    assert posting["title"] == "バックエンドエンジニア"
+    assert posting["posted_at"] == "2026-09-01"
+    assert posting["location"] == "東京都中央区"
+    assert posting["token"] == "jobs.lever.co"
+
+
+def test_from_url_finds_the_job_posting_inside_a_graph():
+    posting = from_url(PAGE_WITH_GRAPH, "https://www.wantedly.com/projects/2576097")
+
+    assert posting["title"] == "事業開発"
+    assert posting["location"] == "JP"
+
+
+def test_from_url_takes_the_body_from_the_page_not_the_json_ld_description():
+    posting = from_url(PAGE_WITH_GRAPH, "https://www.wantedly.com/projects/2576097")
+
+    assert "出店戦略と新業態を主導するポジションです。" in posting["description"]
+
+
+def test_from_url_still_produces_a_record_when_the_page_declares_nothing():
+    posting = from_url(PAGE_WITHOUT_LD, "https://job-boards.greenhouse.io/gitlab/jobs/85566")
+
+    assert posting["title"] == "AI Engineer"
+    assert posting["posted_at"] is None
+    assert posting["location"] == ""
+
+
+async def test_fetch_url_refuses_a_response_that_is_not_html():
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"jobs": []}))
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(ValueError, match="application/json"):
+            await fetch_url(client, "https://example.com/1")

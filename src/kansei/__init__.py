@@ -1,6 +1,7 @@
 import asyncio
 import re
 import statistics
+import sys
 import time
 from datetime import datetime
 from typing import Literal
@@ -12,16 +13,20 @@ from pydantic import BaseModel, HttpUrl, ValidationError
 
 from kansei.config import settings
 from kansei.llm import PostingFacts, cost_usd, extract
-from kansei.sources import SOURCES, fetch_posting
+from kansei.sources import (
+    SOURCES,
+    fetch_posting,
+    fetch_url,
+)
 
 
 class JobPosting(BaseModel):
-    source: Literal["greenhouse", "lever"]
+    source: Literal["greenhouse", "lever", "url"]
     token: str
     id: str
     title: str
     url: HttpUrl
-    posted_at: datetime
+    posted_at: datetime | None
     location: str
     description: str | None = None
 
@@ -148,6 +153,28 @@ async def amain() -> None:
     print(f"{needs_jp}/{len(facts)} require Japanese, {remote}/{len(facts)} allow remote")
 
 
+async def ingest_url(url: str) -> None:
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
+        job = JobPosting.model_validate(await fetch_url(http, url))
+        print(f"{job.title} [{job.source}:{job.token}]")
+        print(f"{len(job.description)} chars of posting text")
+
+        llm = AsyncOpenAI(
+            api_key=settings.openai_api_key.get_secret_value(),
+            timeout=settings.llm_timeout,
+        )
+        response, seconds = await extract_one(http, llm, asyncio.Semaphore(1), job)
+
+    facts = response.output_parsed
+    print(f"  japanese: {facts.japanese_required} {facts.japanese_level or ''}")
+    print(f"  skills:   {', '.join(facts.must_have_skills) or '(none)'}")
+    print(f"  summary:  {facts.role_summary}")
+    print(f"{response.usage.input_tokens} input tokens, ${cost_usd(response.usage):.6f}, {seconds:.1f}s")
+
+
 def main() -> None:
-    asyncio.run(amain())
+    if len(sys.argv) > 1:
+        asyncio.run(ingest_url(sys.argv[1]))
+    else:
+        asyncio.run(amain())
 

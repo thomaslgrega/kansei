@@ -1,7 +1,10 @@
 import html
+import json
 from html.parser import HTMLParser
+from urllib.parse import urlsplit
 
 import httpx
+from bs4 import BeautifulSoup
 
 
 class TextOnly(HTMLParser):
@@ -23,6 +26,25 @@ def html_to_text(fragment: str) -> str:
     lines = (line.strip() for line in "".join(parser.parts).splitlines())
     return "\n".join(line for line in lines if line)
 
+
+def page_text(soup: BeautifulSoup) -> str:
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+    return soup.get_text("\n", strip=True)
+
+
+def job_posting_ld(soup: BeautifulSoup) -> dict:
+    for block in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(block.get_text())
+        except json.JSONDecodeError:
+            continue
+        nodes = data.get("@graph", [data]) if isinstance(data, dict) else data
+        for node in nodes:
+            if isinstance(node, dict) and node.get("@type") == "JobPosting":
+                return node
+    return {}
+            
 
 def lever_text(raw: dict) -> str:
     parts = [raw["descriptionPlain"]]
@@ -64,6 +86,23 @@ def from_lever(raw: dict, token: str) -> dict:
     }
 
 
+def from_url(page: str, url: str) -> dict:
+    soup = BeautifulSoup(page, "html.parser")
+    posting = job_posting_ld(soup)
+    address = (posting.get("jobLocation") or {}).get("address") or {}
+    heading = soup.h1 or soup.title
+    return {
+        "source": "url",
+        "token": urlsplit(url).netloc,
+        "id": url,
+        "title": posting.get("title") or (heading.get_text(strip=True) if heading else ""),
+        "url": url,
+        "posted_at": posting.get("datePosted"),
+        "location": address.get("addressLocality") or address.get("addressCountry") or "",
+        "description": page_text(soup)
+    }
+
+
 async def fetch_posting(client: httpx.AsyncClient, token: str, job_id: str) -> str:
     url = f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_id}"
     response = await client.get(url)
@@ -81,6 +120,15 @@ async def fetch_lever(client: httpx.AsyncClient, token: str) -> list[dict]:
     response = await client.get(LEVER_BOARD.format(token=token))
     response.raise_for_status()
     return [from_lever(raw, token) for raw in response.json()]
+
+
+async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
+    response = await client.get(url, follow_redirects=True)
+    response.raise_for_status()
+    content_type = response.headers.get("content-type")
+    if "text/html" not in content_type:
+        raise ValueError(f"{url} returned {content_type or 'no content type'}, not HTML")
+    return from_url(response.text, url)
 
 
 SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever}
