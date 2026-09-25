@@ -33,14 +33,17 @@ async def extract(llm: AsyncOpenAI, posting: str) -> ParsedResponse[PostingFacts
     )
 
 
-PRICE_PER_MTOK = {"input": 0.20, "cached_input": 0.02, "output": 1.20}
-CACHE_WRITE_MULTIPLIER = 1.25
+PRICE_PER_MTOK = {
+    "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "cache_write": 0.25, "output": 1.20},
+    "gpt-6-luna": {"input": 0.10, "cached_input": 0.01, "cache_write": 0.125, "output": 0.50},
+}
 
 
-def cost_usd(usage: ResponseUsage) -> float:
+def cost_usd(usage: ResponseUsage, model: str) -> float:
+    price = PRICE_PER_MTOK[model]
     input_tokens = usage.input_tokens - usage.input_tokens_details.cached_tokens - usage.input_tokens_details.cache_write_tokens
-    input_base_cost = PRICE_PER_MTOK["input"] * input_tokens
-    cached_read_cost = PRICE_PER_MTOK["cached_input"] * usage.input_tokens_details.cached_tokens
-    cached_write_cost = PRICE_PER_MTOK["input"] * CACHE_WRITE_MULTIPLIER * usage.input_tokens_details.cache_write_tokens
-    output_cost = PRICE_PER_MTOK["output"] * usage.output_tokens
+    input_base_cost = price["input"] * input_tokens
+    cached_read_cost = price["cached_input"] * usage.input_tokens_details.cached_tokens
+    cached_write_cost = price["cache_write"] * usage.input_tokens_details.cache_write_tokens
+    output_cost = price["output"] * usage.output_tokens
     return (input_base_cost + cached_read_cost + cached_write_cost + output_cost) / 1_000_000

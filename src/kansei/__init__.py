@@ -133,7 +133,14 @@ async def amain() -> None:
     if len(done) < 2:
         return
 
-    costs = [cost_usd(response.usage) for response, _ in done.values()]
+    costs = [cost_usd(response.usage, response.model) for response, _ in done.values()]
+    usages = [response.usage for response, _ in done.values()]
+    print(
+        f"\ntokens: {sum(u.input_tokens for u in usages)} in "
+        f"({sum(u.input_tokens_details.cached_tokens for u in usages)} cached), "
+        f"{sum(u.output_tokens for u in usages)} out "
+        f"({sum(u.output_tokens_details.reasoning_tokens for u in usages)} reasoning)"
+    )
     latencies = [seconds for _, seconds in done.values()]
     p95 = statistics.quantiles(latencies, n=20)[-1]
 
@@ -169,7 +176,7 @@ async def ingest_url(url: str) -> None:
     print(f"  japanese: {facts.japanese_required} {facts.japanese_level or ''}")
     print(f"  skills:   {', '.join(facts.must_have_skills) or '(none)'}")
     print(f"  summary:  {facts.role_summary}")
-    print(f"{response.usage.input_tokens} input tokens, ${cost_usd(response.usage):.6f}, {seconds:.1f}s")
+    print(f"{response.usage.input_tokens} input tokens, ${cost_usd(response.usage, response.model):.6f}, {seconds:.1f}s")
 
 
 def main() -> None:

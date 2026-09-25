@@ -18,15 +18,27 @@ def usage(*, fresh: int, cached: int = 0, written: int = 0, output: int) -> Resp
     )
 
 
-def test_cost_usd_prices_a_cold_call():
-    assert cost_usd(usage(fresh=1785, output=76)) == pytest.approx(0.0004482)
+@pytest.mark.parametrize(
+    "model, expected",
+    [
+        ("gpt-5.6-luna", 0.0004482),
+        ("gpt-6-luna", 0.0002165),
+    ],
+)
+def test_cost_usd_prices_a_cold_call_at_the_rate_of_the_model_that_answered(model, expected):
+    assert cost_usd(usage(fresh=1785, output=76), model) == pytest.approx(expected)
+
+
+def test_cost_usd_refuses_to_guess_a_price_for_a_model_it_does_not_know():
+    with pytest.raises(KeyError):
+        cost_usd(usage(fresh=1785, output=76), "gpt-321-luna")
 
 
 def test_cost_usd_does_not_charge_cached_tokens_at_the_full_rate():
-    cold = cost_usd(usage(fresh=2000, output=100))
-    warm = cost_usd(usage(fresh=1000, cached=1000, output=100))
+    cold = cost_usd(usage(fresh=2000, output=100), "gpt-6-luna")
+    warm = cost_usd(usage(fresh=1000, cached=1000, output=100), "gpt-6-luna")
     assert warm < cold
 
 
 def test_cost_usd_splits_every_input_token_into_exactly_one_bucket():
-    assert cost_usd(usage(fresh=500, cached=1000, written=500, output=100)) == pytest.approx(0.000365)
+    assert cost_usd(usage(fresh=500, cached=1000, written=500, output=100), "gpt-5.6-luna") == pytest.approx(0.000365)
