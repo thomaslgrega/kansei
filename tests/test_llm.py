@@ -42,3 +42,8 @@ def test_cost_usd_does_not_charge_cached_tokens_at_the_full_rate():
 
 def test_cost_usd_splits_every_input_token_into_exactly_one_bucket():
     assert cost_usd(usage(fresh=500, cached=1000, written=500, output=100), "gpt-5.6-luna") == pytest.approx(0.000365)
+
+
+def test_cost_usd_refuses_to_price_a_long_context_request():
+    with pytest.raises(ValueError, match="long-context"):
+        cost_usd(usage(fresh=272_001, output=100), "gpt-6-luna")

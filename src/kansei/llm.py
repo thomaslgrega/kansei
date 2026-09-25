@@ -38,8 +38,14 @@ PRICE_PER_MTOK = {
     "gpt-6-luna": {"input": 0.10, "cached_input": 0.01, "cache_write": 0.125, "output": 0.50},
 }
 
+LONG_CONTEXT_INPUT_TOKENS = 272_000
 
 def cost_usd(usage: ResponseUsage, model: str) -> float:
+    if usage.input_tokens > LONG_CONTEXT_INPUT_TOKENS:
+        raise ValueError(
+            f"{usage.input_tokens:,} "
+            "long-context threshold, which PRICE_PER_MTOK does not price"
+        )
     price = PRICE_PER_MTOK[model]
     input_tokens = usage.input_tokens - usage.input_tokens_details.cached_tokens - usage.input_tokens_details.cache_write_tokens
     input_base_cost = price["input"] * input_tokens

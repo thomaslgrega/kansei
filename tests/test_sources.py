@@ -152,8 +152,15 @@ def test_from_url_still_produces_a_record_when_the_page_declares_nothing():
     assert posting["location"] == ""
 
 
-async def test_fetch_url_refuses_a_response_that_is_not_html():
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"jobs": []}))
+@pytest.mark.parametrize(
+    "response, reported",
+    [
+        (httpx.Response(200, json={"jobs": []}), "application/json"),
+        (httpx.Response(200, content=b"%PDF-1.7"), "no content type"),
+    ]
+)
+async def test_fetch_url_refuses_a_response_that_is_not_html(response, reported):
+    transport = httpx.MockTransport(lambda request: response)
     async with httpx.AsyncClient(transport=transport) as client:
-        with pytest.raises(ValueError, match="application/json"):
+        with pytest.raises(ValueError, match=reported):
             await fetch_url(client, "https://example.com/1")
