@@ -3,6 +3,7 @@ import re
 import statistics
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from typing import Literal
 
@@ -55,6 +56,14 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
         except ValidationError as exc:
             failed.append((job.get("id", "unknown"), exc.errors()[0]["msg"]))
     return passed, failed
+
+
+def show(facts: PostingFacts) -> None:
+    print(f"  japanese: {facts.japanese_required}, level {facts.japanese_level}, jlpt {facts.jlpt}")
+    print(f"            {facts.japanese_as_written or '(says nothing)'}")
+    print(f"  remote:   {facts.remote_policy}")
+    print(f"  skills:   {', '.join(facts.must_have_skills) or '(none)'}")
+    print(f"  summary:  {facts.role_summary}")
 
 
 async def extract_one(
@@ -127,9 +136,7 @@ async def amain() -> None:
     for job_id, (response, _) in done.items():
         facts = response.output_parsed
         print(f"\n{by_id[job_id].title}")
-        print(f"  japanese: {facts.japanese_required} {facts.japanese_level or ''}")
-        print(f"  skills:   {', '.join(facts.must_have_skills) or '(none)'}")
-        print(f"  summary:  {facts.role_summary}")
+        show(facts)
     if len(done) < 2:
         return
 
@@ -155,9 +162,8 @@ async def amain() -> None:
     )
 
     facts = [response.output_parsed for response, _ in done.values()]
-    needs_jp = sum(1 for f in facts if f.japanese_required == "yes")
-    remote = sum(1 for f in facts if f.remote_allowed)
-    print(f"{needs_jp}/{len(facts)} require Japanese, {remote}/{len(facts)} allow remote")
+    print(f"japanese: {dict(Counter(f.japanese_required for f in facts))}")
+    print(f"remote:   {dict(Counter(f.remote_policy for f in facts))}")
 
 
 async def ingest_url(url: str) -> None:
@@ -172,10 +178,7 @@ async def ingest_url(url: str) -> None:
         )
         response, seconds = await extract_one(http, llm, asyncio.Semaphore(1), job)
 
-    facts = response.output_parsed
-    print(f"  japanese: {facts.japanese_required} {facts.japanese_level or ''}")
-    print(f"  skills:   {', '.join(facts.must_have_skills) or '(none)'}")
-    print(f"  summary:  {facts.role_summary}")
+    show(response.output_parsed)
     print(f"{response.usage.input_tokens} input tokens, ${cost_usd(response.usage, response.model):.6f}, {seconds:.1f}s")
 
 

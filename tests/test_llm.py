@@ -45,5 +45,5 @@ def test_cost_usd_splits_every_input_token_into_exactly_one_bucket():
 
 
 def test_cost_usd_refuses_to_price_a_long_context_request():
-    with pytest.raises(ValueError, match="long-context"):
+    with pytest.raises(ValueError, match="272,001 input tokens is over the 272,000 long-context threshold"):
         cost_usd(usage(fresh=272_001, output=100), "gpt-6-luna")

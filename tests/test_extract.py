@@ -12,9 +12,11 @@ FACTS = PostingFacts(
     role_summary="Builds payment services.",
     seniority="mid",
     must_have_skills=["Python"],
-    japanese_required="no",
-    japanese_level=None,
-    remote_allowed=True,
+    japanese_as_written=None,
+    japanese_required="not_stated",
+    japanese_level="not_stated",
+    jlpt="not_stated",
+    remote_policy="hybrid",
 )
 
 
@@ -88,3 +90,20 @@ def test_no_field_carries_a_default_the_model_would_override():
 
     defaulted = [name for name, f in schema["properties"].items() if "default" in f]
     assert defaulted == []
+
+
+def test_every_enum_has_exactly_one_way_to_say_the_posting_is_silent():
+    schema = to_strict_json_schema(PostingFacts)
+    enums = {name: f["enum"] for name, f in schema["properties"].items() if "enum" in f}
+
+    assert len(enums) == 5
+    for name, values in enums.items():
+        assert "not_stated" in values, name
+        assert not {"unclear", "unknown", "other", "none"} & set(values), name
+
+
+def test_every_enum_carries_its_decision_rule():
+    schema = to_strict_json_schema(PostingFacts)
+
+    missing = [name for name, f in schema["properties"].items() if "enum" in f and not f.get("description")]
+    assert missing == []
