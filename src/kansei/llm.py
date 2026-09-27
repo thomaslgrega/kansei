@@ -6,10 +6,16 @@ from pydantic import BaseModel, Field
 
 from kansei.config import settings
 
+Seniority = Literal["intern", "junior", "mid", "senior", "staff_plus", "not_stated"]
+JapaneseRequired = Literal["required", "preferred", "not_required", "not_stated"]
+JapaneseLevel = Literal["native", "business", "conversational", "basic", "not_stated"]
+Jlpt = Literal["N1", "N2", "N3", "N4", "N5", "not_stated"]
+RemotePolicy = Literal["remote", "hybrid", "onsite", "not_stated"]
+
 
 class PostingFacts(BaseModel):
     role_summary: str = Field(description="One sentence in English, whatever language the posting is in: what this person actually builds.")
-    seniority: Literal["intern", "junior", "mid", "senior", "staff_plus", "not_stated"] = Field(
+    seniority: Seniority = Field(
         description=(
             "The level the title or text names in words: 'Junior'/ジュニア, 'Senior'/シニア, "
             "'Staff' or 'Principal' for staff_plus. Years of experience alone do not set a level, "
@@ -25,17 +31,18 @@ class PostingFacts(BaseModel):
             "Null if it says nothing about the candidate's Japanese."
         )
     )
-    japanese_required: Literal["required", "preferred", "not_required", "not_stated"] = Field(
+    japanese_required: JapaneseRequired = Field(
         description=(
             "required: listed as a requirement (e.g. 'Minimum qualifications', 必須条件). "
             "Slashes between two languages (e.g. 'Business-level English/Japanese') means both are required. "
             "preferred: listed only as a plus (e.g. 'Nice to have', 歓迎条件). "
-            "not_required: the posting says Japanese is not needed. "
+            "A plus is preferred even when the posting adds that it is not required. "
+            "not_required: only for postings that say Japanese isn't needed and don't count it in your favour. "
             "not_stated: it says nothing about the candidate's Japanese. Mentions of Japanese "
             "customers, companies, holidays or résumés are not about the candidate's Japanese."
         )
     )
-    japanese_level: Literal["native", "business", "conversational", "basic", "not_stated"] = Field(
+    japanese_level: JapaneseLevel = Field(
         description=(
             "The level named in words. native: 'native'/ネイティブ. business: 'business level', "
             "'fluent', ビジネスレベル, 流暢. conversational: 'conversational', 'daily conversation', "
@@ -44,13 +51,13 @@ class PostingFacts(BaseModel):
             "A JLPT level alone does not set this field."
         )
     )
-    jlpt: Literal["N1", "N2", "N3", "N4", "N5", "not_stated"] = Field(
+    jlpt: Jlpt = Field(
         description=(
             "The JLPT level named, including 'or equivalent'/相当 and 'or higher'/以上 forms. "
             "not_stated if none is named."
         )
     )
-    remote_policy: Literal["remote", "hybrid", "onsite", "not_stated"] = Field(
+    remote_policy: RemotePolicy = Field(
         description=(
             "remote: no office attendance required. hybrid: some office days required "
             "(e.g. 'the office 3 days per week', 週3日出社). onsite: office or site every working day. "

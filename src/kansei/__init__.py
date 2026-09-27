@@ -66,6 +66,11 @@ def show(facts: PostingFacts) -> None:
     print(f"  summary:  {facts.role_summary}")
 
 
+async def model_input(http: httpx.AsyncClient, job: JobPosting) -> str:
+    posting = job.description or await fetch_posting(http, job.token, job.id)
+    return f"{job.title}\n\n{posting}"
+
+
 async def extract_one(
     http: httpx.AsyncClient,
     llm: AsyncOpenAI,
@@ -73,9 +78,9 @@ async def extract_one(
     job: JobPosting,
 ) -> tuple[ParsedResponse[PostingFacts], float]:
     async with limit:
-        posting = job.description or await fetch_posting(http, job.token, job.id)
+        text = await model_input(http, job)
         started = time.perf_counter()
-        response = await extract(llm, f"{job.title}\n\n{posting}")
+        response = await extract(llm, text)
         return response, time.perf_counter() - started
 
 

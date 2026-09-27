@@ -126,6 +126,8 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
     response = await client.get(url, follow_redirects=True)
     response.raise_for_status()
     content_type = response.headers.get("content-type", "")
+    if response.url.path != httpx.URL(url).path:
+        raise ValueError(f"{url} redirected to {response.url}")
     if "text/html" not in content_type:
         raise ValueError(f"{url} returned {content_type or 'no content type'}, not HTML")
     return from_url(response.text, url)
