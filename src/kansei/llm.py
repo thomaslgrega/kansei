@@ -44,9 +44,15 @@ class PostingFacts(BaseModel):
     )
     japanese_level: JapaneseLevel = Field(
         description=(
-            "The level named in words. native: 'native'/ネイティブ. business: 'business level', "
-            "'fluent', ビジネスレベル, 流暢. conversational: 'conversational', 'daily conversation', "
-            "日常会話. basic: 'basic'/基礎. If one phrase names two levels, take the higher. "
+            "The level named in words. "
+            "native: 'native'/ネイティブ. "
+            "business if: "
+            "1. an explicit business/fluent/ビジネスレベル/流暢 term appears, OR "
+            "2. the posting explicitly requires BOTH professional spoken Japanese "
+            "AND professional written/document-production ability. "
+            "conversational: 'conversational', 'daily conversation', 日常会話."
+            "basic: 'basic'/基礎. "
+            "If one phrase names two levels, take the higher. "
             "not_stated if no level word appears, even when Japanese is required. "
             "A JLPT level alone does not set this field."
         )
@@ -59,9 +65,11 @@ class PostingFacts(BaseModel):
     )
     remote_policy: RemotePolicy = Field(
         description=(
-            "remote: no office attendance required. hybrid: some office days required "
-            "(e.g. 'the office 3 days per week', 週3日出社). onsite: office or site every working day. "
-            "not_stated: the posting does not say. 'Hybrid' describing infrastructure, such as "
+            "remote: no office attendance required. "
+            "hybrid: some office days required (e.g. 'the office 3 days per week', 週3日出社). "
+            "onsite: office or site every working day. "
+            "not_stated: the posting does not say. "
+            "'Hybrid' describing infrastructure, such as "
             "hybrid cloud, is not a work policy. Where the candidate may live is a different "
             "question and does not change this field."
         )
