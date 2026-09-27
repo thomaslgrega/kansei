@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import random
 import re
 import sys
@@ -16,6 +17,7 @@ from kansei.sources import fetch_url
 
 EVALS = Path(__file__).resolve().parents[2] / "evals"
 POSTINGS = EVALS / "postings.jsonl"
+MANIFEST = EVALS / "manifest.jsonl"
 LABELS = EVALS / "labels.jsonl"
 
 IN_JAPAN = re.compile(r"japan|tokyo|日本|東京", re.IGNORECASE)
@@ -33,6 +35,14 @@ class FrozenPosting(BaseModel):
     frozen_at: datetime
 
 
+class ManifestEntry(BaseModel):
+    url: str
+    title: str
+    chars: int
+    sha256: str
+    frozen_at: datetime
+
+
 class Label(BaseModel):
     url: str
     seniority: Seniority
@@ -46,6 +56,22 @@ def add_new(frozen: list[FrozenPosting], fetched: list[FrozenPosting]) -> list[F
     seen = {posting.url for posting in frozen}
     new = {posting.url: posting for posting in fetched if posting.url not in seen}
     return frozen + list(new.values())
+
+
+def manifest_entry(posting: FrozenPosting) -> ManifestEntry:
+    return ManifestEntry(
+        url=posting.url,
+        title=posting.title,
+        chars=len(posting.text),
+        sha256=hashlib.sha256(posting.text.encode("utf-8")).hexdigest(),
+        frozen_at=posting.frozen_at,
+    )
+
+
+def write_manifest() -> None:
+    postings = load(POSTINGS, FrozenPosting)
+    save(MANIFEST, [manifest_entry(posting) for posting in postings])
+    print(f"{len(postings)} postings in {MANIFEST.name}")
 
 
 def load[T: BaseModel](path: Path, model: type[T]) -> list[T]:
@@ -80,6 +106,7 @@ async def freeze(urls: list[str]) -> None:
     merged = add_new(frozen, fetched)
     save(POSTINGS, merged)
     print(f"{len(merged) - len(frozen)} new, {len(frozen)} already frozen, {len(merged)} in {POSTINGS.name}")
+    write_manifest()
 
 
 def ask(field: str, values: tuple[str, ...]) -> str:
@@ -111,10 +138,12 @@ def main() -> None:
     match sys.argv[1:]:
         case ["freeze", *urls]:
             asyncio.run(freeze(urls))
+        case ["manifest"]:
+            write_manifest()
         case ["label", *urls]:
             try:
                 label(urls)
             except (KeyboardInterrupt, EOFError):
                 print("\nstopped. Every label you finished is saved.")
         case _:
-            sys.exit("usage: kansei-eval freeze [URL ...] | kansei-eval label [URL ...]")
+            sys.exit("usage: kansei-eval freeze [URL ...] | kansei-eval label [URL ...] | kansei-eval manifest")
