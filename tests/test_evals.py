@@ -12,6 +12,7 @@ from kansei.evals import (
     add_new,
     load,
     manifest_entry,
+    score,
 )
 
 THEN = datetime(2026, 9, 26, tzinfo=UTC)
@@ -50,3 +51,36 @@ def test_the_local_postings_are_exactly_the_text_the_manifest_records():
     postings = load(POSTINGS, FrozenPosting)
 
     assert [manifest_entry(p) for p in postings] == load(MANIFEST, ManifestEntry)
+
+
+def answers(url: str, **fields: str) -> Label:
+    return Label(**{
+        "url": url,
+        "seniority": "not_stated",
+        "japanese_required": "not_stated",
+        "japanese_level": "not_stated",
+        "jlpt": "not_stated",
+        "remote_policy": "not_stated",
+        **fields,
+    })
+
+def test_score_pairs_each_prediction_with_its_label_by_url_not_by_position():
+    labels = [answers("https://a", jlpt="N1"), answers("https://b")]
+    predictions = [answers("https://b"), answers("https://a", jlpt="N2")]
+
+    wrong = score(labels, predictions)
+
+    assert wrong == {
+        "seniority": [],
+        "japanese_required": [],
+        "japanese_level": [],
+        "jlpt": ["https://a"],
+        "remote_policy": [],
+    }
+
+
+def test_score_refuses_a_run_that_is_missing_a_labeled_posting():
+    labels = [answers("https://a"), answers("https://b")]
+
+    with pytest.raises(ValueError, match=r"^no prediction for https://b$"):
+        score(labels, [answers("https://a")])

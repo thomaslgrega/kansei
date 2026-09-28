@@ -1,24 +1,39 @@
 import asyncio
 import hashlib
+import json
 import random
 import re
 import sys
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import get_args
 
 import httpx
+from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from kansei import JobPosting, fetch_all, is_candidate, model_input, validate
 from kansei.config import settings
-from kansei.llm import JapaneseLevel, JapaneseRequired, Jlpt, RemotePolicy, Seniority
+from kansei.llm import (
+    INSTRUCTIONS,
+    JapaneseLevel,
+    JapaneseRequired,
+    Jlpt,
+    PostingFacts,
+    RemotePolicy,
+    Seniority,
+    cost_usd,
+    extract,
+)
 from kansei.sources import fetch_url
 
 EVALS = Path(__file__).resolve().parents[2] / "evals"
 POSTINGS = EVALS / "postings.jsonl"
 MANIFEST = EVALS / "manifest.jsonl"
 LABELS = EVALS / "labels.jsonl"
+RUNS = EVALS / "runs"
+PROMPTS = EVALS / "prompts"
 
 IN_JAPAN = re.compile(r"japan|tokyo|日本|東京", re.IGNORECASE)
 MARK = re.compile(
@@ -50,6 +65,22 @@ class Label(BaseModel):
     japanese_level: JapaneseLevel
     jlpt: Jlpt
     remote_policy: RemotePolicy
+
+FIELDS = [name for name in Label.model_fields if name != "url"]
+
+
+def score(labels: list[Label], predictions: list[Label]) -> dict[str, list[str]]:
+    predicted = {p.url: p for p in predictions}
+    missing = [label.url for label in labels if label.url not in predicted]
+    if missing:
+        raise ValueError(f"no prediction for {', '.join(missing)}")
+    return {
+        field: [
+            label.url for label in labels
+            if getattr(label, field) != getattr(predicted[label.url], field)
+        ]
+        for field in FIELDS
+    }
 
 
 def add_new(frozen: list[FrozenPosting], fetched: list[FrozenPosting]) -> list[FrozenPosting]:
@@ -117,16 +148,77 @@ def ask(field: str, values: tuple[str, ...]) -> str:
             return values[int(answer) - 1]
 
 
+async def predict(llm: AsyncOpenAI, limit: asyncio.Semaphore, posting: FrozenPosting) -> tuple[Label, float]:
+    async with limit:
+        response = await extract(llm, posting.text)
+        facts = response.output_parsed.model_dump(include=set(FIELDS))
+        return Label(url=posting.url, **facts), cost_usd(response.usage, response.model)
+
+
+async def run() -> None:
+    labeled = {label.url for label in load(LABELS, Label)}
+    postings = [p for p in load(POSTINGS, FrozenPosting) if p.url in labeled]
+    llm = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value(), timeout=settings.llm_timeout)
+    limit = asyncio.Semaphore(settings.llm_concurrency)
+    results = await asyncio.gather(*(predict(llm, limit, p) for p in postings))
+
+    sha, prompt = prompt_snapshot()
+    PROMPTS.mkdir(parents=True, exist_ok=True)
+    (PROMPTS / f"{sha}.json").write_text(prompt + "\n", encoding="utf-8")
+    path = RUNS / f"{datetime.now(UTC):%Y-%m-%dT%H%M%S}-{settings.openai_model}-{sha}.jsonl"
+    save(path, [prediction for prediction, _ in results])
+    print(f"{len(results)} postings, ${sum(cost for _, cost in results):.4f}, saved {path.name}")
+
+
+def print_posting(posting: FrozenPosting) -> None:
+    print("\n" + "=" * 72)
+    for line in posting.text.splitlines():
+        print(("» " if MARK.search(line) else "  ") + line)
+    print(f"\n{posting.url}")
+
+
+def show(urls: list[str]) -> None:
+    for posting in load(POSTINGS, FrozenPosting):
+        if posting.url in urls:
+            print_posting(posting)
+
+
+def report(run: Path) -> None:
+    labels = load(LABELS, Label)
+    predicted = {p.url: p for p in load(run, Label)}
+    wrong = score(labels, list(predicted.values()))
+    titles = {entry.url: entry.title for entry in load(MANIFEST, ManifestEntry)}
+    n = len(labels)
+
+    print(f"{run.name} against {n} labels\n")
+    for field, urls in wrong.items():
+        value, count = Counter(getattr(label, field) for label in labels).most_common(1)[0]
+        right = n - len(urls)
+        print(f"{field:18} {right:2}/{n}    {right / n:4.0%}    always {value}: {count / n:4.0%}")
+
+    by_url = {label.url: label for label in labels}
+    for field, urls in wrong.items():
+        for url in urls:
+            print(f"\n{field}: you {getattr(by_url[url], field)}, model {getattr(predicted[url], field)}")
+            print(f"  {titles[url]}\n  {url}")
+
+
+def prompt_snapshot() -> tuple[str, str]:
+    text = json.dumps(
+        {"instructions": INSTRUCTIONS, "schema": PostingFacts.model_json_schema()},
+        ensure_ascii=False,
+        indent=2,
+    )
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], text
+
+
 def label(urls: list[str]) -> None:
     fields = {name: get_args(f.annotation) for name, f in Label.model_fields.items() if name != "url"}
     done = {label.url for label in load(LABELS, Label)}
     todo = [p for p in load(POSTINGS, FrozenPosting) if p.url not in done and (not urls or p.url in urls)]
 
     for posting in todo:
-        print("\n" + "=" * 72)
-        for line in posting.text.splitlines():
-            print(("» " if MARK.search(line) else "  ") + line)
-        print(f"\n{posting.url}")
+        print_posting(posting)
         answers = {name: ask(name, values) for name, values in fields.items()}
         with LABELS.open("a", encoding="utf-8") as f:
             f.write(Label(url=posting.url, **answers).model_dump_json() + "\n")
@@ -140,6 +232,14 @@ def main() -> None:
             asyncio.run(freeze(urls))
         case ["manifest"]:
             write_manifest()
+        case ["run"]:
+            asyncio.run(run())
+        case ["score"]:
+            report(max(RUNS.glob("*.jsonl")))
+        case ["score", path]:
+            report(Path(path))
+        case ["show", *urls]:
+            show(urls)
         case ["label", *urls]:
             try:
                 label(urls)
