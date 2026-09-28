@@ -37,7 +37,7 @@ PROMPTS = EVALS / "prompts"
 
 IN_JAPAN = re.compile(r"japan|tokyo|日本|東京", re.IGNORECASE)
 MARK = re.compile(
-    r"japanese|日本語|jlpt|remote|hybrid|on-?site|office|リモート|在宅|出社|ハイブリッド"
+    r"japanese|日本語|jlpt|remote|hybrid|on-?site|office|リモート|在宅|出社|ハイブリッド|オフィス|勤務"
     r"|senior|junior|staff|principal|シニア|ジュニア",
     re.IGNORECASE,
 )

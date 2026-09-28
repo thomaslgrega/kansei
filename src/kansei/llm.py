@@ -46,11 +46,8 @@ class PostingFacts(BaseModel):
         description=(
             "The level named in words. "
             "native: 'native'/ネイティブ. "
-            "business if: "
-            "1. an explicit business/fluent/ビジネスレベル/流暢 term appears, OR "
-            "2. the posting explicitly requires BOTH professional spoken Japanese "
-            "AND professional written/document-production ability. "
-            "conversational: 'conversational', 'daily conversation', 日常会話."
+            "business: 'business level', 'fluent', ビジネスレベル, 流暢. "
+            "conversational: 'conversational', 'daily conversation', 日常会話. "
             "basic: 'basic'/基礎. "
             "If one phrase names two levels, take the higher. "
             "not_stated if no level word appears, even when Japanese is required. "
