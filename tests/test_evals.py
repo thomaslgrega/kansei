@@ -84,3 +84,18 @@ def test_score_refuses_a_run_that_is_missing_a_labeled_posting():
 
     with pytest.raises(ValueError, match=r"^no prediction for https://b$"):
         score(labels, [answers("https://a")])
+
+
+def test_every_labeled_skill_is_written_in_its_posting():
+    if not POSTINGS.exists():
+        pytest.skip(f"{POSTINGS.name} is not in the repo; the posting text is kept private")
+
+    text = {p.url: p.text for p in load(POSTINGS, FrozenPosting)}
+    not_found = [
+        (label.url, skill)
+        for label in load(LABELS, Label)
+        for skill in label.must_have_skills or []
+        if skill not in text[label.url]
+    ]
+
+    assert not_found == []

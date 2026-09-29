@@ -23,7 +23,19 @@ class PostingFacts(BaseModel):
         )
     )
     must_have_skills: list[str] = Field(
-        description="Named technologies the posting requires, as written. Empty list if none are named."
+        description=(
+            "Named software the posting lists as required: languages, frameworks, libraries, "
+            "tools, databases, platforms and cloud services, i.e. things you could install, run "
+            "or sign up for. Only from the required list (必須条件, 'Minimum qualifications', "
+            "'What you'll need', 'Requirements'), never from nice-to-haves, duties or boilerplate. "
+            "Every name on a required line counts, including alternatives ('X or Y', または), "
+            "examples ('e.g.', 'such as', 例, など) and the team's stack ('we use X'). "
+            "Not kinds of thing (cloud, containers, CI/CD, infrastructure as code, shell "
+            "scripting, machine learning, LLM APIs), standards or protocols (ISO 26262, CAN), "
+            "methods (Agile, MLOps), or human languages and their tests (Japanese, JLPT, TOEIC). "
+            "One name per item, copied exactly as the posting writes it, typos included. "
+            "Empty list if the required list names none."
+        )
     )
     japanese_as_written: str | None = Field(
         description=(

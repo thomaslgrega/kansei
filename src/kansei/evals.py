@@ -38,7 +38,8 @@ PROMPTS = EVALS / "prompts"
 IN_JAPAN = re.compile(r"japan|tokyo|日本|東京", re.IGNORECASE)
 MARK = re.compile(
     r"japanese|日本語|jlpt|remote|hybrid|on-?site|office|リモート|在宅|出社|ハイブリッド|オフィス|勤務"
-    r"|senior|junior|staff|principal|シニア|ジュニア",
+    r"|senior|junior|staff|principal|シニア|ジュニア"
+    r"|qualifications|nice to have|what you.ll need|必須条件|歓迎条件",
     re.IGNORECASE,
 )
 
@@ -65,8 +66,9 @@ class Label(BaseModel):
     japanese_level: JapaneseLevel
     jlpt: Jlpt
     remote_policy: RemotePolicy
+    must_have_skills: list[str] | None = None
 
-FIELDS = [name for name in Label.model_fields if name != "url"]
+FIELDS = [name for name in Label.model_fields if name not in {"url", "must_have_skills"}]
 
 
 def score(labels: list[Label], predictions: list[Label]) -> dict[str, list[str]]:
@@ -148,6 +150,16 @@ def ask(field: str, values: tuple[str, ...]) -> str:
             return values[int(answer) - 1]
 
 
+def ask_skills(text: str) -> list[str]:
+    while True:
+        answer = input("must_have_skills    comma-separated, exactly as written, empty for none\n ")
+        skills = [skill.strip() for skill in re.split(r"[,、，]", answer) if skill.strip()]
+        missing = [skill for skill in skills if skill not in text]
+        if not missing:
+            return skills
+        print(f"not in the posting as written: {', '.join(missing)}")
+
+
 async def predict(llm: AsyncOpenAI, limit: asyncio.Semaphore, posting: FrozenPosting) -> tuple[Label, float]:
     async with limit:
         response = await extract(llm, posting.text)
@@ -214,17 +226,33 @@ def prompt_snapshot() -> tuple[str, str]:
 
 
 def label(urls: list[str]) -> None:
-    fields = {name: get_args(f.annotation) for name, f in Label.model_fields.items() if name != "url"}
+    fields = {name: get_args(Label.model_fields[name].annotation) for name in FIELDS}
     done = {label.url for label in load(LABELS, Label)}
     todo = [p for p in load(POSTINGS, FrozenPosting) if p.url not in done and (not urls or p.url in urls)]
 
     for posting in todo:
         print_posting(posting)
         answers = {name: ask(name, values) for name, values in fields.items()}
+        answers["must_have_skills"] = ask_skills(posting.text)
         with LABELS.open("a", encoding="utf-8") as f:
             f.write(Label(url=posting.url, **answers).model_dump_json() + "\n")
         done.add(posting.url)
         print(f"saved: {len(done)} labeled")
+
+
+def label_skills(urls: list[str]) -> None:
+    labels = {label.url: label for label in load(LABELS, Label)}
+    todo = [
+        p for p in load(POSTINGS, FrozenPosting)
+        if p.url in labels and labels[p.url].must_have_skills is None and (not urls or p.url in urls)
+    ]
+
+    for posting in todo:
+        print_posting(posting)
+        labels[posting.url].must_have_skills = ask_skills(posting.text)
+        save(LABELS, list(labels.values()))
+        done = sum(label.must_have_skills is not None for label in labels.values())
+        print(f"saved: {done} of {len(labels)} have skills")
 
 
 def main() -> None:
@@ -246,5 +274,10 @@ def main() -> None:
                 label(urls)
             except (KeyboardInterrupt, EOFError):
                 print("\nstopped. Every label you finished is saved.")
+        case ["skills", *urls]:
+            try:
+                label_skills(urls)
+            except (KeyboardInterrupt, EOFError):
+                print("\nstopped. Every posting you finished is saved.")
         case _:
-            sys.exit("usage: kansei-eval freeze [URL ...] | kansei-eval label [URL ...] | kansei-eval manifest")
+            sys.exit("usage: kansei-eval freeze [URL ...] | label [URL ...] | skills [URL ...] | manifest | run | score [RUN] | show URL ...")
