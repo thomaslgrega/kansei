@@ -184,13 +184,14 @@ def show(urls: list[str]) -> None:
 
 
 def report(run: Path) -> None:
-    labels = load(LABELS, Label)
     predicted = {p.url: p for p in load(run, Label)}
+    everything = load(LABELS, Label)
+    labels = [label for label in everything if label.url in predicted]
     wrong = score(labels, list(predicted.values()))
     titles = {entry.url: entry.title for entry in load(MANIFEST, ManifestEntry)}
     n = len(labels)
 
-    print(f"{run.name} against {n} labels\n")
+    print(f"{run.name} against {n} of {len(everything)} labels\n")
     for field, urls in wrong.items():
         value, count = Counter(getattr(label, field) for label in labels).most_common(1)[0]
         right = n - len(urls)
