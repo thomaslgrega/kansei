@@ -7,7 +7,7 @@ import sys
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import get_args
+from typing import NamedTuple, get_args
 
 import httpx
 from openai import AsyncOpenAI
@@ -71,6 +71,12 @@ class Label(BaseModel):
 FIELDS = [name for name in Label.model_fields if name not in {"url", "must_have_skills"}]
 
 
+class SkillDiff(NamedTuple):
+    found: set[str]
+    extra: set[str]
+    missed: set[str]
+
+
 def score(labels: list[Label], predictions: list[Label]) -> dict[str, list[str]]:
     predicted = {p.url: p for p in predictions}
     missing = [label.url for label in labels if label.url not in predicted]
@@ -83,6 +89,28 @@ def score(labels: list[Label], predictions: list[Label]) -> dict[str, list[str]]
         ]
         for field in FIELDS
     }
+
+
+def compare_skills(labels: list[Label], predictions: list[Label]) -> dict[str, SkillDiff]:
+    predicted = {p.url: p.must_have_skills for p in predictions}
+    diffs = {}
+    for label in labels:
+        want, got = label.must_have_skills, predicted[label.url]
+        if want is None or got is None:
+            continue
+        want, got = set(want), set(got)
+        diffs[label.url] = SkillDiff(found=want & got, extra=got - want, missed=want - got)
+    return diffs
+
+
+def precision_recall_f1(diffs: list[SkillDiff]) -> tuple[float, float, float]:
+    found = sum(len(d.found) for d in diffs)
+    extra = sum(len(d.extra) for d in diffs)
+    missed = sum(len(d.missed) for d in diffs)
+    precision = found / (found + extra) if found + extra else 0.0
+    recall = found / (found + missed) if found + missed else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return precision, recall, f1
 
 
 def add_new(frozen: list[FrozenPosting], fetched: list[FrozenPosting]) -> list[FrozenPosting]:
@@ -163,7 +191,7 @@ def ask_skills(text: str) -> list[str]:
 async def predict(llm: AsyncOpenAI, limit: asyncio.Semaphore, posting: FrozenPosting) -> tuple[Label, float]:
     async with limit:
         response = await extract(llm, posting.text)
-        facts = response.output_parsed.model_dump(include=set(FIELDS))
+        facts = response.output_parsed.model_dump(include=set(Label.model_fields))
         return Label(url=posting.url, **facts), cost_usd(response.usage, response.model)
 
 
@@ -213,6 +241,20 @@ def report(run: Path) -> None:
     for field, urls in wrong.items():
         for url in urls:
             print(f"\n{field}: you {getattr(by_url[url], field)}, model {getattr(predicted[url], field)}")
+            print(f"  {titles[url]}\n  {url}")
+    diffs = compare_skills(labels, list(predicted.values()))
+    if diffs:
+        precision, recall, f1 = precision_recall_f1(list(diffs.values()))
+        print(f"{'must_have_skills':18} P {precision:4.0%}  R {recall:4.0%}  F1 {f1:4.0%}    {len(diffs)} postings")
+        found, extra, missed = (sum(len(d[i]) for d in diffs.values()) for i in range(3))
+        print(f"{'':18} {found} found, {extra} extra, {missed} missed")
+    else:
+        print(f"{'must_have_skills':18} not in this run")
+    for url, diff in diffs.items():
+        if diff.extra or diff.missed:
+            extra = ", ".join(sorted(diff.extra)) or "-"
+            missed = ", ".join(sorted(diff.missed)) or "-"
+            print(f"\nmust_have_skills: model extra {extra} | missed {missed}")
             print(f"  {titles[url]}\n  {url}")
 
 

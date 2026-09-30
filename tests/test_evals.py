@@ -9,9 +9,12 @@ from kansei.evals import (
     FrozenPosting,
     Label,
     ManifestEntry,
+    SkillDiff,
     add_new,
+    compare_skills,
     load,
     manifest_entry,
+    precision_recall_f1,
     score,
 )
 
@@ -53,7 +56,7 @@ def test_the_local_postings_are_exactly_the_text_the_manifest_records():
     assert [manifest_entry(p) for p in postings] == load(MANIFEST, ManifestEntry)
 
 
-def answers(url: str, **fields: str) -> Label:
+def answers(url: str, **fields: str | list[str]) -> Label:
     return Label(**{
         "url": url,
         "seniority": "not_stated",
@@ -99,3 +102,24 @@ def test_every_labeled_skill_is_written_in_its_posting():
     ]
 
     assert not_found == []
+
+
+def test_skills_score_as_sets_of_exact_names_and_skip_unlabeled_postings():
+    labels = [
+        answers("https://a", must_have_skills=["Python", "Go", "Basel"]),
+        answers("https://b", must_have_skills=[]),
+        answers("https://c"),
+    ]
+    predictions = [
+        answers("https://a", must_have_skills=["Go", "Python", "Bazel"]),
+        answers("https://b", must_have_skills=["Google Meet"]),
+        answers("https://c", must_have_skills=["Rust"]),
+    ]
+
+    diffs = compare_skills(labels, predictions)
+
+    assert diffs == {
+        "https://a": SkillDiff(found={"Python", "Go"}, extra={"Bazel"}, missed={"Basel"}),
+        "https://b": SkillDiff(found=set(), extra={"Google Meet"}, missed=set()),
+    }
+    assert precision_recall_f1(list(diffs.values())) == pytest.approx((1/2, 2/3, 4/7))
