@@ -1,0 +1,104 @@
+{
+  "instructions": "You read job postings for a software engineer who lives in Japan.\nExtract only what the posting actually states. Do not infer, and do not fill a\nfield from general knowledge about the company.",
+  "schema": {
+    "properties": {
+      "role_summary": {
+        "description": "One sentence in English, whatever language the posting is in: what this person actually builds.",
+        "title": "Role Summary",
+        "type": "string"
+      },
+      "seniority": {
+        "description": "The level the title or text names in words: 'Junior'/ジュニア, 'Senior'/シニア, 'Staff' or 'Principal' for staff_plus. Years of experience alone do not set a level, and neither does 'Lead'. not_stated if no level word appears.",
+        "enum": [
+          "intern",
+          "junior",
+          "mid",
+          "senior",
+          "staff_plus",
+          "not_stated"
+        ],
+        "title": "Seniority",
+        "type": "string"
+      },
+      "must_have_skills": {
+        "description": "Named software the posting lists as required: languages, frameworks, libraries, tools, databases, platforms and cloud services, i.e. things you could install, run or sign up for. Only from the required list (必須条件, 'Minimum qualifications', 'What you'll need', 'Requirements'), never from nice-to-haves, duties or boilerplate. Every name on a required line counts, including alternatives ('X or Y', または), examples ('e.g.', 'such as', 例, など) and the team's stack ('we use X'). Not kinds of thing (cloud, containers, CI/CD, infrastructure as code, shell scripting, machine learning, LLM APIs), standards or protocols (ISO 26262, CAN), methods (Agile, MLOps), or human languages and their tests (Japanese, JLPT, TOEIC). One name per item, copied exactly as the posting writes it, typos included. Empty list if the required list names none.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Must Have Skills",
+        "type": "array"
+      },
+      "japanese_as_written": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The posting's own words about the candidate's Japanese ability, copied exactly. Null if it says nothing about the candidate's Japanese.",
+        "title": "Japanese As Written"
+      },
+      "japanese_required": {
+        "description": "required: listed as a requirement (e.g. 'Minimum qualifications', 必須条件). Slashes between two languages (e.g. 'Business-level English/Japanese') means both are required. preferred: listed only as a plus (e.g. 'Nice to have', 歓迎条件). A plus is preferred even when the posting adds that it is not required. not_required: only for postings that say Japanese isn't needed and don't count it in your favour. not_stated: it says nothing about the candidate's Japanese. Mentions of Japanese customers, companies, holidays or résumés are not about the candidate's Japanese.",
+        "enum": [
+          "required",
+          "preferred",
+          "not_required",
+          "not_stated"
+        ],
+        "title": "Japanese Required",
+        "type": "string"
+      },
+      "japanese_level": {
+        "description": "The level named in words. native: 'native'/ネイティブ. business: 'business level', 'fluent', ビジネスレベル, 流暢. conversational: 'conversational', 'daily conversation', 日常会話. basic: 'basic'/基礎. If one phrase names two levels, take the higher. not_stated if no level word appears, even when Japanese is required. A JLPT level alone does not set this field.",
+        "enum": [
+          "native",
+          "business",
+          "conversational",
+          "basic",
+          "not_stated"
+        ],
+        "title": "Japanese Level",
+        "type": "string"
+      },
+      "jlpt": {
+        "description": "The JLPT level named, including 'or equivalent'/相当 and 'or higher'/以上 forms. not_stated if none is named.",
+        "enum": [
+          "N1",
+          "N2",
+          "N3",
+          "N4",
+          "N5",
+          "not_stated"
+        ],
+        "title": "Jlpt",
+        "type": "string"
+      },
+      "remote_policy": {
+        "description": "remote: no office attendance required. hybrid: some office days required (e.g. 'the office 3 days per week', 週3日出社). onsite: office or site every working day. not_stated: the posting does not say. 'Hybrid' describing infrastructure, such as hybrid cloud, is not a work policy. Where the candidate may live is a different question and does not change this field.",
+        "enum": [
+          "remote",
+          "hybrid",
+          "onsite",
+          "not_stated"
+        ],
+        "title": "Remote Policy",
+        "type": "string"
+      }
+    },
+    "required": [
+      "role_summary",
+      "seniority",
+      "must_have_skills",
+      "japanese_as_written",
+      "japanese_required",
+      "japanese_level",
+      "jlpt",
+      "remote_policy"
+    ],
+    "title": "PostingFacts",
+    "type": "object"
+  }
+}
