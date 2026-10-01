@@ -7,7 +7,7 @@ import sys
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import NamedTuple, get_args
+from typing import Literal, NamedTuple, get_args
 
 import httpx
 from openai import AsyncOpenAI
@@ -33,6 +33,7 @@ POSTINGS = EVALS / "postings.jsonl"
 MANIFEST = EVALS / "manifest.jsonl"
 LABELS = EVALS / "labels.jsonl"
 RUNS = EVALS / "runs"
+HOLDOUT_RUNS = RUNS / "holdout"
 PROMPTS = EVALS / "prompts"
 
 IN_JAPAN = re.compile(r"japan|tokyo|日本|東京", re.IGNORECASE)
@@ -42,6 +43,9 @@ MARK = re.compile(
     r"|qualifications|nice to have|what you.ll need|必須条件|歓迎条件",
     re.IGNORECASE,
 )
+HOLDOUT_BOARDS = ["lever:mujininc", "greenhouse:databricks", "greenhouse:datadog", "greenhouse:paypaycard"]
+
+Split = Literal["dev", "holdout"]
 
 
 class FrozenPosting(BaseModel):
@@ -49,6 +53,7 @@ class FrozenPosting(BaseModel):
     title: str
     text: str
     frozen_at: datetime
+    split: Split = "dev"
 
 
 class ManifestEntry(BaseModel):
@@ -57,6 +62,7 @@ class ManifestEntry(BaseModel):
     chars: int
     sha256: str
     frozen_at: datetime
+    split: Split = "dev"
 
 
 class Label(BaseModel):
@@ -122,6 +128,16 @@ def skill_misses(labels: list[Label], runs: list[list[Label]]) -> Counter[str]:
     return misses
 
 
+def per_board(jobs: list[JobPosting], k: int) -> list[JobPosting]:
+    taken = Counter()
+    picked = []
+    for job in jobs:
+        if taken[job.token] < k:
+            taken[job.token] += 1
+            picked.append(job)
+    return picked
+
+
 def add_new(frozen: list[FrozenPosting], fetched: list[FrozenPosting]) -> list[FrozenPosting]:
     seen = {posting.url for posting in frozen}
     new = {posting.url: posting for posting in fetched if posting.url not in seen}
@@ -135,6 +151,7 @@ def manifest_entry(posting: FrozenPosting) -> ManifestEntry:
         chars=len(posting.text),
         sha256=hashlib.sha256(posting.text.encode("utf-8")).hexdigest(),
         frozen_at=posting.frozen_at,
+        split=posting.split,
     )
 
 
@@ -156,11 +173,16 @@ def save(path: Path, records: list[BaseModel]) -> None:
     path.write_text("".join(r.model_dump_json() + "\n" for r in records), encoding="utf-8")
 
 
-async def freeze(urls: list[str]) -> None:
-    results = await fetch_all(settings.boards)
+async def freeze(boards: list[str], urls: list[str], split: Split = "dev", k: int | None = None) -> None:
+    results = await fetch_all(boards)
+    for board, result in results.items():
+        if isinstance(result, Exception):
+            print(f"skipped {board}: {result}")
     jobs = [job for r in results.values() if not isinstance(r, Exception) for job in validate(r)[0]]
     in_japan = [job for job in jobs if is_candidate(job) and IN_JAPAN.search(job.location)]
     random.Random(17).shuffle(in_japan)
+    if k is not None:
+        in_japan = per_board(in_japan, k)
 
     async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
         pasted = [JobPosting.model_validate(await fetch_url(http, url)) for url in urls]
@@ -169,7 +191,7 @@ async def freeze(urls: list[str]) -> None:
 
     now = datetime.now(UTC)
     fetched = [
-        FrozenPosting(url=str(job.url), title=job.title, text=text, frozen_at=now)
+        FrozenPosting(url=str(job.url), title=job.title, text=text, frozen_at=now, split=split)
         for job, text in zip(selected, texts)
     ]
     frozen = load(POSTINGS, FrozenPosting)
@@ -204,9 +226,9 @@ async def predict(llm: AsyncOpenAI, limit: asyncio.Semaphore, posting: FrozenPos
         return Label(url=posting.url, **facts), cost_usd(response.usage, response.model)
 
 
-async def run() -> None:
+async def run(split: Split) -> None:
     labeled = {label.url for label in load(LABELS, Label)}
-    postings = [p for p in load(POSTINGS, FrozenPosting) if p.url in labeled]
+    postings = [p for p in load(POSTINGS, FrozenPosting) if p.url in labeled and p.split == split]
     llm = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value(), timeout=settings.llm_timeout)
     limit = asyncio.Semaphore(settings.llm_concurrency)
     results = await asyncio.gather(*(predict(llm, limit, p) for p in postings))
@@ -214,7 +236,8 @@ async def run() -> None:
     sha, prompt = prompt_snapshot()
     PROMPTS.mkdir(parents=True, exist_ok=True)
     (PROMPTS / f"{sha}.json").write_text(prompt + "\n", encoding="utf-8")
-    path = RUNS / f"{datetime.now(UTC):%Y-%m-%dT%H%M%S}-{settings.openai_model}-{sha}.jsonl"
+    runs = HOLDOUT_RUNS if split == "holdout" else RUNS
+    path = runs / f"{datetime.now(UTC):%Y-%m-%dT%H%M%S}-{settings.openai_model}-{sha}.jsonl"
     save(path, [prediction for prediction, _ in results])
     print(f"{len(results)} postings, ${sum(cost for _, cost in results):.4f}, saved {path.name}")
 
@@ -294,10 +317,10 @@ def prompt_snapshot() -> tuple[str, str]:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], text
 
 
-def label(urls: list[str]) -> None:
+def label(urls: list[str], split: Split = "dev") -> None:
     fields = {name: get_args(Label.model_fields[name].annotation) for name in FIELDS}
     done = {label.url for label in load(LABELS, Label)}
-    todo = [p for p in load(POSTINGS, FrozenPosting) if p.url not in done and (not urls or p.url in urls)]
+    todo = [p for p in load(POSTINGS, FrozenPosting) if p.url not in done and p.split == split and (not urls or p.url in urls)]
 
     for posting in todo:
         print_posting(posting)
@@ -327,11 +350,15 @@ def label_skills(urls: list[str]) -> None:
 def main() -> None:
     match sys.argv[1:]:
         case ["freeze", *urls]:
-            asyncio.run(freeze(urls))
+            asyncio.run(freeze(settings.boards, urls))
+        case ["holdout"]:
+            asyncio.run(freeze(HOLDOUT_BOARDS, [], "holdout", k=3))
         case ["manifest"]:
             write_manifest()
         case ["run"]:
-            asyncio.run(run())
+            asyncio.run(run("dev"))
+        case ["run", "holdout"]:
+            asyncio.run(run("holdout"))
         case ["score"]:
             report(max(RUNS.glob("*.jsonl")))
         case ["score", path]:
@@ -340,6 +367,11 @@ def main() -> None:
             compare(old, new)
         case ["show", *urls]:
             show(urls)
+        case ["label", *urls]:
+            try:
+                label([], "holdout")
+            except (KeyboardInterrupt, EOFError):
+                print("\nstopped. Every label you finished is saved.")
         case ["label", *urls]:
             try:
                 label(urls)
@@ -351,4 +383,4 @@ def main() -> None:
             except (KeyboardInterrupt, EOFError):
                 print("\nstopped. Every posting you finished is saved.")
         case _:
-            sys.exit("usage: kansei-eval freeze [URL ...] | label [URL ...] | skills [URL ...] | manifest | run | score [RUN] | compare OLD NEW | show URL ...")
+            sys.exit("usage: kansei-eval freeze [URL ...] | holdout | label [holdout | URL ...] | skills [URL ...] | manifest | run [holdout] | score [RUN] | compare OLD NEW | show URL ...")

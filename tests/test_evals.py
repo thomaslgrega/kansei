@@ -6,6 +6,7 @@ from kansei.evals import (
     LABELS,
     MANIFEST,
     POSTINGS,
+    RUNS,
     FrozenPosting,
     Label,
     ManifestEntry,
@@ -14,6 +15,7 @@ from kansei.evals import (
     compare_skills,
     load,
     manifest_entry,
+    per_board,
     precision_recall_f1,
     score,
     skill_misses,
@@ -141,3 +143,30 @@ def test_skill_misses_counts_runs_per_posting_not_names():
 
     runs = [[joined, go, rust], [split, go_shell, rust], [only_c, go, rust]]
     assert skill_misses(labels, runs) == {"https://a": 2, "https://b": 1}
+
+
+def test_per_board_keeps_the_first_k_of_each_board_in_order(make_posting):
+    jobs = [
+        make_posting(token="a", id="a1"),
+        make_posting(token="b", id="b1"),
+        make_posting(token="a", id="a2"),
+        make_posting(token="a", id="a3"),
+        make_posting(token="c", id="c1"),
+        make_posting(token="b", id="b2"),
+        make_posting(token="b", id="b3"),
+    ]
+
+    picked = per_board(jobs, k=2)
+
+    assert [job.id for job in picked] == ["a1", "b1", "a2", "c1", "b2"]
+
+
+def test_no_dev_run_has_seen_a_holdout_posting():
+    holdout = {entry.url for entry in load(MANIFEST, ManifestEntry) if entry.split == "holdout"}
+    seen = {
+        prediction.url
+        for path in RUNS.glob("*.jsonl")
+        for prediction in load(path, Label)
+    }
+
+    assert seen & holdout == set()
