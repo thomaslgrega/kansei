@@ -34,6 +34,8 @@ class PostingFacts(BaseModel):
             "scripting, machine learning, LLM APIs), standards or protocols (ISO 26262, CAN), "
             "methods (Agile, MLOps), or human languages and their tests (Japanese, JLPT, TOEIC). "
             "One name per item, copied exactly as the posting writes it, typos included. "
+            "Names joined by a slash are separate items: HTML/CSS is HTML and CSS. "
+            "A bare 'Shell' is a kind of thing too, even in a list of languages; a named shell such as zsh is software. "
             "Empty list if the required list names none."
         )
     )
