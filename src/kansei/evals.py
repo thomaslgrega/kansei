@@ -113,6 +113,15 @@ def precision_recall_f1(diffs: list[SkillDiff]) -> tuple[float, float, float]:
     return precision, recall, f1
 
 
+def skill_misses(labels: list[Label], runs: list[list[Label]]) -> Counter[str]:
+    misses = Counter()
+    for predictions in runs:
+        for url, diff in compare_skills(labels, predictions).items():
+            if diff.extra or diff.missed:
+                misses[url] += 1
+    return misses
+
+
 def add_new(frozen: list[FrozenPosting], fetched: list[FrozenPosting]) -> list[FrozenPosting]:
     seen = {posting.url for posting in frozen}
     new = {posting.url: posting for posting in fetched if posting.url not in seen}
@@ -258,6 +267,24 @@ def report(run: Path) -> None:
             print(f"  {titles[url]}\n  {url}")
 
 
+def compare(old: str, new: str) -> None:
+    runs = {sha: [load(path, Label) for path in sorted(RUNS.glob(f"*-{settings.openai_model}-{sha}.jsonl"))] for sha in (old, new)}
+    if missing := [sha for sha, found in runs.items() if not found]:
+        sys.exit(f"no runs for prompt {', '.join(missing)}")
+    covered = set.intersection(*({p.url for p in run} for found in runs.values() for run in found))
+    labels = [label for label in load(LABELS, Label) if label.url in covered]
+    titles = {entry.url: entry.title for entry in load(MANIFEST, ManifestEntry)}
+
+    for sha, found in runs.items():
+        f1s = [precision_recall_f1(list(compare_skills(labels, run).values()))[2] for run in found]
+        print(f"{sha}  F1 " + " ".join(f"{f1:.1%}" for f1 in f1s))
+
+    misses = {sha: skill_misses(labels, found) for sha, found in runs.items()}
+    print(f"\n{old}    {new}    runs that got the skills wrong, {len(labels)} postings")
+    for url in sorted(misses[old] | misses[new], key=titles.get):
+        print(f"{misses[old][url]:>6}/{len(runs[old])}    {misses[new][url]:>6}/{len(runs[new])}    {titles[url]}")
+
+
 def prompt_snapshot() -> tuple[str, str]:
     text = json.dumps(
         {"instructions": INSTRUCTIONS, "schema": PostingFacts.model_json_schema()},
@@ -309,6 +336,8 @@ def main() -> None:
             report(max(RUNS.glob("*.jsonl")))
         case ["score", path]:
             report(Path(path))
+        case ["compare", old, new]:
+            compare(old, new)
         case ["show", *urls]:
             show(urls)
         case ["label", *urls]:
@@ -322,4 +351,4 @@ def main() -> None:
             except (KeyboardInterrupt, EOFError):
                 print("\nstopped. Every posting you finished is saved.")
         case _:
-            sys.exit("usage: kansei-eval freeze [URL ...] | label [URL ...] | skills [URL ...] | manifest | run | score [RUN] | show URL ...")
+            sys.exit("usage: kansei-eval freeze [URL ...] | label [URL ...] | skills [URL ...] | manifest | run | score [RUN] | compare OLD NEW | show URL ...")

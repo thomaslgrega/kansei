@@ -16,6 +16,7 @@ from kansei.evals import (
     manifest_entry,
     precision_recall_f1,
     score,
+    skill_misses,
 )
 
 THEN = datetime(2026, 9, 26, tzinfo=UTC)
@@ -123,3 +124,20 @@ def test_skills_score_as_sets_of_exact_names_and_skip_unlabeled_postings():
         "https://b": SkillDiff(found=set(), extra={"Google Meet"}, missed=set()),
     }
     assert precision_recall_f1(list(diffs.values())) == pytest.approx((1/2, 2/3, 4/7))
+
+
+def test_skill_misses_counts_runs_per_posting_not_names():
+    labels = [
+        answers("https://a", must_have_skills=["C", "C++"]),
+        answers("https://b", must_have_skills=["Go"]),
+        answers("https://c"),
+    ]
+    split = answers("https://a", must_have_skills=["C", "C++"])
+    joined = answers("https://a", must_have_skills=["C/C++"])
+    only_c = answers("https://a", must_have_skills=["C"])
+    go = answers("https://b", must_have_skills=["Go"])
+    go_shell = answers("https://b", must_have_skills=["Go", "Shell"])
+    rust = answers("https://c", must_have_skills=["Rust"])
+
+    runs = [[joined, go, rust], [split, go_shell, rust], [only_c, go, rust]]
+    assert skill_misses(labels, runs) == {"https://a": 2, "https://b": 1}
