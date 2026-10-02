@@ -33,7 +33,7 @@ POSTINGS = EVALS / "postings.jsonl"
 MANIFEST = EVALS / "manifest.jsonl"
 LABELS = EVALS / "labels.jsonl"
 RUNS = EVALS / "runs"
-HOLDOUT_RUNS = RUNS / "holdout"
+TEST_RUNS = RUNS / "test"
 PROMPTS = EVALS / "prompts"
 
 IN_JAPAN = re.compile(r"japan|tokyo|日本|東京", re.IGNORECASE)
@@ -43,9 +43,9 @@ MARK = re.compile(
     r"|qualifications|nice to have|what you.ll need|必須条件|歓迎条件",
     re.IGNORECASE,
 )
-HOLDOUT_BOARDS = ["lever:mujininc", "greenhouse:databricks", "greenhouse:datadog", "greenhouse:paypaycard"]
+TEST_BOARDS = ["lever:mujininc", "greenhouse:databricks", "greenhouse:datadog", "greenhouse:paypaycard"]
 
-Split = Literal["dev", "holdout"]
+Split = Literal["dev", "test"]
 
 
 class FrozenPosting(BaseModel):
@@ -236,7 +236,7 @@ async def run(split: Split) -> None:
     sha, prompt = prompt_snapshot()
     PROMPTS.mkdir(parents=True, exist_ok=True)
     (PROMPTS / f"{sha}.json").write_text(prompt + "\n", encoding="utf-8")
-    runs = HOLDOUT_RUNS if split == "holdout" else RUNS
+    runs = TEST_RUNS if split == "test" else RUNS
     path = runs / f"{datetime.now(UTC):%Y-%m-%dT%H%M%S}-{settings.openai_model}-{sha}.jsonl"
     save(path, [prediction for prediction, _ in results])
     print(f"{len(results)} postings, ${sum(cost for _, cost in results):.4f}, saved {path.name}")
@@ -353,14 +353,14 @@ def main() -> None:
     match sys.argv[1:]:
         case ["freeze", *urls]:
             asyncio.run(freeze(settings.boards, urls))
-        case ["holdout"]:
-            asyncio.run(freeze(HOLDOUT_BOARDS, [], "holdout", k=3))
+        case ["freeze-test"]:
+            asyncio.run(freeze(TEST_BOARDS, [], "test", k=3))
         case ["manifest"]:
             write_manifest()
         case ["run"]:
             asyncio.run(run("dev"))
-        case ["run", "holdout"]:
-            asyncio.run(run("holdout"))
+        case ["run", "test"]:
+            asyncio.run(run("test"))
         case ["score"]:
             report(max(RUNS.glob("*.jsonl")))
         case ["score", path]:
@@ -369,9 +369,9 @@ def main() -> None:
             compare(old, new)
         case ["show", *urls]:
             show(urls)
-        case ["label", "holdout"]:
+        case ["label", "test"]:
             try:
-                label([], "holdout")
+                label([], "test")
             except (KeyboardInterrupt, EOFError):
                 print("\nstopped. Every label you finished is saved.")
         case ["label", *urls]:
@@ -385,4 +385,4 @@ def main() -> None:
             except (KeyboardInterrupt, EOFError):
                 print("\nstopped. Every posting you finished is saved.")
         case _:
-            sys.exit("usage: kansei-eval freeze [URL ...] | holdout | label [holdout | URL ...] | skills [URL ...] | manifest | run [holdout] | score [RUN] | compare OLD NEW | show URL ...")
+            sys.exit("usage: kansei-eval freeze [URL ...] | freeze-test | label [test | URL ...] | skills [URL ...] | manifest | run [test] | score [RUN] | compare OLD NEW | show URL ...")

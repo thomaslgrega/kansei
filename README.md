@@ -59,12 +59,12 @@ These postings helped shape the rules, so the scores show improvement on the dev
 
 The repo includes:
 
-- `evals/manifest.jsonl`: posting URLs, titles, text lengths, SHA-256 hashes, freeze dates, and development or held-out split.
+- `evals/manifest.jsonl`: posting URLs, titles, text lengths, SHA-256 hashes, freeze dates, and development or test split.
 - `evals/labels.jsonl`: my labels.
 - `evals/prompts/`: saved instructions and schemas.
 - `evals/runs/`: model answers from each run.
 
-The full posting text stays in a local, gitignored file, `evals/postings.jsonl`. It isn't published because the employers wrote it. Tests check that the local text matches the manifest and that development runs contain no held-out postings.
+The full posting text stays in a local, gitignored file, `evals/postings.jsonl`. It isn't published because the employers wrote it. Tests check that the local text matches the manifest and that development runs contain no test-set postings.
 
 To check the saved results without making API calls:
 
