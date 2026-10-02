@@ -1,54 +1,96 @@
 # Kansei
 
-Kansei is a small Python tool I'm building to make engineering job postings in Japan easier to understand, whether they're written in Japanese or English. It started with a practical question from my own job search: what does a posting actually require, and is it a role I can apply for?
+Kansei is a Python CLI that reads engineering job postings in Japanese and English. I'm building it for my own job search in Japan, where I want to quickly find the skills, Japanese level, and work arrangements a role requires.
 
 ## What it does
 
-- Reads postings from public Greenhouse and Lever boards, or from a job page URL you provide.
-- Cleans up HTML and brings the different sources into one validated posting format. For job pages, it also uses `JobPosting` structured data when available.
-- Uses OpenAI structured output to extract a role summary, seniority, required skills, Japanese language requirements, and remote work availability.
-- Processes board postings concurrently and reports API cost and latency.
+- Reads postings from Greenhouse, Lever, or a job page URL.
+- Removes HTML and converts each source into the same posting format, checked with Pydantic.
+- Uses OpenAI structured outputs to extract a role summary, seniority, required skills, Japanese requirements, and remote work policy.
+- Processes several postings at a time, limits concurrent requests, and reports failures for individual postings.
+- Reports API cost and median and p95 request times.
 
 ## Run it
 
 You'll need Python 3.13, [uv](https://docs.astral.sh/uv/), and an OpenAI API key.
 
 ```sh
+git clone https://github.com/thomaslgrega/kansei.git
+cd kansei
 cp .env.example .env
 # Add your OPENAI_API_KEY to .env
 uv sync
 ```
 
-To try a single posting, replace this example with a public job posting URL:
+To read one posting, replace the example URL with a real job posting:
 
 ```sh
 uv run kansei "https://jobs.lever.co/company/posting-id"
 ```
 
-To process the configured boards, start with a small limit:
+To read the configured job boards, start with a small limit:
 
 ```sh
 LLM_MAX_POSTINGS=5 uv run kansei
 ```
 
-These commands call the OpenAI API and may incur a charge. The default boards and other settings are in `src/kansei/config.py`.
+These commands make paid OpenAI API calls. The boards, model, request limits, and timeouts are set in [config.py](src/kansei/config.py).
 
 ## Evaluation
 
-To measure extraction accuracy, I label postings by hand and compare the model's answers against those labels, field by field.
+I label postings by hand and compare the model's answers with those labels. Seniority, Japanese requirements, and remote policy are scored by field. Required skills are scored with precision, recall, and F1, using exact skill names.
 
-- **The input is frozen.** Job boards change daily: postings are edited or taken down. So every posting in the evaluation set is saved as the exact text the model reads, and freezing only ever adds new postings. It never replaces one that's already been labeled.
-- **The labels follow written rules.** Each field has a fixed set of values, and each value has a rule for when it applies. The rules live in the schema descriptions in `src/kansei/llm.py`, so the model and I work from the same definitions.
-- **The posting text isn't published.** Job postings are written by the companies that post them, so this repo doesn't redistribute them. What's here:
-  - `evals/manifest.jsonl` lists every frozen posting: its URL, title, length, a SHA-256 hash of the exact text, and when it was frozen.
-  - `evals/labels.jsonl` holds my labels.
+Each posting is saved as the exact text sent to the model. Freezing more postings adds new ones without changing existing text. The labeling rules live in [llm.py](src/kansei/llm.py), so the model and I use the same definitions. Each run saves its answers and a hash of the instructions and schema, with a copy of that prompt saved separately.
 
-  The frozen text (`evals/postings.jsonl`) is kept outside the repo. A test checks that the local copy matches the manifest's hashes, so the labels can't silently end up pointing at different text.
+### Current results
+
+As of October 1, 2026, the development set has 24 labeled postings with 104 required skill names. After reviewing errors, I changed two rules: split slash-joined software names into separate items, and leave out a bare "Shell" because it doesn't name a specific shell.
+
+| Prompt | Skills F1 in each run |
+| --- | --- |
+| Before the rule changes (`a6e2b6c3`) | 93.1%, 92.8% |
+| After the rule changes (`a56fba4b`) | 98.6%, 100.0%, 100.0% |
+
+These are micro-F1 scores: matches, extra names, and missed names are counted across all 24 postings before calculating the score. I repeat runs to see how much the model's answers vary.
+
+These postings helped shape the rules, so the scores show improvement on the development set. They don't yet show how well the rules work on new postings. Another 12 postings from four different companies are frozen as a held-out set. They haven't been labeled or scored in the current repo.
+
+### Saved data and commands
+
+The repo includes:
+
+- `evals/manifest.jsonl`: posting URLs, titles, text lengths, SHA-256 hashes, freeze dates, and development or held-out split.
+- `evals/labels.jsonl`: my labels.
+- `evals/prompts/`: saved instructions and schemas.
+- `evals/runs/`: model answers from each run.
+
+The full posting text stays in a local, gitignored file, `evals/postings.jsonl`. It isn't published because the employers wrote it. Tests check that the local text matches the manifest and that development runs contain no held-out postings.
+
+To check the saved results without making API calls:
 
 ```sh
-uv run kansei-eval freeze [URL ...]   # add Japan-located board postings, plus any URLs given
-uv run kansei-eval label [URL ...]    # label unlabeled postings (all of them, or just the URLs given)
-uv run kansei-eval manifest           # rebuild the manifest from the local frozen text
+uv run kansei-eval score
+uv run kansei-eval compare a6e2b6c3 a56fba4b
 ```
 
-Kansei is currently a CLI. Next come the first accuracy scores, followed by storage and a web interface.
+With the local posting text and labels, you can make a new model run:
+
+```sh
+uv run kansei-eval run
+uv run kansei-eval score
+```
+
+The `run` command makes paid API calls. Cloning the repo gives you the saved results, but not the full posting text needed to repeat those calls.
+
+## Tests
+
+```sh
+uv run pytest
+uv run ruff check .
+```
+
+The tests cover parsing, validation, the code around model calls, cost calculations, and evaluation scoring. Model answers are checked through the evaluations above.
+
+## What's next
+
+Kansei is currently a CLI. Next are labeling and scoring the held-out postings, then adding storage and a web interface.
