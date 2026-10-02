@@ -53,7 +53,24 @@ As of October 1, 2026, the development set has 24 labeled postings with 104 requ
 
 These are micro-F1 scores: matches, extra names, and missed names are counted across all 24 postings before calculating the score. I repeat runs to see how much the model's answers vary.
 
-These postings helped shape the rules, so the scores show improvement on the development set. They don't yet show how well the rules work on new postings. Another 12 postings from four different companies are frozen as a held-out set. They haven't been labeled or scored in the current repo.
+These postings helped shape the rules, so these scores show improvement on the development
+set. They don't show how well the rules work on new postings. That's what the test set is
+for.
+
+### Test set
+
+Twelve postings from four companies the rules were never written against: Mujin, Databricks, Datadog and PayPay Card, three from each. The postings were committed before I labeled them, and the labels were committed before any model run. The prompt was scored on them once, with three runs of `a56fba4b`.
+
+| Set | Postings | Skills F1 in each run |
+| --- | --- | --- |
+| Development | 24 | 98.6%, 100.0%, 100.0% |
+| Test | 12 | 94%, 94%, 94% |
+
+In every run, the other fields matched my labels on 12 of 12 postings. Postings with a skills disagreement, out of 9 posting-runs per company: Mujin 0, Datadog 0, Databricks 1, PayPay Card 3.
+
+The biggest cause of the gap was that the rule didn't clearly state whether hardware vendors should be included. If the rules explicitly included it and my labels also agreed, the score moves to F1 97%, 96%, 96%.
+
+This is the number I report for `a56fba4b`. If I change a rule because of these errors, these 12 become development postings, and the next test number needs new postings.
 
 ### Saved data and commands
 
