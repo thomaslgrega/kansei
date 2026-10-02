@@ -1,7 +1,9 @@
+import sys
 from datetime import UTC, datetime
 
 import pytest
 
+from kansei import evals
 from kansei.evals import (
     LABELS,
     MANIFEST,
@@ -170,3 +172,16 @@ def test_no_dev_run_has_seen_a_holdout_posting():
     }
 
     assert seen & holdout == set()
+
+
+@pytest.mark.parametrize(("args", "expected"), [
+    (["label"], ([], "dev")),
+    (["label", "holdout"], ([], "holdout")),
+    (["label", "https://a"], (["https://a"], "dev")),
+], ids=["label", "label holdout", "label URL"])
+def test_label_command_reaches_the_split_it_names(monkeypatch, args, expected):
+    calls = []
+    monkeypatch.setattr(sys, "argv", ["kansei-eval", *args])
+    monkeypatch.setattr(evals, "label", lambda urls, split="dev": calls.append((urls, split)))
+    evals.main()
+    assert calls == [expected]

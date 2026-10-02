@@ -321,6 +321,8 @@ def label(urls: list[str], split: Split = "dev") -> None:
     fields = {name: get_args(Label.model_fields[name].annotation) for name in FIELDS}
     done = {label.url for label in load(LABELS, Label)}
     todo = [p for p in load(POSTINGS, FrozenPosting) if p.url not in done and p.split == split and (not urls or p.url in urls)]
+    if not todo:
+        print(f"nothing to label in {split}")
 
     for posting in todo:
         print_posting(posting)
@@ -367,7 +369,7 @@ def main() -> None:
             compare(old, new)
         case ["show", *urls]:
             show(urls)
-        case ["label", *urls]:
+        case ["label", "holdout"]:
             try:
                 label([], "holdout")
             except (KeyboardInterrupt, EOFError):
