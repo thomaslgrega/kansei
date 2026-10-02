@@ -110,4 +110,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI. Next are labeling and scoring the held-out postings, then adding storage and a web interface.
+Kansei is currently a CLI. Next are rule changes from the test-set errors, then storage and a web interface.
