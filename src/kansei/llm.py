@@ -20,11 +20,12 @@ class PostingFacts(BaseModel):
             "The level the title or text names in words: 'Junior'/ジュニア, 'Senior'/シニア, "
             "'Staff' or 'Principal' for staff_plus. Years of experience alone do not set a level, "
             "and neither does 'Lead'. not_stated if no level word appears."
+            "Sr. is senior, Jr. is junior. "
         )
     )
     must_have_skills: list[str] = Field(
         description=(
-            "Named software the posting lists as required: languages, frameworks, libraries, "
+            "Named software or hardware the posting lists as required: languages, frameworks, libraries, "
             "tools, databases, platforms and cloud services, i.e. things you could install, run "
             "or sign up for. Only from the required list (必須条件, 'Minimum qualifications', "
             "'What you'll need', 'Requirements'), never from nice-to-haves, duties or boilerplate. "
@@ -36,6 +37,8 @@ class PostingFacts(BaseModel):
             "One name per item, copied exactly as the posting writes it, typos included. "
             "Names joined by a slash are separate items: HTML/CSS is HTML and CSS. "
             "A bare 'Shell' is a kind of thing too, even in a list of languages; a named shell such as zsh is software. "
+            "Hardware is named by a vendor or product line (e.g. Arista). "
+            "A required certification counts as the product it names, written as the product: 'AWS Certified' is AWS. "
             "Empty list if the required list names none."
         )
     )
@@ -78,6 +81,7 @@ class PostingFacts(BaseModel):
         description=(
             "remote: no office attendance required. "
             "hybrid: some office days required (e.g. 'the office 3 days per week', 週3日出社). "
+            "A company-wide statement that it has a hybrid workplace is hybrid. "
             "onsite: office or site every working day. "
             "not_stated: the posting does not say. "
             "'Hybrid' describing infrastructure, such as "

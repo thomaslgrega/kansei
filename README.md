@@ -68,9 +68,25 @@ Twelve postings from four companies the rules were never written against: Mujin,
 
 In every run, the other fields matched my labels on 12 of 12 postings. Postings with a skills disagreement, out of 9 posting-runs per company: Mujin 0, Datadog 0, Databricks 1, PayPay Card 3.
 
-The biggest cause of the gap was that the rule didn't clearly state whether hardware vendors should be included. If the rules explicitly included it and my labels also agreed, the score moves to F1 97%, 96%, 96%.
+The biggest cause of the gap was a case the rules didn't decide: whether hardware vendors count as required skills. Rescored with those vendors labeled the way the rule now says, the same three runs score 99%, 99%, 99%.
 
 This is the number I report for `a56fba4b`. If I change a rule because of these errors, these 12 become development postings, and the next test number needs new postings.
+
+### After the test set
+
+I turned the test-set errors into four rule sentences: named hardware counts as a skill, a
+required certification counts as the product it names, a company-wide hybrid statement means
+hybrid, and Sr./Jr. mean senior and junior. Those decisions came from the 12 test-set
+postings, so they are development postings now, and the development set has 36.
+
+| Prompt | Postings | Skills F1 in each run |
+| --- | --- | --- |
+| `a56fba4b` | 24 | 98.6%, 100.0%, 100.0% |
+| `c876fc21` | 36 | 100.0%, 98.6%, 100.0% |
+
+The remaining errors are skills not being split (e.g. "MATLAB/Simulink" vs "MATLAB, Simulink") and ETL being added even though it is a process and not a tool. These errors are are run-to-run variations.
+
+`c876fc21` has no test number yet. The next one needs postings from companies the rules haven't seen, frozen and labeled before the next change I report.
 
 ### Saved data and commands
 
@@ -110,4 +126,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI. Next are rule changes from the test-set errors, then storage and a web interface.
+Kansei is currently a CLI. Next are storage and a web interface.
