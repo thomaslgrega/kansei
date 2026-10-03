@@ -164,7 +164,7 @@ def test_per_board_keeps_the_first_k_of_each_board_in_order(make_posting):
 
 
 def test_no_dev_run_has_seen_a_test_posting():
-    test_set = {entry.url for entry in load(MANIFEST, ManifestEntry) if entry.split == "holdout"}
+    test_set = {entry.url for entry in load(MANIFEST, ManifestEntry) if entry.split == "test"}
     seen = {
         prediction.url
         for path in RUNS.glob("*.jsonl")
