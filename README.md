@@ -82,9 +82,9 @@ postings, so they are development postings now, and the development set has 36.
 | Prompt | Postings | Skills F1 in each run |
 | --- | --- | --- |
 | `a56fba4b` | 24 | 98.6%, 100.0%, 100.0% |
-| `c876fc21` | 36 | 100.0%, 98.6%, 100.0% |
+| `c876fc21` | 36 | 99.0%, 99.0%, 99.0% |
 
-The remaining errors are skills not being split (e.g. "MATLAB/Simulink" vs "MATLAB, Simulink") and ETL being added even though it is a process and not a tool. These errors are are run-to-run variations.
+The remaining errors are skills not being split (e.g. "MATLAB/Simulink" vs "MATLAB, Simulink") and ETL being added even though it is a process and not a tool. These errors are run-to-run variations.
 
 `c876fc21` has no test number yet. The next one needs postings from companies the rules haven't seen, frozen and labeled before the next change I report.
 

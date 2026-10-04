@@ -300,7 +300,7 @@ def compare(old: str, new: str) -> None:
 
     for sha, found in runs.items():
         f1s = [precision_recall_f1(list(compare_skills(labels, run).values()))[2] for run in found]
-        print(f"{sha}  F1 " + " ".join(f"{f1:.1%}" for f1 in f1s))
+        print(f"{sha}  F1 " + " ".join(f"{f1:.1%}" for f1 in f1s) + f"  on {len(labels)} postings")
 
     misses = {sha: skill_misses(labels, found) for sha, found in runs.items()}
     print(f"\n{old}    {new}    runs that got the skills wrong, {len(labels)} postings")
