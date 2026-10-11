@@ -4,15 +4,18 @@ import statistics
 import sys
 import time
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 import httpx
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse
 from pydantic import BaseModel, HttpUrl, ValidationError
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
 
 from kansei.config import settings
+from kansei.db import Posting, engine
 from kansei.llm import PostingFacts, cost_usd, extract
 from kansei.sources import (
     SOURCES,
@@ -56,6 +59,36 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
         except ValidationError as exc:
             failed.append((job.get("id", "unknown"), exc.errors()[0]["msg"]))
     return passed, failed
+
+
+def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -> None:
+    if not jobs: 
+        return
+
+    rows = [
+        {
+            "url": str(job.url),
+            "source": job.source,
+            "token": job.token,
+            "title": job.title,
+            "location": job.location,
+            "posted_at": job.posted_at,
+            "first_seen_at": seen_at,
+            "last_seen_at": seen_at,
+        }
+        for job in jobs
+    ]
+    statement = insert(Posting).values(rows)
+    statement = statement.on_conflict_do_update(
+        index_elements=[Posting.url],
+        set_={
+            "title": statement.excluded.title,
+            "location": statement.excluded.location,
+            "posted_at": statement.excluded.posted_at,
+            "last_seen_at": statement.excluded.last_seen_at,
+        },
+    )
+    session.execute(statement)
 
 
 def show(facts: PostingFacts) -> None:
@@ -108,14 +141,18 @@ async def amain() -> None:
     boards = {t: r for t, r in results.items() if not isinstance(r, Exception)}
     failed = {t: r for t, r in results.items() if isinstance(r, Exception)}
 
-    total_passed, total_failed = 0, 0
-    candidates: list[JobPosting] = []
+    total_failed = 0
+    postings: list[JobPosting] = []
 
     for token, jobs in boards.items():
         passed_jobs, failed_jobs = validate(jobs)
-        total_passed += len(passed_jobs)
+        postings += passed_jobs
         total_failed += len(failed_jobs)
-        candidates += [job for job in passed_jobs if is_candidate(job)]
+    total_passed = len(postings)
+    candidates = [job for job in postings if is_candidate(job)]
+
+    with Session(engine) as session, session.begin():
+        save_postings(session, postings, datetime.now(UTC))
         
     total = total_passed + total_failed
     print(f"{total} jobs from {len(boards)}/{len(results)} boards in {elapsed:.2f}s")

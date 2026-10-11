@@ -1,7 +1,9 @@
 import httpx
 import pytest
+from sqlalchemy.orm import Session
 
 from kansei import JobPosting
+from kansei.db import engine
 
 
 @pytest.fixture
@@ -29,3 +31,12 @@ def make_board():
         ))
 
     return build
+
+
+@pytest.fixture
+def session():
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        with Session(bind=connection, join_transaction_mode="create_savepoint") as session:
+            yield session
+        transaction.rollback()

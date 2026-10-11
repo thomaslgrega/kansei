@@ -12,7 +12,7 @@ Kansei is a Python CLI that reads engineering job postings in Japanese and Engli
 
 ## Run it
 
-You'll need Python 3.13, [uv](https://docs.astral.sh/uv/), and an OpenAI API key.
+You'll need Python 3.13, [uv](https://docs.astral.sh/uv/), Docker, and an OpenAI API key.
 
 ```sh
 git clone https://github.com/thomaslgrega/kansei.git
@@ -20,6 +20,8 @@ cd kansei
 cp .env.example .env
 # Add your OPENAI_API_KEY to .env
 uv sync
+docker compose up -d --wait
+uv run alembic upgrade head
 ```
 
 To read one posting, replace the example URL with a real job posting:
@@ -35,6 +37,8 @@ LLM_MAX_POSTINGS=5 uv run kansei
 ```
 
 These commands make paid OpenAI API calls. The boards, model, request limits, and timeouts are set in [config.py](src/kansei/config.py).
+
+Every run stores the fetched postings in Postgres, which runs locally from `compose.yaml`. A posting is identified by its URL, so running again updates the same rows: `first_seen_at` keeps the day it first appeared and `last_seen_at` moves to the latest run. `LLM_MAX_POSTINGS=0 uv run kansei` fetches and stores postings without calling the model.
 
 ## Evaluation
 
@@ -126,4 +130,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI. Next are storage and a web interface.
+Kansei is currently a CLI that stores postings in Postgres. Next are storing extractions so a posting is never extracted twice, then an API and a web interface.

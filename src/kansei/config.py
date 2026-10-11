@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     )
 
     openai_api_key: SecretStr
+    database_url: SecretStr
     boards: list[str] = [
         "greenhouse:stripe", "greenhouse:anthropic", "greenhouse:figma",
         "greenhouse:airtable", "greenhouse:discord", "greenhouse:gitlab", "greenhouse:ramp",

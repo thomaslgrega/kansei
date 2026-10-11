@@ -1,0 +1,33 @@
+from datetime import datetime
+
+from sqlalchemy import DateTime, MetaData, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from kansei.config import settings
+
+
+class Base(DeclarativeBase):
+    metadata = MetaData(naming_convention={
+        "ix": "ix_%(column_0_label)s",
+        "uq": "uq_%(table_name)s_%(column_0_name)s",
+        "ck": "ck_%(table_name)s_%(constraint_name)s",
+        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+        "pk": "pk_%(table_name)s",
+    })
+
+
+class Posting(Base):
+    __tablename__ = "postings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    url: Mapped[str] = mapped_column(unique=True)
+    source: Mapped[str]
+    token: Mapped[str]
+    title: Mapped[str]
+    location: Mapped[str]
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+engine = create_engine(settings.database_url.get_secret_value())
