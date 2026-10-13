@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, MetaData, create_engine
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    MetaData,
+    UniqueConstraint,
+    create_engine,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from kansei.config import settings
@@ -9,12 +17,25 @@ from kansei.config import settings
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention={
         "ix": "ix_%(column_0_label)s",
-        "uq": "uq_%(table_name)s_%(column_0_name)s",
+        "uq": "uq_%(table_name)s_%(column_0_N_name)s",
         "ck": "ck_%(table_name)s_%(constraint_name)s",
         "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
         "pk": "pk_%(table_name)s",
     })
 
+
+class Extraction(Base):
+    __tablename__ = "extractions"
+    __table_args__ = (UniqueConstraint("posting_id", "text_sha256", "model", "prompt_sha"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    posting_id: Mapped[int] = mapped_column(ForeignKey("postings.id"))
+    text: Mapped[str]
+    text_sha256: Mapped[str]
+    model: Mapped[str]
+    prompt_sha: Mapped[str]
+    facts: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class Posting(Base):
     __tablename__ = "postings"

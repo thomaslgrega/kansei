@@ -1,3 +1,5 @@
+import hashlib
+import json
 from typing import Literal
 
 from openai import AsyncOpenAI
@@ -102,6 +104,15 @@ async def extract(llm: AsyncOpenAI, posting: str) -> ParsedResponse[PostingFacts
         input=posting,
         text_format=PostingFacts,
     )
+
+
+def prompt_snapshot() -> tuple[str, str]:
+    text = json.dumps(
+        {"instructions": INSTRUCTIONS, "schema": PostingFacts.model_json_schema()},
+        ensure_ascii=False,
+        indent=2,
+    )
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], text
 
 
 PRICE_PER_MTOK = {

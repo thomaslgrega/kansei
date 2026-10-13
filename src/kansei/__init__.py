@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import re
 import statistics
 import sys
@@ -11,12 +12,13 @@ import httpx
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse
 from pydantic import BaseModel, HttpUrl, ValidationError
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from kansei.config import settings
-from kansei.db import Posting, engine
-from kansei.llm import PostingFacts, cost_usd, extract
+from kansei.db import Extraction, Posting, engine
+from kansei.llm import PostingFacts, cost_usd, extract, prompt_snapshot
 from kansei.sources import (
     SOURCES,
     fetch_posting,
@@ -61,9 +63,9 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
     return passed, failed
 
 
-def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -> None:
+def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -> dict[str, int]:
     if not jobs: 
-        return
+        return {}
 
     rows = [
         {
@@ -87,8 +89,20 @@ def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -
             "posted_at": statement.excluded.posted_at,
             "last_seen_at": statement.excluded.last_seen_at,
         },
+    ).returning(Posting.url, Posting.id)
+    return {url: posting_id for url, posting_id in session.execute(statement)}
+
+
+def sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def extracted(session: Session, model: str, prompt_sha: str) -> set[tuple[int, str]]:
+    statement = select(Extraction.posting_id, Extraction.text_sha256).where(
+        Extraction.model == model,
+        Extraction.prompt_sha == prompt_sha,
     )
-    session.execute(statement)
+    return {(posting_id, text_sha256) for posting_id, text_sha256 in session.execute(statement)}
 
 
 def show(facts: PostingFacts) -> None:
@@ -104,33 +118,38 @@ async def model_input(http: httpx.AsyncClient, job: JobPosting) -> str:
     return f"{job.title}\n\n{posting}"
 
 
+async def fetch_texts(jobs: list[JobPosting]) -> list[str | Exception]:
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
+        return await asyncio.gather(
+            *(model_input(http, job) for job in jobs),
+            return_exceptions=True,
+        )
+
+
 async def extract_one(
-    http: httpx.AsyncClient,
     llm: AsyncOpenAI,
     limit: asyncio.Semaphore,
-    job: JobPosting,
+    text: str,
 ) -> tuple[ParsedResponse[PostingFacts], float]:
     async with limit:
-        text = await model_input(http, job)
         started = time.perf_counter()
         response = await extract(llm, text)
         return response, time.perf_counter() - started
 
 
 async def extract_batch(
-    selected: list[JobPosting],
+    todo: dict[str, str],
 ) -> dict[str, tuple[ParsedResponse[PostingFacts], float] | Exception]:
     limit = asyncio.Semaphore(settings.llm_concurrency)
     llm = AsyncOpenAI(
         api_key=settings.openai_api_key.get_secret_value(),
         timeout=settings.llm_timeout,
     )
-    async with httpx.AsyncClient(timeout=settings.request_timeout) as http:
-        results = await asyncio.gather(
-            *(extract_one(http, llm, limit, job) for job in selected),
-            return_exceptions=True,
-        )
-    return {job.id: result for job, result in zip(selected, results)}
+    results = await asyncio.gather(
+        *(extract_one(llm, limit, text) for text in todo.values()),
+        return_exceptions=True,
+    )
+    return dict(zip(todo, results))
 
 
 async def amain() -> None:
@@ -152,7 +171,7 @@ async def amain() -> None:
     candidates = [job for job in postings if is_candidate(job)]
 
     with Session(engine) as session, session.begin():
-        save_postings(session, postings, datetime.now(UTC))
+        ids = save_postings(session, postings, datetime.now(UTC))
         
     total = total_passed + total_failed
     print(f"{total} jobs from {len(boards)}/{len(results)} boards in {elapsed:.2f}s")
@@ -161,24 +180,51 @@ async def amain() -> None:
     print(f"{total_passed} validated, {total_failed} invalid")
 
     selected = candidates[: settings.llm_max_postings]
-    print(f"{len(candidates)} candidates, sending {len(selected)} to {settings.openai_model}")
+    texts = await fetch_texts(selected)
+    fetched = {str(job.url): text for job, text in zip(selected, texts) if not isinstance(text, Exception)}
+    for job, text in zip(selected, texts):
+        if isinstance(text, Exception):
+            print(f"    could not fetch {job.url}: {type(text).__name__}")
+
+    prompt_sha, _ = prompt_snapshot()
+    with Session(engine) as session:
+        before = extracted(session, settings.openai_model, prompt_sha)
+    todo = {url: text for url, text in fetched.items() if (ids[url], sha256(text)) not in before}
+    print(
+        f"{len(candidates)} candidates, {len(fetched) - len(todo)} already extracted with "
+        f"{settings.openai_model} and prompt {prompt_sha}, sending {len(todo)}"
+    )
 
     started = time.perf_counter()
-    summaries = await extract_batch(selected)
+    summaries = await extract_batch(todo)
     wall = time.perf_counter() - started
 
-    done = {i: r for i, r in summaries.items() if not isinstance(r, Exception)}
-    errors = {i: r for i, r in summaries.items() if isinstance(r, Exception)}
+    done = {url: r for url, r in summaries.items() if not isinstance(r, Exception)}
+    errors = {url: r for url, r in summaries.items() if isinstance(r, Exception)}
+
+    with Session(engine) as session, session.begin():
+        session.add_all(
+            Extraction(
+                posting_id=ids[url],
+                text=todo[url],
+                text_sha256=sha256(todo[url]),
+                model=settings.openai_model,
+                prompt_sha=prompt_sha,
+                facts=response.output_parsed.model_dump(mode="json"),
+            )
+            for url, (response, _) in done.items()
+        )
 
     print(f"\n{len(done)}/{len(summaries)} summarized in {wall:.1f}s")
-    for job_id, exc in errors.items():
+    for url, exc in errors.items():
         code = getattr(exc, "code", None) or ""
-        print(f"  failed {job_id}: {type(exc).__name__} {code}")
-    by_id = {job.id: job for job in selected}
-    for job_id, (response, _) in done.items():
+        print(f"    failed {url}: {type(exc).__name__} {code}")
+    by_url = {str(job.url): job for job in selected}
+    for url, (response, _) in done.items():
         facts = response.output_parsed
-        print(f"\n{by_id[job_id].title}")
+        print(f"\n{by_url[url].title}")
         show(facts)
+        
     if len(done) < 2:
         return
 
@@ -218,7 +264,8 @@ async def ingest_url(url: str) -> None:
             api_key=settings.openai_api_key.get_secret_value(),
             timeout=settings.llm_timeout,
         )
-        response, seconds = await extract_one(http, llm, asyncio.Semaphore(1), job)
+        text = await model_input(http, job)
+        response, seconds = await extract_one(llm, asyncio.Semaphore(1), text)
 
     show(response.output_parsed)
     print(f"{response.usage.input_tokens} input tokens, ${cost_usd(response.usage, response.model):.6f}, {seconds:.1f}s")

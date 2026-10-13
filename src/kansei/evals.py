@@ -1,6 +1,5 @@
 import asyncio
 import hashlib
-import json
 import random
 import re
 import sys
@@ -16,15 +15,14 @@ from pydantic import BaseModel
 from kansei import JobPosting, fetch_all, is_candidate, model_input, validate
 from kansei.config import settings
 from kansei.llm import (
-    INSTRUCTIONS,
     JapaneseLevel,
     JapaneseRequired,
     Jlpt,
-    PostingFacts,
     RemotePolicy,
     Seniority,
     cost_usd,
     extract,
+    prompt_snapshot,
 )
 from kansei.sources import fetch_url
 
@@ -306,15 +304,6 @@ def compare(old: str, new: str) -> None:
     print(f"\n{old}    {new}    runs that got the skills wrong, {len(labels)} postings")
     for url in sorted(misses[old] | misses[new], key=titles.get):
         print(f"{misses[old][url]:>6}/{len(runs[old])}    {misses[new][url]:>6}/{len(runs[new])}    {titles[url]}")
-
-
-def prompt_snapshot() -> tuple[str, str]:
-    text = json.dumps(
-        {"instructions": INSTRUCTIONS, "schema": PostingFacts.model_json_schema()},
-        ensure_ascii=False,
-        indent=2,
-    )
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], text
 
 
 def label(urls: list[str], split: Split = "dev") -> None:

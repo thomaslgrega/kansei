@@ -40,6 +40,8 @@ These commands make paid OpenAI API calls. The boards, model, request limits, an
 
 Every run stores the fetched postings in Postgres, which runs locally from `compose.yaml`. A posting is identified by its URL, so running again updates the same rows: `first_seen_at` keeps the day it first appeared and `last_seen_at` moves to the latest run. `LLM_MAX_POSTINGS=0 uv run kansei` fetches and stores postings without calling the model.
 
+Extractions are stored too, with the exact text the model read. A posting is sent to the model only when its text, the model or the prompt has changed since it was last extracted, so running again costs nothing for postings that haven't changed. `kansei-eval run` doesn't use this cache: every eval run calls the model, because repeated runs are how run-to-run variation is measured.
+
 ## Evaluation
 
 I label postings by hand and compare the model's answers with those labels. Seniority, Japanese requirements, and remote policy are scored by field. Required skills are scored with precision, recall, and F1, using exact skill names.
@@ -130,4 +132,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI that stores postings in Postgres. Next are storing extractions so a posting is never extracted twice, then an API and a web interface.
+Kansei is currently a CLI that stores postings and their extractions in Postgres. Next are an API and a web interface.
