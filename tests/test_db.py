@@ -43,4 +43,3 @@ def test_extracted_finds_a_text_only_under_the_model_and_prompt_that_read_it(ses
     assert key in extracted(session, "gpt-6-luna", "c876fc21")
     assert key not in extracted(session, "gpt-6-luna", "70b7a0b0")
     assert key not in extracted(session, "gpt-5.6-luna", "c876fc21")
-    

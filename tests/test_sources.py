@@ -171,7 +171,7 @@ async def test_fetch_url_refuses_a_response_that_redirected_a_non_existing_post(
         if request.url.path == "/jobs/1":
             return httpx.Response(302, headers={"location": "https://example.com/jobs"})
         return httpx.Response(200, headers={"content-type": "text/html"}, text="<html><body>Current openings</body></html>")
-    
+
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(ValueError, match="redirected to"):

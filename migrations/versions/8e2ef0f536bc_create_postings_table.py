@@ -1,7 +1,7 @@
 """Create postings table
 
 Revision ID: 8e2ef0f536bc
-Revises: 
+Revises:
 Create Date: 2026-10-04 18:13:33.159400
 
 """

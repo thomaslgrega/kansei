@@ -64,7 +64,7 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
 
 
 def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -> dict[str, int]:
-    if not jobs: 
+    if not jobs:
         return {}
 
     rows = [
@@ -172,7 +172,7 @@ async def amain() -> None:
 
     with Session(engine) as session, session.begin():
         ids = save_postings(session, postings, datetime.now(UTC))
-        
+
     total = total_passed + total_failed
     print(f"{total} jobs from {len(boards)}/{len(results)} boards in {elapsed:.2f}s")
     for token, exc in failed.items():
@@ -224,7 +224,7 @@ async def amain() -> None:
         facts = response.output_parsed
         print(f"\n{by_url[url].title}")
         show(facts)
-        
+
     if len(done) < 2:
         return
 

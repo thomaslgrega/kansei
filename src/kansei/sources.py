@@ -44,7 +44,7 @@ def job_posting_ld(soup: BeautifulSoup) -> dict:
             if isinstance(node, dict) and node.get("@type") == "JobPosting":
                 return node
     return {}
-            
+
 
 def lever_text(raw: dict) -> str:
     parts = [raw["descriptionPlain"]]
