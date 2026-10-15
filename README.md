@@ -121,6 +121,13 @@ uv run kansei-eval score
 
 The `run` command makes paid API calls. Cloning the repo gives you the saved results, but not the full posting text needed to repeat those calls.
 
+## API
+
+`uv run fastapi dev` serves a read-only JSON API at http://127.0.0.1:8000, with interactive documentation at `/docs`.
+
+- `GET /postings` lists stored postings, newest first. Filter by board with `token`, and page with `limit` (up to 100) and `offset`.
+- `GET /postings/{id}` returns one posting with its newest extraction for the configured model and prompt, or `null` if it hasn't been extracted.
+
 ## Tests
 
 ```sh
@@ -132,4 +139,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI that stores postings and their extractions in Postgres. Next are an API and a web interface.
+Kansei is currently a CLI that stores postings and their extractions in Postgres, with a read-only API over them. Next are user accounts and a web interface.
