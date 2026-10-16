@@ -69,13 +69,13 @@ def get_posting(posting_id: int, session: SessionDep) -> PostingDetail:
     if posting is None:
         raise HTTPException(status_code=404, detail="Posting not found")
 
-    promp_sha, _ = prompt_snapshot()
+    prompt_sha, _ = prompt_snapshot()
     extraction = session.scalars(
         select(Extraction)
         .where(
             Extraction.posting_id == posting_id,
             Extraction.model == settings.openai_model,
-            Extraction.prompt_sha == promp_sha,
+            Extraction.prompt_sha == prompt_sha,
         )
         .order_by(Extraction.created_at.desc(), Extraction.id.desc())
         .limit(1)
