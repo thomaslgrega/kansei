@@ -1,9 +1,11 @@
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from kansei import JobPosting
-from kansei.db import engine
+from kansei.api import app
+from kansei.db import engine, get_session
 
 
 @pytest.fixture
@@ -40,3 +42,10 @@ def session():
         with Session(bind=connection, join_transaction_mode="create_savepoint") as session:
             yield session
         transaction.rollback()
+
+
+@pytest.fixture
+def client(session):
+    app.dependency_overrides[get_session] = lambda: session
+    yield TestClient(app, base_url="https://testserver")
+    app.dependency_overrides = {}

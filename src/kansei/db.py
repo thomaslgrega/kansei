@@ -1,5 +1,8 @@
+from collections.abc import Iterator
 from datetime import datetime
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy import (
     DateTime,
     ForeignKey,
@@ -9,7 +12,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from kansei.config import settings
 
@@ -52,3 +55,11 @@ class Posting(Base):
 
 
 engine = create_engine(settings.database_url.get_secret_value())
+
+
+def get_session() -> Iterator[Session]:
+    with Session(engine) as session:
+        yield session
+
+
+SessionDep = Annotated[Session, Depends(get_session)]

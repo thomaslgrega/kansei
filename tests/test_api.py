@@ -1,10 +1,6 @@
 from datetime import UTC, datetime
 
-import pytest
-from fastapi.testclient import TestClient
-
 from kansei import save_postings, sha256
-from kansei.api import app, get_session
 from kansei.config import settings
 from kansei.db import Extraction
 from kansei.llm import PostingFacts, prompt_snapshot
@@ -19,13 +15,6 @@ FACTS = PostingFacts(
     jlpt="not_stated",
     remote_policy="hybrid",
 )
-
-
-@pytest.fixture
-def client(session):
-    app.dependency_overrides[get_session] = lambda: session
-    yield TestClient(app)
-    app.dependency_overrides = {}
 
 
 def make_extraction(posting_id: int, day: int, role_summary: str, **overrides) -> Extraction:
@@ -67,7 +56,7 @@ def test_get_posting_returns_the_newest_extraction_for_the_current_model_and_pro
         make_extraction(posting_id, 5, "Earlier."),
         make_extraction(posting_id, 6, "Newest."),
         make_extraction(posting_id, 7, "Other model.", model="gpt-5.6-luna"),
-        make_extraction(posting_id, 8, "Old promp.", prompt_sha="70b7a0b0", facts={}),
+        make_extraction(posting_id, 8, "Old prompt.", prompt_sha="70b7a0b0", facts={}),
     ])
 
     response = client.get(f"/postings/{posting_id}")

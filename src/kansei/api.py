@@ -1,25 +1,15 @@
-from collections.abc import Iterator
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from kansei.config import settings
-from kansei.db import Extraction, Posting, engine
+from kansei.db import Extraction, Posting, SessionDep
 from kansei.llm import PostingFacts, prompt_snapshot
 
 app = FastAPI(title="kansei")
-
-
-def get_session() -> Iterator[Session]:
-    with Session(engine) as session:
-        yield session
-
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 class PostingOut(BaseModel):
