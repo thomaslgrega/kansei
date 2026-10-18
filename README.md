@@ -127,6 +127,8 @@ The `run` command makes paid API calls. Cloning the repo gives you the saved res
 
 - `GET /postings` lists stored postings, newest first. Filter by board with `token`, and page with `limit` (up to 100) and `offset`.
 - `GET /postings/{id}` returns one posting with its newest extraction for the configured model and prompt, or `null` if it hasn't been extracted.
+- `POST /signup` and `POST /login` take `{"email", "password"}`. Passwords need at least 15 characters and are stored as Argon2id hashes. Login sets an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie that lasts 14 days.
+- `GET /me` returns the logged-in user, or 401. `POST /logout` deletes the session on the server, so a copied cookie stops working.
 
 ## Tests
 
@@ -139,4 +141,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI that stores postings and their extractions in Postgres, with a read-only API over them. Next are user accounts and a web interface.
+Kansei is currently a CLI that stores postings and their extractions in Postgres, with an API over them and user accounts. Next are per-user tracked postings and a web interface.

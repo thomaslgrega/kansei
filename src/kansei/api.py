@@ -5,11 +5,13 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
+from kansei import auth
 from kansei.config import settings
 from kansei.db import Extraction, Posting, SessionDep
 from kansei.llm import PostingFacts, prompt_snapshot
 
 app = FastAPI(title="kansei")
+app.include_router(auth.router)
 
 
 class PostingOut(BaseModel):
