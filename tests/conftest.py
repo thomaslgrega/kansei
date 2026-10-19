@@ -49,3 +49,15 @@ def client(session):
     app.dependency_overrides[get_session] = lambda: session
     yield TestClient(app, base_url="https://testserver")
     app.dependency_overrides = {}
+
+
+@pytest.fixture
+def log_in_as(client):
+    def log_in(email: str) -> None:
+        credentials = {"email": email, "password": "correct password"}
+        response = client.post("/signup", json=credentials)
+        assert response.status_code == 201, response.text
+        response = client.post("/login", json=credentials)
+        assert response.status_code == 204, response.text
+
+    return log_in

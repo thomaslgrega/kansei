@@ -129,6 +129,8 @@ The `run` command makes paid API calls. Cloning the repo gives you the saved res
 - `GET /postings/{id}` returns one posting with its newest extraction for the configured model and prompt, or `null` if it hasn't been extracted.
 - `POST /signup` and `POST /login` take `{"email", "password"}`. Passwords need at least 15 characters and are stored as Argon2id hashes. Login sets an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie that lasts 14 days.
 - `GET /me` returns the logged-in user, or 401. `POST /logout` deletes the session on the server, so a copied cookie stops working.
+- `GET /me/tracked` lists the postings you're tracking, newest first. `POST /me/tracked` takes `{"posting_id", "status", "note"}`, and `PATCH /me/tracked/{id}` changes the status or note. Status is one of `saved`, `applied`, `interviewing`, `offer`, `rejected`, and Postgres enforces it too. `DELETE /me/tracked` deletes a post you're tracking. Another user's tracked posting returns the same 404 as one that doesn't exist.
+
 
 ## Tests
 
@@ -141,4 +143,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI that stores postings and their extractions in Postgres, with an API over them and user accounts. Next are per-user tracked postings and a web interface.
+Kansei is currently a CLI that stores postings and their extractions in Postgres, with an API over them, user accounts, and per-user tracked postings. Next is a web interface.
