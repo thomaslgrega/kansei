@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -12,8 +12,8 @@ from kansei.config import settings
 from kansei.db import Extraction, Posting, SessionDep, Tracked, TrackStatus
 from kansei.llm import PostingFacts, prompt_snapshot
 
-app = FastAPI(title="kansei")
-app.include_router(auth.router)
+api = APIRouter(prefix="/api")
+api.include_router(auth.router)
 
 
 class PostingOut(BaseModel):
@@ -44,7 +44,7 @@ class PostingDetail(BaseModel):
     extraction: ExtractionOut | None
 
 
-@app.get("/postings")
+@api.get("/postings")
 def list_postings(
     session: SessionDep,
     token: str | None = None,
@@ -57,7 +57,7 @@ def list_postings(
     postings = session.scalars(statement.limit(limit).offset(offset))
     return [PostingOut.model_validate(posting) for posting in postings]
 
-@app.get("/postings/{posting_id}")
+@api.get("/postings/{posting_id}")
 def get_posting(posting_id: int, session: SessionDep) -> PostingDetail:
     posting = session.get(Posting, posting_id)
     if posting is None:
@@ -102,7 +102,7 @@ class TrackedOut(BaseModel):
     posting: PostingOut
 
 
-@app.get("/me/tracked")
+@api.get("/me/tracked")
 def list_tracked(user: CurrentUser, session: SessionDep) -> list[TrackedOut]:
     tracked = session.scalars(
         select(Tracked)
@@ -112,7 +112,7 @@ def list_tracked(user: CurrentUser, session: SessionDep) -> list[TrackedOut]:
     return [TrackedOut.model_validate(row) for row in tracked]
 
 
-@app.post("/me/tracked", status_code=201)
+@api.post("/me/tracked", status_code=201)
 def track(body: TrackIn, user: CurrentUser, session: SessionDep) -> TrackedOut:
     if session.get(Posting, body.posting_id) is None:
         raise HTTPException(status_code=404, detail="Posting not found")
@@ -126,7 +126,7 @@ def track(body: TrackIn, user: CurrentUser, session: SessionDep) -> TrackedOut:
     return TrackedOut.model_validate(tracked)
 
 
-@app.patch("/me/tracked/{tracked_id}")
+@api.patch("/me/tracked/{tracked_id}")
 def update_tracked(tracked_id: int, body: TrackUpdate, user: CurrentUser, session: SessionDep) -> TrackedOut:
     tracked = session.scalar(
         select(Tracked)
@@ -143,7 +143,7 @@ def update_tracked(tracked_id: int, body: TrackUpdate, user: CurrentUser, sessio
     return TrackedOut.model_validate(tracked)
 
 
-@app.delete("/me/tracked/{tracked_id}", status_code=204)
+@api.delete("/me/tracked/{tracked_id}", status_code=204)
 def untrack(tracked_id: int, user: CurrentUser, session: SessionDep) -> None:
     result = session.execute(
         delete(Tracked)
@@ -152,3 +152,6 @@ def untrack(tracked_id: int, user: CurrentUser, session: SessionDep) -> None:
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Tracked posting not found")
     session.commit()
+
+app = FastAPI(title="kansei")
+app.include_router(api)

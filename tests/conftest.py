@@ -55,9 +55,9 @@ def client(session):
 def log_in_as(client):
     def log_in(email: str) -> None:
         credentials = {"email": email, "password": "correct password"}
-        response = client.post("/signup", json=credentials)
+        response = client.post("/api/signup", json=credentials)
         assert response.status_code == 201, response.text
-        response = client.post("/login", json=credentials)
+        response = client.post("/api/login", json=credentials)
         assert response.status_code == 204, response.text
 
     return log_in

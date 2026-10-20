@@ -37,14 +37,14 @@ def test_list_postings_filters_by_token(client, session, make_posting):
         datetime(2026, 10, 5, tzinfo=UTC),
     )
 
-    response = client.get("/postings", params={"token": "kansei-test"})
+    response = client.get("/api/postings", params={"token": "kansei-test"})
 
     assert response.status_code == 200
     assert [posting["url"] for posting in response.json()] == ["https://example.com/1"]
 
 
 def test_get_posting_returns_404_for_a_posting_that_doesnt_exist(client):
-    response = client.get("/postings/0")
+    response = client.get("/api/postings/0")
 
     assert response.status_code == 404
 
@@ -59,7 +59,7 @@ def test_get_posting_returns_the_newest_extraction_for_the_current_model_and_pro
         make_extraction(posting_id, 8, "Old prompt.", prompt_sha="70b7a0b0", facts={}),
     ])
 
-    response = client.get(f"/postings/{posting_id}")
+    response = client.get(f"/api/postings/{posting_id}")
 
     assert response.status_code == 200
     assert response.json()["extraction"]["facts"]["role_summary"] == "Newest."
