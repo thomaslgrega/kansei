@@ -92,3 +92,14 @@ def test_a_user_cant_delete_another_users_tracked_posting(client, session, log_i
 
     assert response.status_code == 404
     assert session.get(Tracked, bobs) is not None
+
+
+def test_deleting_your_tracked_posting_is_204_with_no_body(client, session, log_in_as, posting_ids):
+    log_in_as("ada@example.com")
+    tracked = client.post("/me/tracked", json={"posting_id": posting_ids[0]}).json()["id"]
+
+    response = client.delete(f"/me/tracked/{tracked}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert session.get(Tracked, tracked) is None

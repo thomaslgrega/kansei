@@ -143,7 +143,7 @@ def update_tracked(tracked_id: int, body: TrackUpdate, user: CurrentUser, sessio
     return TrackedOut.model_validate(tracked)
 
 
-@app.delete("/me/tracked/{tracked_id}")
+@app.delete("/me/tracked/{tracked_id}", status_code=204)
 def untrack(tracked_id: int, user: CurrentUser, session: SessionDep) -> None:
     result = session.execute(
         delete(Tracked)
