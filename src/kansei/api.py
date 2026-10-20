@@ -1,7 +1,9 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -155,3 +157,7 @@ def untrack(tracked_id: int, user: CurrentUser, session: SessionDep) -> None:
 
 app = FastAPI(title="kansei")
 app.include_router(api)
+
+WEB_DIST = Path(__file__).parents[2] / "web" / "dist"
+if WEB_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")

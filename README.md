@@ -131,6 +131,16 @@ The `run` command makes paid API calls. Cloning the repo gives you the saved res
 - `GET /api/me` returns the logged-in user, or 401. `POST /api/logout` deletes the session on the server, so a copied cookie stops working.
 - `GET /api/me/tracked` lists the postings you're tracking, newest first. `POST /api/me/tracked` takes `{"posting_id", "status", "note"}`, `PATCH /api/me/tracked/{id}` changes the status or note, and `DELETE /api/me/tracked/{id}` stops tracking a posting. Status is one of `saved`, `applied`, `interviewing`, `offer`, `rejected`, and Postgres enforces it too. Another user's tracked posting returns the same 404 as one that doesn't exist.
 
+## Web app
+
+The frontend is a Vite + React + TypeScript app in `web/`. FastAPI serves the built app from the same origin as the API, so the session cookie works with no CORS setup.
+
+```
+cd web && npm install
+npm run dev     # http://localhost:5173, proxies /api to the API on port 8000
+npm run build   # writes web/dist, which uv run fastapi dev serves at http://127.0.0.1:8000
+```
+
 ## Tests
 
 ```sh
@@ -142,4 +152,5 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI that stores postings and their extractions in Postgres, with an API over them, user accounts, and per-user tracked postings. Next is a web interface.
+Kansei is currently a CLI that stores postings and their extractions in Postgres, with an API over them, user accounts, per-user tracked postings, and a web app served from the same origin. Next is deploying it.
+
