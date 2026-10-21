@@ -1,4 +1,16 @@
-# --- Stage 1: build the virtual env ----------
+# --- Stage 1: build the web app ---------------
+FROM node:22.22.0-trixie-slim AS web
+
+WORKDIR /web
+
+COPY web/package.json web/package-lock.json ./
+RUN --mount=type=cache,id=s/8c6b2f1b-1aec-42fe-84d7-3e6647dca13d-/root/.npm,target=/root/.npm \
+    npm ci
+
+COPY web/ ./
+RUN npm run build
+
+# --- Stage 2: build the virtual env ----------
 FROM ghcr.io/astral-sh/uv:0.12.13-python3.13-trixie-slim AS builder
 
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
@@ -17,13 +29,14 @@ COPY . /app
 RUN --mount=type=cache,id=s/8c6b2f1b-1aec-42fe-84d7-3e6647dca13d-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --locked
 
-# ---- Stage 2: the image shipped -------------
+# ---- Stage 3: the image shipped -------------
 FROM python:3.13-slim-trixie
 
 RUN groupadd --system --gid 999 nonroot \
  && useradd --system --gid 999 --uid 999 --create-home nonroot
 
 COPY --from=builder --chown=nonroot:nonroot /app /app
+COPY --from=web --chown=nonroot:nonroot /web/dist /app/web/dist
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
@@ -31,4 +44,4 @@ ENV PYTHONUNBUFFERED=1
 USER nonroot
 WORKDIR /app
 
-CMD ["kansei"]
+CMD ["fastapi", "run"]

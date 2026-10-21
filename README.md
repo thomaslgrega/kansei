@@ -141,6 +141,14 @@ npm run dev     # http://localhost:5173, proxies /api to the API on port 8000
 npm run build   # writes web/dist, which uv run fastapi dev serves at http://127.0.0.1:8000
 ```
 
+## Deploy
+
+Kansei runs on Railway as one service built from the `Dockerfile`. A Node stage builds `web/dist`, a uv stage builds the virtual environment, and the final image, which has neither Node nor uv, runs `fastapi run`, which listens on the port Railway injects as `PORT` (8080). Postgres 18 with pgvector runs as a second service, from Railway's pgvector template.
+
+- The app reaches Postgres over Railway's private network. `DATABASE_URL` is built from the database's private host, with the `postgresql+psycopg` scheme: `postgresql+psycopg://${{pgvector.PGUSER}}:${{pgvector.PGPASSWORD}}@${{pgvector.PGHOST_PRIVATE}}:${{pgvector.PGPORT_PRIVATE}}/${{pgvector.PGDATABASE}}`.
+- Migrations run as the pre-deploy command, `alembic upgrade head`. If one fails, the new version doesn't start and the running one keeps serving.
+- The public domain targets port 8080, the value of Railway's `PORT`. `railway up` deploys the working directory.
+
 ## Tests
 
 ```sh
@@ -152,5 +160,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is currently a CLI that stores postings and their extractions in Postgres, with an API over them, user accounts, per-user tracked postings, and a web app served from the same origin. Next is deploying it.
-
+Kansei is a web app with an API, user accounts and per-user tracked postings, deployed on Railway with Postgres. Next is a sample workspace for visitors and signup in the web app.
