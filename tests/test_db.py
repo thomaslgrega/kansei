@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.pool import NullPool
 
 from kansei import extracted, save_postings, sha256
-from kansei.db import Extraction, Posting
+from kansei.db import Extraction, Posting, engine
 
 
 def test_save_postings_updates_a_posting_it_has_seen_before(session, make_posting):
@@ -43,3 +44,13 @@ def test_extracted_finds_a_text_only_under_the_model_and_prompt_that_read_it(ses
     assert key in extracted(session, "gpt-6-luna", "c876fc21")
     assert key not in extracted(session, "gpt-6-luna", "70b7a0b0")
     assert key not in extracted(session, "gpt-5.6-luna", "c876fc21")
+
+
+def test_engine_reconnects_after_the_database_drops_an_idle_connection():
+    engine.dispose()
+    with engine.connect() as connection:
+        pid = connection.execute(text("select pg_backend_pid()")).scalar_one()
+    with create_engine(engine.url, poolclass=NullPool).connect() as other:
+        other.execute(text("select pg_terminate_backend(:pid)"), {"pid": pid})
+    with engine.connect() as connection:
+        assert connection.execute(text("select 1")).scalar_one() == 1

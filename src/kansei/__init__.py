@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from kansei.config import settings
 from kansei.db import Extraction, Posting, engine
-from kansei.llm import PostingFacts, cost_usd, extract, prompt_snapshot
+from kansei.llm import PostingFacts, cost_usd, extract, openai_client, prompt_snapshot
 from kansei.sources import (
     SOURCES,
     fetch_posting,
@@ -141,10 +141,7 @@ async def extract_batch(
     todo: dict[str, str],
 ) -> dict[str, tuple[ParsedResponse[PostingFacts], float] | Exception]:
     limit = asyncio.Semaphore(settings.llm_concurrency)
-    llm = AsyncOpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.llm_timeout,
-    )
+    llm = openai_client()
     results = await asyncio.gather(
         *(extract_one(llm, limit, text) for text in todo.values()),
         return_exceptions=True,
@@ -260,10 +257,7 @@ async def ingest_url(url: str) -> None:
         print(f"{job.title} [{job.source}:{job.token}]")
         print(f"{len(job.description)} chars of posting text")
 
-        llm = AsyncOpenAI(
-            api_key=settings.openai_api_key.get_secret_value(),
-            timeout=settings.llm_timeout,
-        )
+        llm = openai_client()
         text = await model_input(http, job)
         response, seconds = await extract_one(llm, asyncio.Semaphore(1), text)
 

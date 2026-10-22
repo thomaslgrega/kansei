@@ -9,7 +9,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    openai_api_key: SecretStr
+    openai_api_key: SecretStr | None = None
     database_url: SecretStr
     boards: list[str] = [
         "greenhouse:stripe", "greenhouse:anthropic", "greenhouse:figma",

@@ -22,6 +22,7 @@ from kansei.llm import (
     Seniority,
     cost_usd,
     extract,
+    openai_client,
     prompt_snapshot,
 )
 from kansei.sources import fetch_url
@@ -227,7 +228,7 @@ async def predict(llm: AsyncOpenAI, limit: asyncio.Semaphore, posting: FrozenPos
 async def run(split: Split) -> None:
     labeled = {label.url for label in load(LABELS, Label)}
     postings = [p for p in load(POSTINGS, FrozenPosting) if p.url in labeled and p.split == split]
-    llm = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value(), timeout=settings.llm_timeout)
+    llm = openai_client()
     limit = asyncio.Semaphore(settings.llm_concurrency)
     results = await asyncio.gather(*(predict(llm, limit, p) for p in postings))
 

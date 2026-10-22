@@ -97,6 +97,12 @@ Extract only what the posting actually states. Do not infer, and do not fill a
 field from general knowledge about the company."""
 
 
+def openai_client() -> AsyncOpenAI:
+    if settings.openai_api_key is None:
+        raise RuntimeError("OPENAI_API_KEY is not set. The ingest and the evals need it, the web app doesn't.")
+    return AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value(), timeout=settings.llm_timeout)
+
+
 async def extract(llm: AsyncOpenAI, posting: str) -> ParsedResponse[PostingFacts]:
     return await llm.responses.parse(
         model=settings.openai_model,
