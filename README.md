@@ -143,11 +143,22 @@ npm run build   # writes web/dist, which uv run fastapi dev serves at http://127
 
 ## Deploy
 
-Kansei runs on Railway as one service built from the `Dockerfile`. A Node stage builds `web/dist`, a uv stage builds the virtual environment, and the final image, which has neither Node nor uv, runs `fastapi run`, which listens on the port Railway injects as `PORT` (8080). Postgres 18 with pgvector runs as a second service, from Railway's pgvector template.
+Kansei runs on Google Cloud in Tokyo (`asia-northeast1`). The web app is a Cloud Run service built from the `Dockerfile`: a Node stage builds `web/dist`, a uv stage builds the virtual environment, and the final image runs `fastapi run` on the `PORT` Cloud Run sets (8080). Postgres 18 runs on Cloud SQL.
 
-- The app reaches Postgres over Railway's private network. `DATABASE_URL` is built from the database's private host, with the `postgresql+psycopg` scheme: `postgresql+psycopg://${{pgvector.PGUSER}}:${{pgvector.PGPASSWORD}}@${{pgvector.PGHOST_PRIVATE}}:${{pgvector.PGPORT_PRIVATE}}/${{pgvector.PGDATABASE}}`.
-- Migrations run as the pre-deploy command, `alembic upgrade head`. If one fails, the new version doesn't start and the running one keeps serving.
-- The public domain targets port 8080, the value of Railway's `PORT`. `railway up` deploys the working directory.
+- The service runs as its own service account, `kansei-web`. It has the Cloud SQL Client role and can read one secret, `database-url`. It holds no OpenAI key, because the web app never calls the model.
+- The app connects to Cloud SQL through the Unix socket Cloud Run mounts at `/cloudsql/`. The database has no authorized networks, so the only way in is through IAM.
+- `DATABASE_URL` comes from Secret Manager, pinned to a version. Changing the password means adding a version and deploying with it.
+- Scaling is 0 to 1 instances: the database accepts 25 connections and each process pools up to 15. A cold start takes about 6.53s.
+- Images are built for `linux/amd64` and tagged with the commit.
+
+Release order: migrations first, as a Cloud Run job from the same image, then the service.
+
+```sh
+IMAGE=asia-northeast1-docker.pkg.dev/$PROJECT/kansei/kansei:$(git rev-parse --short HEAD)
+docker build --platform linux/amd64 -t "$IMAGE" . && docker push "$IMAGE"
+gcloud run jobs deploy migrate --image="$IMAGE" --wait
+gcloud run deploy kansei --image="$IMAGE"
+```
 
 ## Tests
 
@@ -160,4 +171,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is a web app with an API, user accounts and per-user tracked postings, deployed on Railway with Postgres. Next is a sample workspace for visitors and signup in the web app.
+Kansei is a web app with an API, user accounts and per-user tracked postings, deployed on Cloud Run with Cloud SQL. Next is a sample workspace for visitors and signup in the web app.
