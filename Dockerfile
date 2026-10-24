@@ -4,7 +4,7 @@ FROM node:22.22.0-trixie-slim AS web
 WORKDIR /web
 
 COPY web/package.json web/package-lock.json ./
-RUN --mount=type=cache,id=s/8c6b2f1b-1aec-42fe-84d7-3e6647dca13d-/root/.npm,target=/root/.npm \
+RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
 COPY web/ ./
@@ -21,12 +21,12 @@ WORKDIR /app
 
 # Dependencies alone, in their own layer.
 COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,id=s/8c6b2f1b-1aec-42fe-84d7-3e6647dca13d-/root/.cache/uv,target=/root/.cache/uv \
+RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 # Code
 COPY . /app
-RUN --mount=type=cache,id=s/8c6b2f1b-1aec-42fe-84d7-3e6647dca13d-/root/.cache/uv,target=/root/.cache/uv \
+RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
 # ---- Stage 3: the image shipped -------------
