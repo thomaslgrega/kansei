@@ -150,14 +150,18 @@ Kansei runs on Google Cloud in Tokyo (`asia-northeast1`). The web app is a Cloud
 - `DATABASE_URL` comes from Secret Manager, pinned to a version. Changing the password means adding a version and deploying with it.
 - Scaling is 0 to 1 instances: the database accepts 25 connections and each process pools up to 15. A cold start takes about 6.53s.
 - Images are built for `linux/amd64` and tagged with the commit.
+- The daily ingest is a Cloud Run job, `ingest`, from the same image, running `kansei`. Cloud Scheduler starts it at 06:00 Tokyo time as `kansei-scheduler`, which can run that one job and nothing else.
+- The job runs as `kansei-ingest`: Cloud SQL Client, plus read access to `database-url` and `openai-api-key`. It's the only identity that can read the OpenAI key, and that key isn't used anywhere else.
+- `LLM_MAX_POSTINGS=200` caps model calls per run. Extractions are cached on (posting, text hash, model, prompt hash), so a daily run only pays for new or changed postings. The first run extracted 187 of 187 candidates for $0.05.
 
-Release order: migrations first, as a Cloud Run job from the same image, then the service.
+Release order: migrations first, as a Cloud Run job from the same image, then the service, then the ingest job's image.
 
 ```sh
 IMAGE=asia-northeast1-docker.pkg.dev/$PROJECT/kansei/kansei:$(git rev-parse --short HEAD)
 docker build --platform linux/amd64 -t "$IMAGE" . && docker push "$IMAGE"
 gcloud run jobs deploy migrate --image="$IMAGE" --wait
 gcloud run deploy kansei --image="$IMAGE"
+gcloud run jobs deploy ingest --image="$IMAGE"
 ```
 
 ## Tests
