@@ -39,8 +39,15 @@ class JobPosting(BaseModel):
 
 def is_candidate(job: JobPosting) -> bool:
     engineering = re.compile(r"engineer|developer|エンジニア|開発", re.IGNORECASE)
-    reachable = re.compile(r"japan|tokyo|remote|日本|東京", re.IGNORECASE)
-    return bool(engineering.search(job.title) and reachable.search(job.location))
+    in_japan = re.compile(
+        r"japan|tokyo|osaka|kyoto|fukuoka|nagoya|yokohama|sapporo|kobe"
+        r"|日本|東京|大阪|京都|福岡|名古屋|横浜|札幌|神戸|北海道|県",
+        re.IGNORECASE,
+    )
+    open_remote = re.compile(r"^remote$|anywhere|worldwide|global|apac|asia", re.IGNORECASE)
+    location = job.location.strip()
+    reachable = in_japan.search(location) or open_remote.search(location)
+    return bool(engineering.search(job.title) and reachable)
 
 
 async def fetch_all(boards: list[str]) -> dict[str, list[dict] | Exception]:

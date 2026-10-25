@@ -38,6 +38,8 @@ LLM_MAX_POSTINGS=5 uv run kansei
 
 These commands make paid OpenAI API calls. The boards, model, request limits, and timeouts are set in [config.py](src/kansei/config.py).
 
+The default boards are companies that hire, or could hire, engineers in Japan. A board stays on the list when it has no Japan roles yet: fetching it costs one request a day, and nothing reaches the model until a posting passes the filter. A posting reaches the model when its title is an engineering role and its location is in Japan (the country, a major city or a prefecture, in English or Japanese) or is remote without naming another place (`Remote`, `Anywhere`, `Worldwide`, `Global`, `APAC`, `Asia`). `Remote, Japan` and `Osaka` count; `Remote - USA` doesn't. The filter errs toward sending: a wrong guess costs one extraction, a missed posting is never seen. The eval sets are frozen with the same rule, so their scores describe the postings the ingest extracts.
+
 Every run stores the fetched postings in Postgres, which runs locally from `compose.yaml`. A posting is identified by its URL, so running again updates the same rows: `first_seen_at` keeps the day it first appeared and `last_seen_at` moves to the latest run. `LLM_MAX_POSTINGS=0 uv run kansei` fetches and stores postings without calling the model.
 
 Extractions are stored too, with the exact text the model read. A posting is sent to the model only when its text, the model or the prompt has changed since it was last extracted, so running again costs nothing for postings that haven't changed. `kansei-eval run` doesn't use this cache: every eval run calls the model, because repeated runs are how run-to-run variation is measured.
@@ -152,7 +154,7 @@ Kansei runs on Google Cloud in Tokyo (`asia-northeast1`). The web app is a Cloud
 - Images are built for `linux/amd64` and tagged with the commit.
 - The daily ingest is a Cloud Run job, `ingest`, from the same image, running `kansei`. Cloud Scheduler starts it at 06:00 Tokyo time as `kansei-scheduler`, which can run that one job and nothing else.
 - The job runs as `kansei-ingest`: Cloud SQL Client, plus read access to `database-url` and `openai-api-key`. It's the only identity that can read the OpenAI key, and that key isn't used anywhere else.
-- `LLM_MAX_POSTINGS=200` caps model calls per run. Extractions are cached on (posting, text hash, model, prompt hash), so a daily run only pays for new or changed postings. The first run extracted 187 of 187 candidates for $0.05.
+- `LLM_MAX_POSTINGS=200` caps model calls per run. Extractions are cached on (posting, text hash, model, prompt hash), so a daily run only pays for new or changed postings. The first run extracted 187 of 189 candidates for $0.06.
 
 Release order: migrations first, as a Cloud Run job from the same image, then the service, then the ingest job's image.
 

@@ -35,7 +35,6 @@ RUNS = EVALS / "runs"
 TEST_RUNS = RUNS / "test"
 PROMPTS = EVALS / "prompts"
 
-IN_JAPAN = re.compile(r"japan|tokyo|日本|東京", re.IGNORECASE)
 MARK = re.compile(
     r"japanese|日本語|jlpt|remote|hybrid|on-?site|office|リモート|在宅|出社|ハイブリッド|オフィス|勤務"
     r"|senior|junior|staff|principal|シニア|ジュニア"
@@ -178,7 +177,7 @@ async def freeze(boards: list[str], urls: list[str], split: Split = "dev", k: in
         if isinstance(result, Exception):
             print(f"skipped {board}: {result}")
     jobs = [job for r in results.values() if not isinstance(r, Exception) for job in validate(r)[0]]
-    in_japan = [job for job in jobs if is_candidate(job) and IN_JAPAN.search(job.location)]
+    in_japan = [job for job in jobs if is_candidate(job)]
     random.Random(17).shuffle(in_japan)
     if k is not None:
         in_japan = per_board(in_japan, k)
