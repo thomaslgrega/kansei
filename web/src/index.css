@@ -24,3 +24,11 @@ li {
   font-size: 0.85em;
   opacity: 0.7;
 }
+
+.postings p {
+  margin: 0;
+}
+
+.facts {
+  font-weight: 600;
+}

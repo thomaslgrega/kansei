@@ -1,4 +1,5 @@
 import { type SubmitEvent, useEffect, useState } from 'react'
+import Postings from './Postings'
 
 type User = { id: number; email: string }
 
@@ -47,40 +48,52 @@ export default function App() {
     setSession(null)
   }
 
+  async function track(postingId: number) {
+    const response = await fetch('/api/me/tracked', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ posting_id: postingId }),
+    })
+    if (!response.ok) {
+      setSession(await loadSession())
+      return
+    }
+    const tracked: Tracked = await response.json()
+    setSession((current) => current && { ...current, tracked: [tracked, ...current.tracked] })
+  }
+
   if (session === undefined) return null
 
-  if (session === null) {
-    return (
-      <main>
-        <h1>kansei</h1>
+  return (
+    <main>
+      <h1>kansei</h1>
+      {session === null ? (
         <form onSubmit={logIn}>
           <input name="email" type="email" placeholder="Email" required />
           <input name="password" type="password" placeholder="Password" required />
           <button>Log in</button>
           {error && <p role="alert">{error}</p>}
         </form>
-      </main>
-    )
-  }
-
-  return (
-    <main>
-      <h1>kansei</h1>
-      <p>
-        {session.user.email} · <button onClick={logOut}>Log out</button>
-      </p>
-      <h2>Tracked postings</h2>
-      <ul>
-        {session.tracked.map((row) => (
-          <li key={row.id}>
-            <a href={row.posting.url}>{row.posting.title}</a>
-            <br />
-            <span className="status">
-              {row.status} · {row.posting.location}
-            </span>
-          </li>
-        ))}
-      </ul>
+      ) : (
+        <>
+          <p>
+            {session.user.email} · <button onClick={logOut}>Log out</button>
+          </p>
+          <h2>Tracked postings</h2>
+          <ul>
+            {session.tracked.map((row) => (
+              <li key={row.id}>
+                <a href={row.posting.url}>{row.posting.title}</a>
+                <br />
+                <span className="status">
+                  {row.status} · {row.posting.location}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <Postings trackedIds={session && new Set(session.tracked.map((row) => row.posting.id))} onTrack={track} />
     </main>
   )
 }
