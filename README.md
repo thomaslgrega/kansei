@@ -9,6 +9,7 @@ Kansei is a Python CLI that reads engineering job postings in Japanese and Engli
 - Uses OpenAI structured outputs to extract a role summary, seniority, required skills, Japanese requirements, and remote work policy.
 - Processes several postings at a time, limits concurrent requests, and reports failures for individual postings.
 - Reports API cost and median and p95 request times.
+- Shows the open postings on a public web page with the extracted facts, newest first. Sales and support roles are hidden until you ask for them, and logged-in users can track postings.
 
 ## Run it
 
@@ -175,4 +176,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is a web app with an API, user accounts and per-user tracked postings, deployed on Cloud Run with Cloud SQL. Next is a sample workspace for visitors and signup in the web app.
+Kansei is a web app with a public postings page, user accounts and per-user tracked postings, deployed on Cloud Run with Cloud SQL. Next is following companies by name from the web app, then a demo account and signup.
