@@ -26,8 +26,8 @@ from kansei import fetch_posting, is_candidate, validate
         ("カスタマーサクセスマネージャー", "東京都中央区", False),
     ],
 )
-def test_is_candidate(make_posting, title, location, expected):
-    assert is_candidate(make_posting(title, location)) is expected
+def test_is_candidate(title, location, expected):
+    assert is_candidate(title, location) is expected
 
 
 def test_validate_keeps_the_good_records_and_names_the_bad_one():

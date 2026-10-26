@@ -37,7 +37,7 @@ class JobPosting(BaseModel):
     description: str | None = None
 
 
-def is_candidate(job: JobPosting) -> bool:
+def is_candidate(title: str, location: str) -> bool:
     engineering = re.compile(r"engineer|developer|エンジニア|開発", re.IGNORECASE)
     in_japan = re.compile(
         r"japan|tokyo|osaka|kyoto|fukuoka|nagoya|yokohama|sapporo|kobe"
@@ -45,9 +45,9 @@ def is_candidate(job: JobPosting) -> bool:
         re.IGNORECASE,
     )
     open_remote = re.compile(r"^remote$|anywhere|worldwide|global|apac|asia", re.IGNORECASE)
-    location = job.location.strip()
+    location = location.strip()
     reachable = in_japan.search(location) or open_remote.search(location)
-    return bool(engineering.search(job.title) and reachable)
+    return bool(engineering.search(title) and reachable)
 
 
 async def fetch_all(boards: list[str]) -> dict[str, list[dict] | Exception]:
@@ -172,7 +172,7 @@ async def amain() -> None:
         postings += passed_jobs
         total_failed += len(failed_jobs)
     total_passed = len(postings)
-    candidates = [job for job in postings if is_candidate(job)]
+    candidates = [job for job in postings if is_candidate(job.title, job.location)]
 
     with Session(engine) as session, session.begin():
         ids = save_postings(session, postings, datetime.now(UTC))
