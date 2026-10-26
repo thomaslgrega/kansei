@@ -127,7 +127,7 @@ The `run` command makes paid API calls. Cloning the repo gives you the saved res
 
 `uv run fastapi dev` serves a JSON API under `/api` at http://127.0.0.1:8000, with interactive documentation at `/docs`.
 
-- `GET /api/postings` lists what the postings page shows: postings that pass the candidate rule, were seen on their board in the last two days, and have an extraction for the configured model and prompt. Each appears once, with the facts from its newest extraction, newest first seen first. Filter by board with `token`. There's no paging: the candidate rule runs in Python after the query, so a SQL limit would cut before it. In production the full list is about 158 postings (121987 KB).
+- `GET /api/postings` lists what the postings page shows: postings that pass the candidate rule, were seen on their board in the last two days, and have an extraction for the configured model and prompt. Each appears once, with the facts from its newest extraction, newest first seen first. Filter by board with `token`. There's no paging: the candidate rule runs in Python after the query, so a SQL limit would cut before it. In production the full list is about 158 postings (122 KB).
 - `GET /api/postings/{id}` returns one posting with its newest extraction for the configured model and prompt, or `null` if it hasn't been extracted.
 - `POST /api/signup` and `POST /api/login` take `{"email", "password"}`. Passwords need at least 15 characters and are stored as Argon2id hashes. Login sets an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie that lasts 14 days.
 - `GET /api/me` returns the logged-in user, or 401. `POST /api/logout` deletes the session on the server, so a copied cookie stops working.
