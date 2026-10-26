@@ -1,14 +1,14 @@
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import IntegrityError
 
-from kansei import auth
+from kansei import auth, is_candidate
 from kansei.auth import CurrentUser
 from kansei.config import settings
 from kansei.db import Extraction, Posting, SessionDep, Tracked, TrackStatus
@@ -46,18 +46,38 @@ class PostingDetail(BaseModel):
     extraction: ExtractionOut | None
 
 
+class PostingWithFacts(BaseModel):
+    posting: PostingOut
+    facts: PostingFacts
+
+
+OPEN_FOR = timedelta(days=2)
+
+
 @api.get("/postings")
-def list_postings(
-    session: SessionDep,
-    token: str | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> list[PostingOut]:
-    statement = select(Posting).order_by(Posting.first_seen_at.desc(), Posting.id.desc())
+def list_postings(session: SessionDep, token: str | None = None) -> list[PostingWithFacts]:
+    prompt_sha, _ = prompt_snapshot()
+    newest = (
+        select(Extraction.posting_id, Extraction.facts)
+        .where(Extraction.model == settings.openai_model, Extraction.prompt_sha == prompt_sha)
+        .ext(distinct_on(Extraction.posting_id))
+        .order_by(Extraction.posting_id, Extraction.created_at.desc(), Extraction.id.desc())
+        .subquery()
+    )
+    statement = (
+        select(Posting, newest.c.facts)
+        .join(newest, newest.c.posting_id == Posting.id)
+        .where(Posting.last_seen_at > datetime.now(UTC) - OPEN_FOR)
+        .order_by(Posting.first_seen_at.desc(), Posting.id.desc())
+    )
     if token is not None:
         statement = statement.where(Posting.token == token)
-    postings = session.scalars(statement.limit(limit).offset(offset))
-    return [PostingOut.model_validate(posting) for posting in postings]
+    return [
+        PostingWithFacts(posting=PostingOut.model_validate(posting), facts=facts)
+        for posting, facts in session.execute(statement)
+        if is_candidate(posting.title, posting.location)
+    ]
+
 
 @api.get("/postings/{posting_id}")
 def get_posting(posting_id: int, session: SessionDep) -> PostingDetail:
