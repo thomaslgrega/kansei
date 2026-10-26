@@ -50,6 +50,14 @@ def is_candidate(title: str, location: str) -> bool:
     return bool(engineering.search(title) and reachable)
 
 
+def is_sales_or_support(title: str) -> bool:
+    customer_facing = re.compile(
+        r"\b(sales|support|solutions?|field|customer success)\b|セールス|サポート|カスタマーサクセス",
+        re.IGNORECASE,
+    )
+    return bool(customer_facing.search(title))
+
+
 async def fetch_all(boards: list[str]) -> dict[str, list[dict] | Exception]:
     parsed = [board.split(":", 1) for board in boards]
     async with httpx.AsyncClient(timeout=settings.request_timeout) as client:

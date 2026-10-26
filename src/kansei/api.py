@@ -8,7 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import IntegrityError
 
-from kansei import auth, is_candidate
+from kansei import auth, is_candidate, is_sales_or_support
 from kansei.auth import CurrentUser
 from kansei.config import settings
 from kansei.db import Extraction, Posting, SessionDep, Tracked, TrackStatus
@@ -49,6 +49,7 @@ class PostingDetail(BaseModel):
 class PostingWithFacts(BaseModel):
     posting: PostingOut
     facts: PostingFacts
+    sales_or_support: bool
 
 
 OPEN_FOR = timedelta(days=2)
@@ -73,7 +74,11 @@ def list_postings(session: SessionDep, token: str | None = None) -> list[Posting
     if token is not None:
         statement = statement.where(Posting.token == token)
     return [
-        PostingWithFacts(posting=PostingOut.model_validate(posting), facts=facts)
+        PostingWithFacts(
+            posting=PostingOut.model_validate(posting),
+            facts=facts,
+            sales_or_support=is_sales_or_support(posting.title),
+        )
         for posting, facts in session.execute(statement)
         if is_candidate(posting.title, posting.location)
     ]
