@@ -2,6 +2,8 @@
 
 Kansei is a Python CLI that reads engineering job postings in Japanese and English. I'm building it for my own job search in Japan, where I want to quickly find the skills, Japanese level, and work arrangements a role requires.
 
+Live: https://kansei-3dr6p2i5tq-an.a.run.app/ (the postings page is public; signup isn't open yet).
+
 ## What it does
 
 - Reads postings from Greenhouse, Lever, or a job page URL.
