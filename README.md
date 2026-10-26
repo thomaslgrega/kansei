@@ -159,12 +159,10 @@ Kansei runs on Google Cloud in Tokyo (`asia-northeast1`). The web app is a Cloud
 Release order: migrations first, as a Cloud Run job from the same image, then the service, then the ingest job's image.
 
 ```sh
-IMAGE=asia-northeast1-docker.pkg.dev/$PROJECT/kansei/kansei:$(git rev-parse --short HEAD)
-docker build --platform linux/amd64 -t "$IMAGE" . && docker push "$IMAGE"
-gcloud run jobs deploy migrate --image="$IMAGE" --wait
-gcloud run deploy kansei --image="$IMAGE"
-gcloud run jobs deploy ingest --image="$IMAGE"
+scripts/release.sh
 ```
+
+The script refuses to run with uncommitted changes, because the image is tagged with the commit, and it checks that the ingest job ended up on the new image.
 
 ## Tests
 
