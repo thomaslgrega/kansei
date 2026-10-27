@@ -11,12 +11,7 @@ class Settings(BaseSettings):
 
     openai_api_key: SecretStr | None = None
     database_url: SecretStr
-    boards: list[str] = [
-        "greenhouse:anthropic", "greenhouse:appier", "greenhouse:binance", "greenhouse:databricks",
-        "greenhouse:datadog", "greenhouse:discord", "greenhouse:figma", "greenhouse:gitlab",
-        "greenhouse:paypaycard", "greenhouse:stripe", "greenhouse:zscaler",
-        "lever:mujininc", "lever:woven-by-toyota",
-    ]
+    boards: list[str] | None = None
     request_timeout: float = 10.0
     openai_model: str = "gpt-6-luna"
     llm_max_postings: int = 300

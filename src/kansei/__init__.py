@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from kansei.config import settings
-from kansei.db import Extraction, Posting, engine
+from kansei.db import Board, Extraction, Posting, engine
 from kansei.llm import PostingFacts, cost_usd, extract, openai_client, prompt_snapshot
 from kansei.sources import (
     SOURCES,
@@ -56,6 +56,13 @@ def is_sales_or_support(title: str) -> bool:
         re.IGNORECASE,
     )
     return bool(customer_facing.search(title))
+
+
+def boards_to_fetch(session: Session) -> list[str]:
+    if settings.boards is not None:
+        return settings.boards
+    boards = session.scalars(select(Board).order_by(Board.id))
+    return [f"{board.source}:{board.token}" for board in boards]
 
 
 async def fetch_all(boards: list[str]) -> dict[str, list[dict] | Exception]:
@@ -181,8 +188,10 @@ async def extract_batch(
 
 
 async def amain() -> None:
+    with Session(engine) as session:
+        to_fetch = boards_to_fetch(session)
     started = time.perf_counter()
-    results = await fetch_all(settings.boards)
+    results = await fetch_all(to_fetch)
     elapsed = time.perf_counter() - started
 
     boards = {t: r for t, r in results.items() if not isinstance(r, Exception)}
