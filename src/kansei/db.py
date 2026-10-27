@@ -30,6 +30,22 @@ class Base(DeclarativeBase):
     })
 
 
+BoardSource = Literal["greenhouse", "lever"]
+
+
+class Board(Base):
+    __tablename__ = "boards"
+    __table_args__ = (
+        UniqueConstraint("source", "token"),
+        CheckConstraint(column("source").in_(get_args(BoardSource)), name="source"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[BoardSource] = mapped_column(String)
+    token: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Extraction(Base):
     __tablename__ = "extractions"
     __table_args__ = (UniqueConstraint("posting_id", "text_sha256", "model", "prompt_sha"),)

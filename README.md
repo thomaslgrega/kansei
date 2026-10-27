@@ -39,9 +39,11 @@ To read the configured job boards, start with a small limit:
 LLM_MAX_POSTINGS=5 uv run kansei
 ```
 
-These commands make paid OpenAI API calls. The boards, model, request limits, and timeouts are set in [config.py](src/kansei/config.py).
+These commands make paid OpenAI API calls. The model, request limits, and timeouts are set in [config.py](src/kansei/config.py).
 
-The default boards are companies that hire, or could hire, engineers in Japan. A board stays on the list when it has no Japan roles yet: fetching it costs one request a day, and nothing reaches the model until a posting passes the filter. A posting reaches the model when its title is an engineering role and its location is in Japan (the country, a major city or a prefecture, in English or Japanese) or is remote without naming another place (`Remote`, `Anywhere`, `Worldwide`, `Global`, `APAC`, `Asia`). `Remote, Japan` and `Osaka` count; `Remote - USA` doesn't. The filter errs toward sending: a wrong guess costs one extraction, a missed posting is never seen. The eval sets are frozen with the same rule, so their scores describe the postings the ingest extracts.
+The boards are rows in the `boards` table, and the migrations start it with thirteen defaults. `BOARDS` replaces the table for one run, so `BOARDS='["lever:mujininc"]' uv run kansei` fetches one board and `BOARDS='[]'` fetches none.
+
+The default boards are companies that hire, or could hire, engineers in Japan. A board stays in the table when it has no Japan roles yet: fetching it costs one request a day, and nothing reaches the model until a posting passes the filter. A posting reaches the model when its title is an engineering role and its location is in Japan (the country, a major city or a prefecture, in English or Japanese) or is remote without naming another place (`Remote`, `Anywhere`, `Worldwide`, `Global`, `APAC`, `Asia`). `Remote, Japan` and `Osaka` count; `Remote - USA` doesn't. The filter errs toward sending: a wrong guess costs one extraction, a missed posting is never seen. The eval sets are frozen with the same rule, so their scores describe the postings the ingest extracts.
 
 Every run stores the fetched postings in Postgres, which runs locally from `compose.yaml`. A posting is identified by its URL, so running again updates the same rows: `first_seen_at` keeps the day it first appeared and `last_seen_at` moves to the latest run. `LLM_MAX_POSTINGS=0 uv run kansei` fetches and stores postings without calling the model, and reports how many would be sent.
 

@@ -11,9 +11,18 @@ from typing import Literal, NamedTuple, get_args
 import httpx
 from openai import AsyncOpenAI
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from kansei import JobPosting, fetch_all, is_candidate, model_input, validate
+from kansei import (
+    JobPosting,
+    boards_to_fetch,
+    fetch_all,
+    is_candidate,
+    model_input,
+    validate,
+)
 from kansei.config import settings
+from kansei.db import engine
 from kansei.llm import (
     JapaneseLevel,
     JapaneseRequired,
@@ -341,7 +350,9 @@ def label_skills(urls: list[str]) -> None:
 def main() -> None:
     match sys.argv[1:]:
         case ["freeze", *urls]:
-            asyncio.run(freeze(settings.boards, urls))
+            with Session(engine) as session:
+                boards = boards_to_fetch(session)
+            asyncio.run(freeze(boards, urls))
         case ["freeze-test"]:
             asyncio.run(freeze(TEST_BOARDS, [], "test", k=3))
         case ["manifest"]:
