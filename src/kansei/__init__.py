@@ -120,6 +120,20 @@ def extracted(session: Session, model: str, prompt_sha: str) -> set[tuple[int, s
     return {(posting_id, text_sha256) for posting_id, text_sha256 in session.execute(statement)}
 
 
+def pending_extractions(
+    texts: dict[str, str | Exception],
+    ids: dict[str, int],
+    cached: set[tuple[int, str]],
+    cap: int,
+) -> tuple[dict[str, str], int]:
+    pending = [
+        (url, text)
+        for url, text in texts.items()
+        if not isinstance(text, Exception) and (ids[url], sha256(text)) not in cached
+    ]
+    return dict(pending[:cap]), len(pending)
+
+
 def show(facts: PostingFacts) -> None:
     print(f"  japanese: {facts.japanese_required}, level {facts.japanese_level}, jlpt {facts.jlpt}")
     print(f"            {facts.japanese_as_written or '(says nothing)'}")
@@ -155,6 +169,8 @@ async def extract_one(
 async def extract_batch(
     todo: dict[str, str],
 ) -> dict[str, tuple[ParsedResponse[PostingFacts], float] | Exception]:
+    if not todo:
+        return {}
     limit = asyncio.Semaphore(settings.llm_concurrency)
     llm = openai_client()
     results = await asyncio.gather(
@@ -191,20 +207,20 @@ async def amain() -> None:
         print(f"  skipped {token}: {type(exc).__name__}")
     print(f"{total_passed} validated, {total_failed} invalid")
 
-    selected = candidates[: settings.llm_max_postings]
-    texts = await fetch_texts(selected)
-    fetched = {str(job.url): text for job, text in zip(selected, texts) if not isinstance(text, Exception)}
-    for job, text in zip(selected, texts):
+    texts = dict(zip((str(job.url) for job in candidates), await fetch_texts(candidates)))
+    for url, text in texts.items():
         if isinstance(text, Exception):
-            print(f"    could not fetch {job.url}: {type(text).__name__}")
+            print(f"    could not fetch {url}: {type(text).__name__}")
+    fetched = sum(not isinstance(text, Exception) for text in texts.values())
 
     prompt_sha, _ = prompt_snapshot()
     with Session(engine) as session:
         before = extracted(session, settings.openai_model, prompt_sha)
-    todo = {url: text for url, text in fetched.items() if (ids[url], sha256(text)) not in before}
+    todo, pending_count = pending_extractions(texts, ids, before, settings.llm_max_postings)
     print(
-        f"{len(candidates)} candidates, {len(fetched) - len(todo)} already extracted with "
-        f"{settings.openai_model} and prompt {prompt_sha}, sending {len(todo)}"
+        f"{len(candidates)} candidates, {fetched - pending_count} already extracted with "
+        f"{settings.openai_model} and prompt {prompt_sha}, {pending_count} need the model, "
+        f"sending {len(todo)} (LLM_MAX_POSTINGS={settings.llm_max_postings})"
     )
 
     started = time.perf_counter()
@@ -231,7 +247,7 @@ async def amain() -> None:
     for url, exc in errors.items():
         code = getattr(exc, "code", None) or ""
         print(f"    failed {url}: {type(exc).__name__} {code}")
-    by_url = {str(job.url): job for job in selected}
+    by_url = {str(job.url): job for job in candidates}
     for url, (response, _) in done.items():
         facts = response.output_parsed
         print(f"\n{by_url[url].title}")

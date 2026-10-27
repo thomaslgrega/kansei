@@ -1,7 +1,14 @@
 import httpx
 import pytest
 
-from kansei import fetch_posting, is_candidate, is_sales_or_support, validate
+from kansei import (
+    fetch_posting,
+    is_candidate,
+    is_sales_or_support,
+    pending_extractions,
+    sha256,
+    validate,
+)
 
 
 @pytest.mark.parametrize(
@@ -90,3 +97,43 @@ async def test_fetch_posting_raises_on_a_404():
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(httpx.HTTPStatusError):
             await fetch_posting(client, "ramp", 42)
+
+
+IDS = {"https://example.com/a": 1, "https://example.com/b": 2, "https://example.com/c": 3,
+       "https://example.com/d": 4}
+
+
+def test_pending_extractions_sends_the_first_ones_up_to_the_cap():
+    texts = {"https://example.com/a": "A", "https://example.com/b": "B", "https://example.com/c": "C"}
+
+    assert pending_extractions(texts, IDS, cached=set(), cap=2) == (
+        {"https://example.com/a": "A", "https://example.com/b": "B"},
+        3,
+    )
+
+
+def test_pending_extractions_skips_already_extracted_candidates_without_using_the_cap():
+    texts = {"https://example.com/a": "A", "https://example.com/b": "B", "https://example.com/c": "C",
+             "https://example.com/d": "D"}
+    cached = {(1, sha256("A")), (2, sha256("B")), (3, sha256("old C"))}
+
+    assert pending_extractions(texts, IDS, cached, cap=2) == (
+        {"https://example.com/c": "C", "https://example.com/d": "D"},
+        2,
+    )
+
+
+def test_pending_extractions_sends_nothing_with_a_cap_of_zero():
+    texts = {"https://example.com/a": "A", "https://example.com/b": "B"}
+
+    assert pending_extractions(texts, IDS, cached=set(), cap=0) == ({}, 2)
+
+
+def test_pending_extractions_skips_a_failed_fetch_without_using_the_cap():
+    texts = {"https://example.com/a": httpx.ReadTimeout("timed out"), "https://example.com/b": "B",
+             "https://example.com/c": "C"}
+
+    assert pending_extractions(texts, IDS, cached=set(), cap=2) == (
+        {"https://example.com/b": "B", "https://example.com/c": "C"},
+        2,
+    )
