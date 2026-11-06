@@ -2,6 +2,7 @@ from typing import get_args
 
 import pytest
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 
 import kansei
 from kansei import boards_to_fetch
@@ -34,3 +35,10 @@ def test_the_database_accepts_every_board_source(session, source):
     session.flush()
 
     assert session.execute(select(Board.source, Board.token)).all() == [(source, "a")]
+
+
+def test_the_database_rejects_a_board_named_the_empty_string(session):
+    session.add(Board(source="greenhouse", token="a", name=""))
+
+    with pytest.raises(IntegrityError, match="ck_boards_name"):
+        session.flush()

@@ -11,7 +11,7 @@ type Facts = {
 }
 
 type Row = {
-    posting: { id: number; url: string; token: string; title: string; location: string; first_seen_at: string }
+    posting: { id: number; url: string; company: string; title: string; location: string; first_seen_at: string }
     facts: Facts
     sales_or_support: boolean
 }
@@ -60,7 +60,7 @@ export default function Postings({ trackedIds, onTrack }: Props) {
                             {posting.title}
                         </a>
                         <p className="status">
-                            {posting.token} · {posting.location} · first seen {new Date(posting.first_seen_at).toLocaleDateString('en-CA')}
+                            {posting.company} · {posting.location} · first seen {new Date(posting.first_seen_at).toLocaleDateString('en-CA')}
                         </p>
                         <p className="facts">{factLine(facts)}</p>
                         {facts.must_have_skills.length > 0 && <p className="status">{facts.must_have_skills.join(', ')}</p>}

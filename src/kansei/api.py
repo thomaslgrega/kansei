@@ -25,6 +25,7 @@ class PostingOut(BaseModel):
     url: str
     source: str
     token: str
+    company: str
     title: str
     location: str
     posted_at: datetime | None

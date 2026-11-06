@@ -12,6 +12,10 @@ _Avoid_: Company, source
 A posting whose title is an engineering role and whose location is in Japan or remote without naming another place.
 _Avoid_: Match, Japan posting
 
+**Company name**:
+The name a board's company goes by, such as `Woven by Toyota` for `lever:woven-by-toyota`. A board may have none, and a pasted posting has no board, so such a posting goes by its token instead.
+_Avoid_: Employer, organization
+
 **Extraction**:
 The facts the model read out of one posting's text, stored with that exact text, the model and the prompt.
 _Avoid_: Summary, parse

@@ -13,9 +13,17 @@ from sqlalchemy import (
     column,
     create_engine,
     func,
+    select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    Session,
+    column_property,
+    mapped_column,
+    relationship,
+)
 
 from kansei.config import settings
 
@@ -38,11 +46,13 @@ class Board(Base):
     __table_args__ = (
         UniqueConstraint("source", "token"),
         CheckConstraint(column("source").in_(get_args(BoardSource)), name="source"),
+        CheckConstraint(column("name") != "", name="name"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     source: Mapped[BoardSource] = mapped_column(String)
     token: Mapped[str]
+    name: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -64,13 +74,21 @@ class Posting(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     url: Mapped[str] = mapped_column(unique=True)
-    source: Mapped[str]
-    token: Mapped[str]
+    # Assigned so `company` below can refer to them in the class body.
+    source: Mapped[str] = mapped_column()
+    token: Mapped[str] = mapped_column()
     title: Mapped[str]
     location: Mapped[str]
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    company: Mapped[str] = column_property(
+        func.coalesce(
+            select(Board.name).where(Board.source == source, Board.token == token).scalar_subquery(),
+            token,
+        )
+    )
 
 
 class User(Base):
