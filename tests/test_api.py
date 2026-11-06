@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from kansei import save_postings, sha256
 from kansei.config import settings
-from kansei.db import Extraction
+from kansei.db import Board, Extraction
 from kansei.llm import PostingFacts, prompt_snapshot
 
 FACTS = PostingFacts(
@@ -97,3 +97,36 @@ def test_get_posting_returns_the_newest_extraction_for_the_current_model_and_pro
 
     assert response.status_code == 200
     assert response.json()["extraction"]["facts"]["role_summary"] == "Newest."
+
+
+def test_a_posting_whose_board_has_a_name_shows_that_name_everywhere(client, session, make_posting, log_in_as):
+    session.add(Board(source="greenhouse", token="kansei-test", name="Kansei Test K.K."))
+    ids = save_postings(session, [make_posting(token="kansei-test")], datetime.now(UTC))
+    posting_id = ids["https://example.com/1"]
+    session.add(make_extraction(posting_id, 6, "Named."))
+    log_in_as("ada@example.com")
+    client.post("/api/me/tracked", json={"posting_id": posting_id})
+
+    listed = client.get("/api/postings", params={"token": "kansei-test"}).json()
+    single = client.get(f"/api/postings/{posting_id}").json()
+    tracked = client.get("/api/me/tracked").json()
+
+    assert [row["posting"]["company"] for row in [*listed, single, *tracked]] == ["Kansei Test K.K."] * 3
+
+
+def test_a_posting_whose_board_has_no_name_shows_its_token(client, session, make_posting):
+    session.add(Board(source="greenhouse", token="kansei-test"))
+    ids = save_postings(session, [make_posting(token="kansei-test")], datetime.now(UTC))
+
+    response = client.get(f"/api/postings/{ids['https://example.com/1']}")
+
+    assert response.json()["posting"]["company"] == "kansei-test"
+
+
+def test_a_pasted_posting_shows_its_token_even_when_a_board_shares_it(client, session, make_posting):
+    session.add(Board(source="greenhouse", token="example.com", name="Example K.K."))
+    ids = save_postings(session, [make_posting(source="url", token="example.com")], datetime.now(UTC))
+
+    response = client.get(f"/api/postings/{ids['https://example.com/1']}")
+
+    assert response.json()["posting"]["company"] == "example.com"
