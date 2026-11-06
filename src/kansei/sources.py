@@ -58,6 +58,8 @@ def lever_text(raw: dict) -> str:
 GREENHOUSE_BOARD = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs"
 GREENHOUSE_JOB = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_id}"
 LEVER_BOARD = "https://api.lever.co/v0/postings/{token}?mode=json"
+GREENHOUSE_NAME = "https://boards-api.greenhouse.io/v1/boards/{token}"
+LEVER_PAGE = "https://jobs.lever.co/{token}"
 
 
 def from_greenhouse(raw: dict, token: str) -> dict:
@@ -131,6 +133,24 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
     if "text/html" not in content_type:
         raise ValueError(f"{url} returned {content_type or 'no content type'}, not HTML")
     return from_url(response.text, url)
+
+
+async def fetch_board_name(client: httpx.AsyncClient, source: str, token: str) -> str | None:
+    url = GREENHOUSE_NAME if source == "greenhouse" else LEVER_PAGE
+    try:
+        response = await client.get(url.format(token=token))
+        response.raise_for_status()
+    except httpx.HTTPError:
+        return None
+    if source == "greenhouse":
+        try:
+            name = response.json().get("name") or ""
+        except ValueError:
+            return None
+    else:
+        title = BeautifulSoup(response.text, "html.parser").title
+        name = title.get_text() if title else ""
+    return name.strip() or None
 
 
 SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever}

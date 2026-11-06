@@ -3,6 +3,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from kansei.sources import (
+    fetch_board_name,
     fetch_url,
     from_greenhouse,
     from_lever,
@@ -176,3 +177,60 @@ async def test_fetch_url_refuses_a_response_that_redirected_a_non_existing_post(
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(ValueError, match="redirected to"):
             await fetch_url(client, "https://example.com/jobs/1")
+
+
+async def test_fetch_board_name_reads_the_greenhouse_board_name():
+    def handler(request):
+        assert request.url == "https://boards-api.greenhouse.io/v1/boards/anthropic"
+        return httpx.Response(200, json={"name": "Anthropic", "content": "<p>About us</p>"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await fetch_board_name(client, "greenhouse", "anthropic") == "Anthropic"
+
+
+def lever_page(head: str) -> httpx.Response:
+    page = f"<html><head>{head}</head><body><h1>Open roles</h1></body></html>"
+    return httpx.Response(200, headers={"content-type": "text/html"}, text=page)
+
+
+async def test_fetch_board_name_reads_the_lever_page_title_not_og_title():
+    def handler(request):
+        assert request.url == "https://jobs.lever.co/woven-by-toyota"
+        return lever_page(
+            '<meta property="og:title" content="Woven by Toyota jobs">'
+            "<title>\n  Woven by Toyota  \n</title>"
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await fetch_board_name(client, "lever", "woven-by-toyota") == "Woven by Toyota"
+
+
+@pytest.mark.parametrize(
+    "source, response",
+    [
+        ("lever", lever_page('<meta property="og:title" content="Mujin jobs">')),
+        ("lever", lever_page("<title>  </title>")),
+        ("greenhouse", httpx.Response(200, json={"name": " "})),
+        ("greenhouse", httpx.Response(200, text="<html>Maintenance</html>")),
+    ],
+)
+async def test_fetch_board_name_gives_no_name_for_a_missing_or_blank_one(source, response):
+    async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: response)) as client:
+        assert await fetch_board_name(client, source, "mujininc") is None
+
+
+def times_out(request):
+    raise httpx.ReadTimeout("timed out", request=request)
+
+
+@pytest.mark.parametrize(
+    "source, handler",
+    [
+        ("lever", lambda request: httpx.Response(404, text="<title>Not found – 404 error</title>")),
+        ("greenhouse", lambda request: httpx.Response(500, json={"name": "Anthropic"})),
+        ("greenhouse", times_out),
+    ],
+)
+async def test_fetch_board_name_gives_no_name_when_the_request_fails(source, handler):
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await fetch_board_name(client, source, "mujin") is None
