@@ -41,7 +41,7 @@ LLM_MAX_POSTINGS=5 uv run kansei
 
 These commands make paid OpenAI API calls. The model, request limits, and timeouts are set in [config.py](src/kansei/config.py).
 
-The boards are rows in the `boards` table, and the migrations start it with thirteen defaults. `BOARDS` replaces the table for one run, so `BOARDS='["lever:mujininc"]' uv run kansei` fetches one board and `BOARDS='[]'` fetches none.
+The boards are rows in the `boards` table, and the migrations start it with thirteen defaults. `BOARDS` replaces the table for one run, so `BOARDS='["lever:mujininc"]' uv run kansei` fetches postings from one board and `BOARDS='[]'` fetches none. Company names are still filled for the table's boards, as described below.
 
 Each board's company name comes from its ATS: the `name` field of the Greenhouse board API (`https://boards-api.greenhouse.io/v1/boards/{token}`), or the `<title>` of the Lever board page (`https://jobs.lever.co/{token}`). The ingest fetches a name only for a board that doesn't have one yet and never overwrites a name. When the fetch fails, the name stays empty, the page shows the token, and the next run tries again. Boards given only in `BOARDS` have no row, so they get no name.
 

@@ -202,9 +202,9 @@ async def extract_batch(
 async def amain() -> None:
     with Session(engine) as session, session.begin():
         async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-            unnamed = await fill_board_names(session, client)
+            still_unnamed = await fill_board_names(session, client)
         to_fetch = boards_to_fetch(session)
-    for board in unnamed:
+    for board in still_unnamed:
         print(f"  no company name for {board}")
     started = time.perf_counter()
     results = await fetch_all(to_fetch)

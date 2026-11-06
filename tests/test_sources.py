@@ -212,9 +212,11 @@ async def test_fetch_board_name_reads_the_lever_page_title_not_og_title():
         ("lever", lever_page("<title>  </title>")),
         ("greenhouse", httpx.Response(200, json={"name": " "})),
         ("greenhouse", httpx.Response(200, text="<html>Maintenance</html>")),
+        ("greenhouse", httpx.Response(200, json=["Anthropic"])),
+        ("greenhouse", httpx.Response(200, json={"name": 123})),
     ],
 )
-async def test_fetch_board_name_gives_no_name_for_a_missing_or_blank_one(source, response):
+async def test_fetch_board_name_gives_no_name_for_a_missing_blank_or_malformed_one(source, response):
     async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: response)) as client:
         assert await fetch_board_name(client, source, "mujininc") is None
 
