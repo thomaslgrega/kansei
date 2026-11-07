@@ -1,4 +1,5 @@
 import { type SubmitEvent, useEffect, useState } from 'react'
+import NewBadge from './NewBadge'
 import Postings from './Postings'
 
 type User = { id: number; email: string }
@@ -7,7 +8,7 @@ type Tracked = {
   id: number
   status: string
   note: string
-  posting: { id: number; title: string; url: string; location: string }
+  posting: { id: number; title: string; url: string; location: string; first_seen_at: string }
 }
 
 type Session = { user: User; tracked: Tracked[] }
@@ -83,6 +84,7 @@ export default function App() {
           <ul>
             {session.tracked.map((row) => (
               <li key={row.id}>
+                <NewBadge firstSeenAt={row.posting.first_seen_at} />
                 <a href={row.posting.url}>{row.posting.title}</a>
                 <br />
                 <span className="status">
