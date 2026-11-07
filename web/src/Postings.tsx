@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { boardKey } from "./boards";
 import NewBadge from "./NewBadge";
 
 type Facts = {
@@ -12,7 +13,17 @@ type Facts = {
 }
 
 type Row = {
-    posting: { id: number; url: string; company: string; title: string; location: string; first_seen_at: string }
+    posting: {
+        id: number
+        url: string
+        source: string
+        token: string
+        company: string
+        has_board: boolean
+        title: string
+        location: string
+        first_seen_at: string
+    }
     facts: Facts
     sales_or_support: boolean
 }
@@ -24,22 +35,38 @@ function factLine(facts: Facts): string {
         .join(' · ')
 }
 
-type Props = { trackedIds: Set<number> | null; onTrack: (postingId: number) => void }
+type Props = {
+    trackedIds: Set<number> | null
+    onTrack: (postingId: number) => void
+    followed: Set<string> | null
+    onFollow: (source: string, token: string) => void
+    onUnfollow: (source: string, token: string) => void
+}
 
-export default function Postings({ trackedIds, onTrack }: Props) {
+export default function Postings({ trackedIds, onTrack, followed, onFollow, onUnfollow }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
     const [showSales, setShowSales] = useState(false)
+    const [followingOnly, setFollowingOnly] = useState(false)
     const [failed, setFailed] = useState(false)
 
+    const following = followingOnly && followed !== null
+    // Refetch the following list when follows change, so an unfollowed board's postings leave it.
+    const followedKey = following ? [...followed].sort().join(' ') : ''
+
     useEffect(() => {
-        fetch('/api/postings')
+        let current = true
+        const url = following ? '/api/postings?following=true' : '/api/postings'
+        fetch(url)
             .then((response) => {
-                if (!response.ok) throw new Error(`GET /api/postings: ${response.status}`)
+                if (!response.ok) throw new Error(`GET ${url}: ${response.status}`)
                 return response.json()
             })
-            .then(setRows)
-            .catch(() => setFailed(true))
-    }, [])
+            .then((rows) => current && setRows(rows))
+            .catch(() => current && setFailed(true))
+        return () => {
+            current = false
+        }
+    }, [following, followedKey])
 
     if (failed) return <p>Couldn't load postings. Try reloading the page.</p>
     if (rows === undefined) return <p>Loading postings...</p>
@@ -50,6 +77,12 @@ export default function Postings({ trackedIds, onTrack }: Props) {
     return (
         <section>
             <h2>Postings ({visible.length})</h2>
+            {followed && (
+                <label>
+                    <input type="checkbox" checked={followingOnly} onChange={(event) => setFollowingOnly(event.target.checked)} />
+                    Following only
+                </label>
+            )}
             <label>
                 <input type="checkbox" checked={showSales} onChange={(event) => setShowSales(event.target.checked)} />
                 Show sales and support roles ({hidden})
@@ -62,7 +95,13 @@ export default function Postings({ trackedIds, onTrack }: Props) {
                             {posting.title}
                         </a>
                         <p className="status">
-                            {posting.company} · {posting.location} · first seen {new Date(posting.first_seen_at).toLocaleDateString('en-CA')}
+                            {posting.company}
+                            {followed && posting.has_board && (followed.has(boardKey(posting)) ? (
+                                <> <button onClick={() => onUnfollow(posting.source, posting.token)}>Unfollow</button></>
+                            ) : (
+                                <> <button onClick={() => onFollow(posting.source, posting.token)}>Follow</button></>
+                            ))}
+                            {' '}· {posting.location} · first seen {new Date(posting.first_seen_at).toLocaleDateString('en-CA')}
                         </p>
                         <p className="facts">{factLine(facts)}</p>
                         {facts.must_have_skills.length > 0 && <p className="status">{facts.must_have_skills.join(', ')}</p>}

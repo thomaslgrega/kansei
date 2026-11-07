@@ -1,4 +1,5 @@
 import { type SubmitEvent, useEffect, useState } from 'react'
+import { type Board, boardKey } from './boards'
 import NewBadge from './NewBadge'
 import Postings from './Postings'
 
@@ -11,13 +12,17 @@ type Tracked = {
   posting: { id: number; title: string; url: string; location: string; first_seen_at: string }
 }
 
-type Session = { user: User; tracked: Tracked[] }
+type Session = { user: User; tracked: Tracked[]; follows: Board[] }
+
+async function loadFollows(): Promise<Board[]> {
+  return (await fetch('/api/me/follows')).json()
+}
 
 async function loadSession(): Promise<Session | null> {
   const me = await fetch('/api/me')
   if (me.status === 401) return null
-  const tracked = await fetch('/api/me/tracked')
-  return { user: await me.json(), tracked: await tracked.json() }
+  const [tracked, follows] = await Promise.all([fetch('/api/me/tracked'), loadFollows()])
+  return { user: await me.json(), tracked: await tracked.json(), follows }
 }
 
 export default function App() {
@@ -63,6 +68,22 @@ export default function App() {
     setSession((current) => current && { ...current, tracked: [tracked, ...current.tracked] })
   }
 
+  async function follow(source: string, token: string) {
+    await fetch('/api/me/follows', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, token }),
+    })
+    const follows = await loadFollows()
+    setSession((current) => current && { ...current, follows })
+  }
+
+  async function unfollow(source: string, token: string) {
+    await fetch(`/api/me/follows/${encodeURIComponent(source)}/${encodeURIComponent(token)}`, { method: 'DELETE' })
+    const follows = await loadFollows()
+    setSession((current) => current && { ...current, follows })
+  }
+
   if (session === undefined) return null
 
   return (
@@ -93,9 +114,23 @@ export default function App() {
               </li>
             ))}
           </ul>
+          <h2>Following</h2>
+          <ul>
+            {session.follows.map((board) => (
+              <li key={boardKey(board)}>
+                {board.company} <button onClick={() => unfollow(board.source, board.token)}>Unfollow</button>
+              </li>
+            ))}
+          </ul>
         </>
       )}
-      <Postings trackedIds={session && new Set(session.tracked.map((row) => row.posting.id))} onTrack={track} />
+      <Postings
+        trackedIds={session && new Set(session.tracked.map((row) => row.posting.id))}
+        onTrack={track}
+        followed={session && new Set(session.follows.map(boardKey))}
+        onFollow={follow}
+        onUnfollow={unfollow}
+      />
     </main>
   )
 }
