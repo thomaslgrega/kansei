@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     request_timeout: float = 10.0
     openai_model: str = "gpt-6-luna"
     llm_max_postings: int = 300
+    llm_daily_limit: int = 300
     llm_concurrency: int = 8
     llm_timeout: float = 60.0
 

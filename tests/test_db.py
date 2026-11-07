@@ -1,11 +1,11 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
 
-from kansei import extracted, save_postings, sha256
+from kansei import extracted, extraction_cap, save_postings, sha256
 from kansei.db import Extraction, Posting, engine
 
 
@@ -61,3 +61,53 @@ def test_engine_reconnects_after_the_database_drops_an_idle_connection():
 def test_the_database_rejects_a_posting_whose_company_name_is_the_empty_string(session, make_posting):
     with pytest.raises(IntegrityError, match="ck_postings_company_name"):
         save_postings(session, [make_posting(source="url", company_name="")], datetime.now(UTC))
+
+
+NOW = datetime(2030, 1, 1, tzinfo=UTC)
+
+
+@pytest.fixture
+def extract_at(session, make_posting):
+    posting_id = save_postings(session, [make_posting()], NOW)["https://example.com/1"]
+
+    def add(*created_at: datetime) -> None:
+        session.add_all(
+            Extraction(
+                posting_id=posting_id,
+                text=f"text {i}",
+                text_sha256=sha256(f"text {i}"),
+                model="gpt-6-luna",
+                prompt_sha="c876fc21",
+                facts={},
+                created_at=when,
+            )
+            for i, when in enumerate(created_at)
+        )
+        session.flush()
+
+    return add
+
+
+def test_extraction_cap_takes_the_last_24_hours_off_the_daily_limit(session, extract_at):
+    extract_at(NOW - timedelta(hours=1), NOW - timedelta(hours=12), NOW - timedelta(hours=23, minutes=59))
+
+    assert extraction_cap(session, NOW, max_postings=300, daily_limit=300) == (297, 297)
+
+
+def test_extraction_cap_ignores_extractions_older_than_24_hours(session, extract_at):
+    extract_at(NOW - timedelta(hours=1), NOW - timedelta(hours=24, seconds=1), NOW - timedelta(days=3))
+
+    assert extraction_cap(session, NOW, max_postings=300, daily_limit=300) == (299, 299)
+
+
+@pytest.mark.parametrize("daily_limit", [3, 2, 0])
+def test_extraction_cap_is_zero_once_the_daily_limit_is_used_up(session, extract_at, daily_limit):
+    extract_at(NOW - timedelta(hours=1), NOW - timedelta(hours=2), NOW - timedelta(hours=3))
+
+    assert extraction_cap(session, NOW, max_postings=300, daily_limit=daily_limit) == (0, 0)
+
+
+def test_extraction_cap_keeps_the_per_run_cap_when_it_is_smaller(session, extract_at):
+    extract_at(NOW - timedelta(hours=1))
+
+    assert extraction_cap(session, NOW, max_postings=5, daily_limit=300) == (5, 299)

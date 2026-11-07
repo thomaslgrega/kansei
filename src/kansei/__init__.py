@@ -5,14 +5,14 @@ import statistics
 import sys
 import time
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import httpx
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse
 from pydantic import BaseModel, HttpUrl, ValidationError
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -150,6 +150,15 @@ def extracted(session: Session, model: str, prompt_sha: str) -> set[tuple[int, s
     return {(posting_id, text_sha256) for posting_id, text_sha256 in session.execute(statement)}
 
 
+def extraction_cap(session: Session, now: datetime, max_postings: int, daily_limit: int) -> tuple[int, int]:
+    """Return how many extractions this run may send, and how many the daily limit has left."""
+    used = session.scalar(
+        select(func.count()).select_from(Extraction).where(Extraction.created_at >= now - timedelta(hours=24))
+    )
+    left = max(0, daily_limit - used)
+    return min(max_postings, left), left
+
+
 def pending_extractions(
     texts: dict[str, str | Exception],
     ids: dict[str, int],
@@ -258,11 +267,15 @@ async def amain() -> None:
     prompt_sha, _ = prompt_snapshot()
     with Session(engine) as session:
         before = extracted(session, settings.openai_model, prompt_sha)
-    todo, pending_count = pending_extractions(texts, ids, before, settings.llm_max_postings)
+        cap, left = extraction_cap(
+            session, datetime.now(UTC), settings.llm_max_postings, settings.llm_daily_limit
+        )
+    todo, pending_count = pending_extractions(texts, ids, before, cap)
     print(
         f"{len(candidates)} candidates, {fetched - pending_count} already extracted with "
         f"{settings.openai_model} and prompt {prompt_sha}, {pending_count} need the model, "
-        f"sending {len(todo)} (LLM_MAX_POSTINGS={settings.llm_max_postings})"
+        f"sending {len(todo)} (LLM_MAX_POSTINGS={settings.llm_max_postings}, "
+        f"{left} of LLM_DAILY_LIMIT={settings.llm_daily_limit} unused in the last 24 hours)"
     )
 
     started = time.perf_counter()
