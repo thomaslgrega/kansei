@@ -12,7 +12,7 @@ import httpx
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse
 from pydantic import BaseModel, HttpUrl, ValidationError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -66,15 +66,23 @@ def boards_to_fetch(session: Session) -> list[str]:
     return [f"{board.source}:{board.token}" for board in boards]
 
 
-async def fill_board_names(session: Session, client: httpx.AsyncClient) -> list[str]:
-    unnamed = session.scalars(select(Board).where(Board.name.is_(None)).order_by(Board.id)).all()
+def unnamed_boards(session: Session) -> list[Board]:
+    return list(session.scalars(select(Board).where(Board.name.is_(None)).order_by(Board.id)))
+
+
+async def fetch_board_names(client: httpx.AsyncClient, boards: list[Board]) -> dict[Board, str | None]:
     names = await asyncio.gather(
-        *(fetch_board_name(client, board.source, board.token) for board in unnamed)
+        *(fetch_board_name(client, board.source, board.token) for board in boards)
     )
-    for board, name in zip(unnamed, names):
-        board.name = name
-    session.flush()
-    return [f"{board.source}:{board.token}" for board in unnamed if board.name is None]
+    return dict(zip(boards, names))
+
+
+def save_board_names(session: Session, names: dict[Board, str | None]) -> None:
+    for board, name in names.items():
+        if name is not None:
+            session.execute(
+                update(Board).where(Board.id == board.id, Board.name.is_(None)).values(name=name)
+            )
 
 
 async def fetch_all(boards: list[str]) -> dict[str, list[dict] | Exception]:
@@ -200,12 +208,18 @@ async def extract_batch(
 
 
 async def amain() -> None:
+    with Session(engine) as session:
+        unnamed = unnamed_boards(session)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        names = await fetch_board_names(client, unnamed)
     with Session(engine) as session, session.begin():
-        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-            still_unnamed = await fill_board_names(session, client)
+        save_board_names(session, names)
+    for board, name in names.items():
+        if name is None:
+            print(f"  no company name for {board.source}:{board.token}")
+
+    with Session(engine) as session:
         to_fetch = boards_to_fetch(session)
-    for board in still_unnamed:
-        print(f"  no company name for {board}")
     started = time.perf_counter()
     results = await fetch_all(to_fetch)
     elapsed = time.perf_counter() - started
