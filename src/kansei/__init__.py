@@ -12,7 +12,7 @@ import httpx
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse
 from pydantic import BaseModel, HttpUrl, ValidationError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ from kansei.db import Board, Extraction, Posting, engine
 from kansei.llm import PostingFacts, cost_usd, extract, openai_client, prompt_snapshot
 from kansei.sources import (
     SOURCES,
+    fetch_board_name,
     fetch_posting,
     fetch_url,
 )
@@ -63,6 +64,25 @@ def boards_to_fetch(session: Session) -> list[str]:
         return settings.boards
     boards = session.scalars(select(Board).order_by(Board.id))
     return [f"{board.source}:{board.token}" for board in boards]
+
+
+def unnamed_boards(session: Session) -> list[Board]:
+    return list(session.scalars(select(Board).where(Board.name.is_(None)).order_by(Board.id)))
+
+
+async def fetch_board_names(client: httpx.AsyncClient, boards: list[Board]) -> dict[Board, str | None]:
+    names = await asyncio.gather(
+        *(fetch_board_name(client, board.source, board.token) for board in boards)
+    )
+    return dict(zip(boards, names))
+
+
+def save_board_names(session: Session, names: dict[Board, str | None]) -> None:
+    for board, name in names.items():
+        if name is not None:
+            session.execute(
+                update(Board).where(Board.id == board.id, Board.name.is_(None)).values(name=name)
+            )
 
 
 async def fetch_all(boards: list[str]) -> dict[str, list[dict] | Exception]:
@@ -188,6 +208,16 @@ async def extract_batch(
 
 
 async def amain() -> None:
+    with Session(engine) as session:
+        unnamed = unnamed_boards(session)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        names = await fetch_board_names(client, unnamed)
+    with Session(engine) as session, session.begin():
+        save_board_names(session, names)
+    for board, name in names.items():
+        if name is None:
+            print(f"  no company name for {board.source}:{board.token}")
+
     with Session(engine) as session:
         to_fetch = boards_to_fetch(session)
     started = time.perf_counter()
