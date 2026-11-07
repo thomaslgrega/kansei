@@ -83,6 +83,7 @@ PAGE_WITH_LD = """
 {"@context": "http://schema.org", "@type": "JobPosting",
  "title": "バックエンドエンジニア",
  "datePosted": "2026-09-01",
+ "hiringOrganization": {"@type": "Organization", "name": "Woven by Toyota"},
  "jobLocation": {"@type": "Place", "address": {"addressLocality": "東京都中央区"}},
  "description": "<p>必須条件</p><ul><li>Pythonでの開発経験3年以上</li></ul>"}
 </script>
@@ -130,6 +131,27 @@ def test_from_url_reads_the_fields_the_page_declares():
     assert posting["posted_at"] == "2026-09-01"
     assert posting["location"] == "東京都中央区"
     assert posting["token"] == "jobs.lever.co"
+
+
+def test_from_url_names_the_company_the_page_declares_as_hiring():
+    posting = from_url(PAGE_WITH_LD, "https://jobs.lever.co/woven-by-toyota/abc123")
+
+    assert posting["company_name"] == "Woven by Toyota"
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        pytest.param(PAGE_WITHOUT_LD, id="no ld+json"),
+        pytest.param(PAGE_WITH_GRAPH, id="an organization in the graph but no hiringOrganization"),
+        pytest.param(
+            PAGE_WITH_LD.replace('"name": "Woven by Toyota"', '"name": " "'),
+            id="a blank name",
+        ),
+    ],
+)
+def test_from_url_gives_no_company_name_when_the_page_declares_none(page):
+    assert from_url(page, "https://example.com/1")["company_name"] is None
 
 
 def test_from_url_finds_the_job_posting_inside_a_graph():

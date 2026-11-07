@@ -130,3 +130,12 @@ def test_a_pasted_posting_shows_its_token_even_when_a_board_shares_it(client, se
     response = client.get(f"/api/postings/{ids['https://example.com/1']}")
 
     assert response.json()["posting"]["company"] == "example.com"
+
+
+def test_a_pasted_posting_shows_the_company_name_its_page_declared(client, session, make_posting):
+    posting = make_posting(source="url", token="careers.example.co.jp", company_name="Example K.K.")
+    ids = save_postings(session, [posting], datetime.now(UTC))
+
+    response = client.get(f"/api/postings/{ids['https://example.com/1']}")
+
+    assert response.json()["posting"]["company"] == "Example K.K."
