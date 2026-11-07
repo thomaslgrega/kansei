@@ -1,10 +1,15 @@
+import json
+
 import httpx
 import pytest
 from bs4 import BeautifulSoup
 
+from kansei import is_candidate
 from kansei.sources import (
+    fetch_ashby,
     fetch_board_name,
     fetch_url,
+    from_ashby,
     from_greenhouse,
     from_lever,
     from_url,
@@ -32,12 +37,34 @@ LEVER_RAW = {
     ],
     "additionalPlain": "応募について",
 }
+ASHBY_RAW = {
+    "id": "7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+    "title": "Software Engineer, Payments",
+    "department": "Engineering",
+    "team": "Payments",
+    "employmentType": "FullTime",
+    "location": "San Francisco",
+    "secondaryLocations": [
+        {"location": "Tokyo", "address": {"postalAddress": {"addressCountry": "Japan"}}},
+        {"location": "Remote - US", "address": {"postalAddress": {"addressCountry": "USA"}}},
+    ],
+    "publishedAt": "2026-10-04T14:29:08.532+00:00",
+    "isListed": True,
+    "isRemote": True,
+    "workplaceType": "Hybrid",
+    "address": {"postalAddress": {"addressCountry": "USA"}},
+    "jobUrl": "https://jobs.ashbyhq.com/acme/7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+    "applyUrl": "https://jobs.ashbyhq.com/acme/7458d4e9-da2e-47bd-98cb-adfda43d42b2/application",
+    "descriptionHtml": "<p>Build the ledger.</p>",
+    "descriptionPlain": "Build the ledger.",
+}
 
 
 def test_every_adapter_produces_exactly_the_same_keys():
     assert (
         from_greenhouse(GREENHOUSE_RAW, "stripe").keys()
         == from_lever(LEVER_RAW, "woven-by-toyota").keys()
+        == from_ashby(ASHBY_RAW, "acme").keys()
         == from_url(PAGE_WITHOUT_LD, "https://example.com/1").keys()
     )
 
@@ -56,6 +83,56 @@ def test_from_lever_sends_the_requirements_not_just_the_company_blurd():
     assert "必須条件" in description
     assert "Pythonでの開発経験3年以上" in description
     assert "<li>" not in description
+
+
+def test_from_ashby_maps_every_field():
+    assert from_ashby(ASHBY_RAW, "acme") == {
+        "source": "ashby",
+        "token": "acme",
+        "id": "7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+        "title": "Software Engineer, Payments",
+        "url": "https://jobs.ashbyhq.com/acme/7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+        "posted_at": "2026-10-04T14:29:08.532+00:00",
+        "location": "San Francisco / Tokyo / Remote - US",
+        "company_name": None,
+        "description": "Build the ledger.",
+    }
+
+
+@pytest.mark.parametrize(
+    ("secondary", "location"),
+    [
+        pytest.param([], "Tokyo", id="none"),
+        pytest.param([{"location": "Osaka"}], "Tokyo / Osaka", id="one"),
+        pytest.param(
+            [{"location": "Osaka"}, {"location": "Remote"}, {"location": "Fukuoka"}],
+            "Tokyo / Osaka / Remote / Fukuoka",
+            id="several, in order",
+        ),
+    ],
+)
+def test_from_ashby_joins_the_primary_and_secondary_locations_in_order(secondary, location):
+    raw = {**ASHBY_RAW, "location": "Tokyo", "secondaryLocations": secondary}
+
+    assert from_ashby(raw, "acme")["location"] == location
+
+
+def test_an_ashby_job_whose_only_japan_location_is_secondary_is_a_candidate():
+    posting = from_ashby(ASHBY_RAW, "acme")
+
+    assert is_candidate(posting["title"], posting["location"]) is True
+
+
+async def test_fetch_ashby_makes_one_request_for_the_whole_board():
+    requested = []
+
+    def handler(request):
+        requested.append(str(request.url))
+        return httpx.Response(200, json={"apiVersion": "1", "jobs": [ASHBY_RAW]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await fetch_ashby(client, "acme") == [from_ashby(ASHBY_RAW, "acme")]
+    assert requested == ["https://api.ashbyhq.com/posting-api/job-board/acme"]
 
 
 def test_from_greenhouse_stringifies_the_integer_id():
@@ -210,6 +287,22 @@ async def test_fetch_board_name_reads_the_greenhouse_board_name():
         assert await fetch_board_name(client, "greenhouse", "anthropic") == "Anthropic"
 
 
+async def test_fetch_board_name_reads_the_ashby_organization_name():
+    def handler(request):
+        assert request.method == "POST"
+        assert request.url == (
+            "https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiOrganizationFromHostedJobsPageName"
+        )
+        assert json.loads(request.content)["variables"] == {
+            "organizationHostedJobsPageName": "acme",
+            "searchContext": "JobBoard",
+        }
+        return httpx.Response(200, json={"data": {"organization": {"name": " Acme Corp "}}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await fetch_board_name(client, "ashby", "acme") == "Acme Corp"
+
+
 def lever_page(head: str) -> httpx.Response:
     page = f"<html><head>{head}</head><body><h1>Open roles</h1></body></html>"
     return httpx.Response(200, headers={"content-type": "text/html"}, text=page)
@@ -236,6 +329,12 @@ async def test_fetch_board_name_reads_the_lever_page_title_not_og_title():
         ("greenhouse", httpx.Response(200, text="<html>Maintenance</html>")),
         ("greenhouse", httpx.Response(200, json=["Anthropic"])),
         ("greenhouse", httpx.Response(200, json={"name": 123})),
+        ("ashby", httpx.Response(200, json={"data": {"organization": None}})),
+        ("ashby", httpx.Response(200, json={"data": {"organization": {"name": ""}}})),
+        ("ashby", httpx.Response(200, json={"data": None, "errors": [{"message": "Bad"}]})),
+        ("ashby", httpx.Response(200, json={"data": {"organization": {"name": 123}}})),
+        ("ashby", httpx.Response(200, json=["Acme"])),
+        ("ashby", httpx.Response(200, text="<html>Maintenance</html>")),
     ],
 )
 async def test_fetch_board_name_gives_no_name_for_a_missing_blank_or_malformed_one(source, response):
@@ -253,6 +352,8 @@ def times_out(request):
         ("lever", lambda request: httpx.Response(404, text="<title>Not found – 404 error</title>")),
         ("greenhouse", lambda request: httpx.Response(500, json={"name": "Anthropic"})),
         ("greenhouse", times_out),
+        ("ashby", lambda request: httpx.Response(500, json={"data": {"organization": {"name": "Acme"}}})),
+        ("ashby", times_out),
     ],
 )
 async def test_fetch_board_name_gives_no_name_when_the_request_fails(source, handler):
