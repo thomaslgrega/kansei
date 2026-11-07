@@ -13,7 +13,7 @@ A posting whose title is an engineering role and whose location is in Japan or r
 _Avoid_: Match, Japan posting
 
 **Company name**:
-The name a board's company goes by, such as `Woven by Toyota` for `lever:woven-by-toyota`. A board may have none, and a pasted posting has no board, so such a posting goes by its token instead.
+The name a board's company goes by, such as `Woven by Toyota` for `lever:woven-by-toyota`. A board may have none. A pasted posting has no board, so it goes by the `hiringOrganization` name its page declares. A posting with neither goes by its token.
 _Avoid_: Employer, organization
 
 **Extraction**:

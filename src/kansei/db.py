@@ -71,6 +71,7 @@ class Extraction(Base):
 
 class Posting(Base):
     __tablename__ = "postings"
+    __table_args__ = (CheckConstraint(column("company_name") != "", name="company_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     url: Mapped[str] = mapped_column(unique=True)
@@ -80,12 +81,15 @@ class Posting(Base):
     title: Mapped[str]
     location: Mapped[str]
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Only pasted postings set it, from their page; a board posting's name comes from its board.
+    company_name: Mapped[str | None] = mapped_column()
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     company: Mapped[str] = column_property(
         func.coalesce(
             select(Board.name).where(Board.source == source, Board.token == token).scalar_subquery(),
+            company_name,
             token,
         )
     )

@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 
+import pytest
 from sqlalchemy import create_engine, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
 
 from kansei import extracted, save_postings, sha256
@@ -54,3 +56,8 @@ def test_engine_reconnects_after_the_database_drops_an_idle_connection():
         other.execute(text("select pg_terminate_backend(:pid)"), {"pid": pid})
     with engine.connect() as connection:
         assert connection.execute(text("select 1")).scalar_one() == 1
+
+
+def test_the_database_rejects_a_posting_whose_company_name_is_the_empty_string(session, make_posting):
+    with pytest.raises(IntegrityError, match="ck_postings_company_name"):
+        save_postings(session, [make_posting(source="url", company_name="")], datetime.now(UTC))

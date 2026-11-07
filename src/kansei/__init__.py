@@ -34,6 +34,7 @@ class JobPosting(BaseModel):
     url: HttpUrl
     posted_at: datetime | None
     location: str
+    company_name: str | None = None
     description: str | None = None
 
 
@@ -97,6 +98,7 @@ def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -
             "title": job.title,
             "location": job.location,
             "posted_at": job.posted_at,
+            "company_name": job.company_name,
             "first_seen_at": seen_at,
             "last_seen_at": seen_at,
         }
@@ -109,6 +111,7 @@ def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -
             "title": statement.excluded.title,
             "location": statement.excluded.location,
             "posted_at": statement.excluded.posted_at,
+            "company_name": statement.excluded.company_name,
             "last_seen_at": statement.excluded.last_seen_at,
         },
     ).returning(Posting.url, Posting.id)

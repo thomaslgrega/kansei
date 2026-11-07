@@ -46,6 +46,14 @@ def job_posting_ld(soup: BeautifulSoup) -> dict:
     return {}
 
 
+def hiring_organization_name(posting: dict) -> str | None:
+    organization = posting.get("hiringOrganization")
+    name = organization.get("name") if isinstance(organization, dict) else None
+    if not isinstance(name, str):
+        return None
+    return name.strip() or None
+
+
 def lever_text(raw: dict) -> str:
     parts = [raw["descriptionPlain"]]
     for section in raw.get("lists", []):
@@ -69,6 +77,7 @@ def from_greenhouse(raw: dict, token: str) -> dict:
         "url": raw["absolute_url"],
         "posted_at": raw["updated_at"],
         "location": raw["location"]["name"],
+        "company_name": None,
         "description": None,
     }
 
@@ -82,6 +91,7 @@ def from_lever(raw: dict, token: str) -> dict:
         "url": raw["hostedUrl"],
         "posted_at": raw["createdAt"],
         "location": raw["categories"]["location"],
+        "company_name": None,
         "description": lever_text(raw),
     }
 
@@ -99,6 +109,7 @@ def from_url(page: str, url: str) -> dict:
         "url": url,
         "posted_at": posting.get("datePosted"),
         "location": address.get("addressLocality") or address.get("addressCountry") or "",
+        "company_name": hiring_organization_name(posting),
         "description": page_text(soup)
     }
 
