@@ -59,9 +59,12 @@ def test_unfollowing_removes_only_that_follow(client, log_in_as, boards):
     ]
 
 
-def test_follows_lists_only_your_boards_by_company_name_even_without_open_candidates(client, session, log_in_as, boards):
+def test_follows_lists_only_your_boards_by_company_name_even_without_open_candidates(
+    client, session, log_in_as, make_posting, boards
+):
     session.add(Board(source="greenhouse", token="kansei-other", name="Other Co"))
-    session.flush()
+    closed = make_posting(source="lever", token="kansei-unnamed", url="https://example.com/closed")
+    save_postings(session, [closed], datetime.now(UTC) - timedelta(days=3))
     log_in_as("bob@example.com")
     client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-other"})
     log_in_as("ada@example.com")

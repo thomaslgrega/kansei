@@ -51,7 +51,7 @@ export default function Postings({ trackedIds, onTrack, followed, onFollow, onUn
 
     const following = followingOnly && followed !== null
     // Refetch the following list when follows change, so an unfollowed board's postings leave it.
-    const followedKey = following ? [...followed].sort().join(' ') : ''
+    const followsSignature = following ? [...followed].sort().join(' ') : ''
 
     useEffect(() => {
         let current = true
@@ -66,7 +66,7 @@ export default function Postings({ trackedIds, onTrack, followed, onFollow, onUn
         return () => {
             current = false
         }
-    }, [following, followedKey])
+    }, [following, followsSignature])
 
     if (failed) return <p>Couldn't load postings. Try reloading the page.</p>
     if (rows === undefined) return <p>Loading postings...</p>

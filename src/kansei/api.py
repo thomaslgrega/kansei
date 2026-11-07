@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, func, select, tuple_
+from sqlalchemy import delete, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 
@@ -217,13 +217,8 @@ class BoardOut(BaseModel):
 
 @api.get("/me/follows")
 def list_follows(user: CurrentUser, session: SessionDep) -> list[BoardOut]:
-    boards = session.scalars(
-        select(Board)
-        .join(Follow, Follow.board_id == Board.id)
-        .where(Follow.user_id == user.id)
-        .order_by(func.lower(func.coalesce(Board.name, Board.token)), Board.id)
-    )
-    return [BoardOut.model_validate(board) for board in boards]
+    boards = session.scalars(select(Board).join(Follow, Follow.board_id == Board.id).where(Follow.user_id == user.id))
+    return [BoardOut.model_validate(board) for board in sorted(boards, key=lambda board: (board.company.lower(), board.id))]
 
 
 @api.post("/me/follows", status_code=201)
