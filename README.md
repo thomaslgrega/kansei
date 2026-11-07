@@ -163,7 +163,7 @@ Kansei runs on Google Cloud in Tokyo (`asia-northeast1`). The web app is a Cloud
 - The job runs as `kansei-ingest`: Cloud SQL Client, plus read access to `database-url` and `openai-api-key`. It's the only identity that can read the OpenAI key, and that key isn't used anywhere else.
 - `LLM_MAX_POSTINGS=300` caps the pending extractions sent to the model per run. Extractions are cached on (posting, text hash, model, prompt hash), and already-extracted candidates don't count toward the cap, so a daily run only pays for pending extractions. The first run extracted 187 of 189 candidates for $0.06.
 - `LLM_DAILY_LIMIT=300` caps the extractions created in the last 24 hours, across runs. A run sends at most the smaller of `LLM_MAX_POSTINGS` and what the daily limit has left, so a burst of new boards can't spend the month's OpenAI budget in a day. The OpenAI billing cap stays the last line of defense.
-- The release script deploys the ingest job with a 50-minute task timeout and no retries, so a run is gone before the next hourly one starts. Two overlapping runs would send the same postings to the model, and the second insert would hit the unique constraint on extractions and lose its batch. Keep the timeout under the scheduler interval.
+- The release script deploys the ingest job with a 50-minute task timeout and no retries, so a run is gone before the next one starts once Cloud Scheduler runs it hourly. Two overlapping runs would send the same postings to the model, and the second insert would hit the unique constraint on extractions and lose its batch. Keep the timeout under the scheduler interval.
 
 Release order: migrations first, as a Cloud Run job from the same image, then the service, then the ingest job's image.
 

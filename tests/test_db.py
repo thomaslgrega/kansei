@@ -67,7 +67,7 @@ NOW = datetime(2030, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
-def extract_at(session, make_posting):
+def add_extractions_at(session, make_posting):
     posting_id = save_postings(session, [make_posting()], NOW)["https://example.com/1"]
 
     def add(*created_at: datetime) -> None:
@@ -88,26 +88,26 @@ def extract_at(session, make_posting):
     return add
 
 
-def test_extraction_cap_takes_the_last_24_hours_off_the_daily_limit(session, extract_at):
-    extract_at(NOW - timedelta(hours=1), NOW - timedelta(hours=12), NOW - timedelta(hours=23, minutes=59))
+def test_extraction_cap_takes_the_last_24_hours_off_the_daily_limit_including_the_boundary(session, add_extractions_at):
+    add_extractions_at(NOW - timedelta(hours=1), NOW - timedelta(hours=23, minutes=59), NOW - timedelta(hours=24))
 
     assert extraction_cap(session, NOW, max_postings=300, daily_limit=300) == (297, 297)
 
 
-def test_extraction_cap_ignores_extractions_older_than_24_hours(session, extract_at):
-    extract_at(NOW - timedelta(hours=1), NOW - timedelta(hours=24, seconds=1), NOW - timedelta(days=3))
+def test_extraction_cap_ignores_extractions_older_than_24_hours(session, add_extractions_at):
+    add_extractions_at(NOW - timedelta(hours=1), NOW - timedelta(hours=24, seconds=1), NOW - timedelta(days=3))
 
     assert extraction_cap(session, NOW, max_postings=300, daily_limit=300) == (299, 299)
 
 
 @pytest.mark.parametrize("daily_limit", [3, 2, 0])
-def test_extraction_cap_is_zero_once_the_daily_limit_is_used_up(session, extract_at, daily_limit):
-    extract_at(NOW - timedelta(hours=1), NOW - timedelta(hours=2), NOW - timedelta(hours=3))
+def test_extraction_cap_is_zero_once_the_daily_limit_is_used_up(session, add_extractions_at, daily_limit):
+    add_extractions_at(NOW - timedelta(hours=1), NOW - timedelta(hours=2), NOW - timedelta(hours=3))
 
     assert extraction_cap(session, NOW, max_postings=300, daily_limit=daily_limit) == (0, 0)
 
 
-def test_extraction_cap_keeps_the_per_run_cap_when_it_is_smaller(session, extract_at):
-    extract_at(NOW - timedelta(hours=1))
+def test_extraction_cap_keeps_the_per_run_cap_when_it_is_smaller(session, add_extractions_at):
+    add_extractions_at(NOW - timedelta(hours=1))
 
     assert extraction_cap(session, NOW, max_postings=5, daily_limit=300) == (5, 299)
