@@ -207,7 +207,45 @@ def test_probing_a_board_with_no_readable_name_gives_no_company(client, log_in_a
 
     response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
 
-    assert response.json()["hits"][0]["company"] is None
+    assert response.json() == {
+        "message": None,
+        "hits": [{
+            "source": "greenhouse",
+            "token": "kansei-test",
+            "company": None,
+            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer"],
+            "candidates": 3,
+            "state": "not_on_kansei",
+            "following": False,
+        }],
+    }
+
+
+def test_a_board_on_kansei_is_found_whatever_the_case_of_the_pasted_token(client, session, log_in_as, ats):
+    serve_greenhouse_board(ats, token="Kansei-Test")
+    session.add(Board(source="greenhouse", token="kansei-test", name="Kansei Test K.K.", status="removed"))
+    session.flush()
+    log_in_as("ada@example.com")
+
+    probed = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/Kansei-Test"})
+    added = client.post("/api/me/follows", json={"source": "greenhouse", "token": "Kansei-Test"})
+
+    assert probed.json() == {
+        "message": None,
+        "hits": [{
+            "source": "greenhouse",
+            "token": "kansei-test",
+            "company": "Kansei Test K.K.",
+            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer"],
+            "candidates": 3,
+            "state": "removed",
+            "following": False,
+        }],
+    }
+    assert added.status_code == 409
+    assert session.scalars(select(Board.token).where(Board.source == "greenhouse", Board.token.ilike("kansei-test"))).all() == [
+        "kansei-test",
+    ]
 
 
 @pytest.mark.parametrize("status", [404, 500])

@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, select, tuple_
+from sqlalchemy import Select, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -244,6 +244,11 @@ class ProbeOut(BaseModel):
     message: str | None = None
 
 
+def board_named(source: str, token: str) -> Select[tuple[Board]]:
+    # Ignores case, so pasting `Acme` can't add a second copy of a removed `acme`.
+    return select(Board).where(Board.source == source, func.lower(Board.token) == token.lower())
+
+
 @api.get("/probe")
 async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -> ProbeOut:
     try:
@@ -253,10 +258,10 @@ async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -
     jobs, name = await asyncio.gather(board_jobs(http, source, token), fetch_board_name(http, source, token))
     if jobs is None:
         return ProbeOut(hits=[], message="No board found at that URL.")
-    board = session.scalar(select(Board).where(Board.source == source, Board.token == token))
+    board = session.scalar(board_named(source, token))
     return ProbeOut(hits=[ProbeHit(
         source=source,
-        token=token,
+        token=board.token if board else token,
         company=(board.name if board else None) or name,
         titles=[job.title for job in jobs[:5]],
         candidates=sum(is_candidate(job.title, job.location) for job in jobs),
@@ -273,9 +278,7 @@ def list_follows(user: CurrentUser, session: SessionDep) -> list[BoardOut]:
 
 def locked_board(session: Session, source: str, token: str) -> Board | None:
     # FOR SHARE waits out a concurrent removal, so no follow lands after its DELETE.
-    return session.scalar(
-        select(Board).where(Board.source == source, Board.token == token).with_for_update(read=True)
-    )
+    return session.scalar(board_named(source, token).with_for_update(read=True))
 
 
 @api.post("/me/follows", status_code=201)
