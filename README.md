@@ -159,11 +159,11 @@ Kansei runs on Google Cloud in Tokyo (`asia-northeast1`). The web app is a Cloud
 - `DATABASE_URL` comes from Secret Manager, pinned to a version. Changing the password means adding a version and deploying with it.
 - Scaling is 0 to 1 instances: the database accepts 25 connections and each process pools up to 15. A cold start takes about 6.53s.
 - Images are built for `linux/amd64` and tagged with the commit.
-- The daily ingest is a Cloud Run job, `ingest`, from the same image, running `kansei`. Cloud Scheduler starts it at 06:00 Tokyo time as `kansei-scheduler`, which can run that one job and nothing else.
+- The ingest is a Cloud Run job, `ingest`, from the same image, running `kansei`. Cloud Scheduler starts it every hour on the hour (`0 * * * *`) as `kansei-scheduler`, which can run that one job and nothing else. The trigger is still called `ingest-daily`, from when it ran once a day.
 - The job runs as `kansei-ingest`: Cloud SQL Client, plus read access to `database-url` and `openai-api-key`. It's the only identity that can read the OpenAI key, and that key isn't used anywhere else.
-- `LLM_MAX_POSTINGS=300` caps the pending extractions sent to the model per run. Extractions are cached on (posting, text hash, model, prompt hash), and already-extracted candidates don't count toward the cap, so a daily run only pays for pending extractions. The first run extracted 187 of 189 candidates for $0.06.
+- `LLM_MAX_POSTINGS=300` caps the pending extractions sent to the model per run. Extractions are cached on (posting, text hash, model, prompt hash), and already-extracted candidates don't count toward the cap, so a run only pays for pending extractions. The first run extracted 187 of 189 candidates for $0.06.
 - `LLM_DAILY_LIMIT=300` caps the extractions created in the last 24 hours, across runs. A run sends at most the smaller of `LLM_MAX_POSTINGS` and what the daily limit has left, so a burst of new boards can't spend the month's OpenAI budget in a day. The OpenAI billing cap stays the last line of defense.
-- The release script deploys the ingest job with a 50-minute task timeout and no retries, so a run is gone before the next one starts once Cloud Scheduler runs it hourly. Two overlapping runs would send the same postings to the model, and the second insert would hit the unique constraint on extractions and lose its batch. Keep the timeout under the scheduler interval.
+- The release script deploys the ingest job with a 50-minute task timeout and no retries, so a run is gone before the next hourly one starts. Two overlapping runs would send the same postings to the model, and the second insert would hit the unique constraint on extractions and lose its batch. Keep the timeout under the scheduler interval.
 
 Release order: migrations first, as a Cloud Run job from the same image, then the service, then the ingest job's image.
 
