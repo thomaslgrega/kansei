@@ -6,7 +6,7 @@ Live: https://kansei-3dr6p2i5tq-an.a.run.app/ (the postings page is public; sign
 
 ## What it does
 
-- Reads postings from Greenhouse, Lever, or a job page URL.
+- Reads postings from Greenhouse, Lever, Ashby, or a job page URL.
 - Removes HTML and converts each source into the same posting format, checked with Pydantic.
 - Uses OpenAI structured outputs to extract a role summary, seniority, required skills, Japanese requirements, and remote work policy.
 - Processes several postings at a time, limits concurrent requests, and reports failures for individual postings.
@@ -43,9 +43,9 @@ These commands make paid OpenAI API calls. The model, request limits, and timeou
 
 The boards are rows in the `boards` table, and the migrations start it with thirteen defaults. `BOARDS` replaces the table for one run, so `BOARDS='["lever:mujininc"]' uv run kansei` fetches postings from one board and `BOARDS='[]'` fetches none. Company names are still filled for the table's boards, as described below.
 
-Each board's company name comes from its ATS: the `name` field of the Greenhouse board API (`https://boards-api.greenhouse.io/v1/boards/{token}`), or the `<title>` of the Lever board page (`https://jobs.lever.co/{token}`). The ingest fetches a name only for a board that doesn't have one yet and never overwrites a name. When the fetch fails, the name stays empty, the page shows the token, and the next run tries again. Boards given only in `BOARDS` have no row, so they get no name.
+Each board's company name comes from its ATS: the `name` field of the Greenhouse board API (`https://boards-api.greenhouse.io/v1/boards/{token}`), the `<title>` of the Lever board page (`https://jobs.lever.co/{token}`), or the company name from the GraphQL query that Ashby's hosted jobs page makes (`https://jobs.ashbyhq.com/api/non-user-graphql`). The ingest fetches a name only for a board that doesn't have one yet and never overwrites a name. When the fetch fails, the name stays empty, the page shows the token, and the next run tries again. Boards given only in `BOARDS` have no row, so they get no name.
 
-The default boards are companies that hire, or could hire, engineers in Japan. A board stays in the table when it has no Japan roles yet: fetching it costs one request a day, and nothing reaches the model until a posting passes the filter. A posting reaches the model when its title is an engineering role and its location is in Japan (the country, a major city or a prefecture, in English or Japanese) or is remote without naming another place (`Remote`, `Anywhere`, `Worldwide`, `Global`, `APAC`, `Asia`). `Remote, Japan` and `Osaka` count; `Remote - USA` doesn't. The filter errs toward sending: a wrong guess costs one extraction, a missed posting is never seen. The eval sets are frozen with the same rule, so their scores describe the postings the ingest extracts.
+The default boards are companies that hire, or could hire, engineers in Japan. A board stays in the table when it has no Japan roles yet: fetching it costs one request a day, and nothing reaches the model until a posting passes the filter. A posting reaches the model when its title is an engineering role and its location is in Japan (the country, a major city or a prefecture, in English or Japanese) or is remote without naming another place (`Remote`, `Anywhere`, `Worldwide`, `Global`, `APAC`, `Asia`). An Ashby posting's location is its primary location and then its secondary ones, joined with ` / `, so `San Francisco / Tokyo` counts. `Remote, Japan` and `Osaka` count; `Remote - USA` doesn't. The filter errs toward sending: a wrong guess costs one extraction, a missed posting is never seen. The eval sets are frozen with the same rule, so their scores describe the postings the ingest extracts.
 
 Every run stores the fetched postings in Postgres, which runs locally from `compose.yaml`. A posting is identified by its URL, so running again updates the same rows: `first_seen_at` keeps the day it first appeared and `last_seen_at` moves to the latest run. `LLM_MAX_POSTINGS=0 uv run kansei` fetches and stores postings without calling the model, and reports how many would be sent.
 

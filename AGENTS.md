@@ -1,8 +1,8 @@
 # kansei
 
-A job board for engineers in Japan, filled from companies' Greenhouse and Lever boards. The
-ingest (`uv run kansei`) fetches postings, keeps the Japan engineering candidates, and sends new
-or changed ones to OpenAI for extraction. The web app (`uv run fastapi dev` plus `web/`) shows
+A job board for engineers in Japan, filled from companies' Greenhouse, Lever and Ashby boards.
+The ingest (`uv run kansei`) fetches postings, keeps the Japan engineering candidates, and sends
+new or changed ones to OpenAI for extraction. The web app (`uv run fastapi dev` plus `web/`) shows
 them.
 
 ## Done means green

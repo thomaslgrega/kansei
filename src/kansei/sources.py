@@ -68,6 +68,18 @@ GREENHOUSE_JOB = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_i
 LEVER_BOARD = "https://api.lever.co/v0/postings/{token}?mode=json"
 GREENHOUSE_BOARD_INFO = "https://boards-api.greenhouse.io/v1/boards/{token}"
 LEVER_BOARD_PAGE = "https://jobs.lever.co/{token}"
+ASHBY_BOARD = "https://api.ashbyhq.com/posting-api/job-board/{token}"
+ASHBY_GRAPHQL = "https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiOrganizationFromHostedJobsPageName"
+ASHBY_ORGANIZATION_QUERY = """
+query ApiOrganizationFromHostedJobsPageName(
+  $organizationHostedJobsPageName: String!, $searchContext: OrganizationSearchContext
+) {
+  organization: organizationFromHostedJobsPageName(
+    organizationHostedJobsPageName: $organizationHostedJobsPageName,
+    searchContext: $searchContext
+  ) { name }
+}
+"""
 
 
 def from_greenhouse(raw: dict, token: str) -> dict:
@@ -95,6 +107,21 @@ def from_lever(raw: dict, token: str) -> dict:
         "location": raw["categories"]["location"],
         "company_name": None,
         "description": lever_text(raw),
+    }
+
+
+def from_ashby(raw: dict, token: str) -> dict:
+    locations = [raw["location"], *(secondary["location"] for secondary in raw["secondaryLocations"])]
+    return {
+        "source": "ashby",
+        "token": token,
+        "id": raw["id"],
+        "title": raw["title"],
+        "url": raw["jobUrl"],
+        "posted_at": raw["publishedAt"],
+        "location": " / ".join(locations),
+        "company_name": None,
+        "description": raw["descriptionPlain"],
     }
 
 
@@ -135,6 +162,12 @@ async def fetch_lever(client: httpx.AsyncClient, token: str) -> list[dict]:
     return [from_lever(raw, token) for raw in response.json()]
 
 
+async def fetch_ashby(client: httpx.AsyncClient, token: str) -> list[dict]:
+    response = await client.get(ASHBY_BOARD.format(token=token))
+    response.raise_for_status()
+    return [from_ashby(raw, token) for raw in response.json()["jobs"]]
+
+
 async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
     response = await client.get(url, follow_redirects=True)
     response.raise_for_status()
@@ -146,27 +179,42 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
     return from_url(response.text, url)
 
 
-def greenhouse_name(response: httpx.Response) -> str:
+async def greenhouse_name(client: httpx.AsyncClient, token: str) -> str:
+    response = await client.get(GREENHOUSE_BOARD_INFO.format(token=token))
+    response.raise_for_status()
     board = response.json()
     name = board.get("name") if isinstance(board, dict) else None
     return name if isinstance(name, str) else ""
 
 
-def lever_name(response: httpx.Response) -> str:
+async def lever_name(client: httpx.AsyncClient, token: str) -> str:
+    response = await client.get(LEVER_BOARD_PAGE.format(token=token))
+    response.raise_for_status()
     title = BeautifulSoup(response.text, "html.parser").title
     return title.get_text() if title else ""
 
 
+async def ashby_name(client: httpx.AsyncClient, token: str) -> str:
+    response = await client.post(ASHBY_GRAPHQL, json={
+        "operationName": "ApiOrganizationFromHostedJobsPageName",
+        "variables": {"organizationHostedJobsPageName": token, "searchContext": "JobBoard"},
+        "query": ASHBY_ORGANIZATION_QUERY,
+    })
+    response.raise_for_status()
+    body = response.json()
+    data = body.get("data") if isinstance(body, dict) else None
+    organization = data.get("organization") if isinstance(data, dict) else None
+    name = organization.get("name") if isinstance(organization, dict) else None
+    return name if isinstance(name, str) else ""
+
+
 async def fetch_board_name(client: httpx.AsyncClient, source: str, token: str) -> str | None:
-    url, read_name = NAMES[source]
     try:
-        response = await client.get(url.format(token=token))
-        response.raise_for_status()
-        name = read_name(response)
+        name = await NAMES[source](client, token)
     except (httpx.HTTPError, ValueError):
         return None
     return name.strip() or None
 
 
-SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever}
-NAMES = {"greenhouse": (GREENHOUSE_BOARD_INFO, greenhouse_name), "lever": (LEVER_BOARD_PAGE, lever_name)}
+SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch_ashby}
+NAMES = {"greenhouse": greenhouse_name, "lever": lever_name, "ashby": ashby_name}

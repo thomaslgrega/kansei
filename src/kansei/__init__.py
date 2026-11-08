@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from kansei.config import settings
-from kansei.db import Board, Extraction, Posting, engine
+from kansei.db import Board, BoardSource, Extraction, Posting, engine
 from kansei.llm import PostingFacts, cost_usd, extract, openai_client, prompt_snapshot
 from kansei.sources import (
     SOURCES,
@@ -28,7 +28,7 @@ from kansei.sources import (
 
 
 class JobPosting(BaseModel):
-    source: Literal["greenhouse", "lever", "url"]
+    source: BoardSource | Literal["url"]
     token: str
     id: str
     title: str

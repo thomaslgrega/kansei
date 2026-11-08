@@ -38,7 +38,7 @@ class Base(DeclarativeBase):
     })
 
 
-BoardSource = Literal["greenhouse", "lever"]
+BoardSource = Literal["greenhouse", "lever", "ashby"]
 
 
 class Board(Base):
