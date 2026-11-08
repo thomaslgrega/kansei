@@ -1,6 +1,7 @@
 import html
 import json
 import re
+import unicodedata
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 
@@ -247,3 +248,23 @@ def parse_board_url(url: str) -> tuple[str, str]:
     if not SLUG.fullmatch(token):
         raise NotABoard("That URL doesn't name a board.")
     return source, token
+
+
+def looks_like_url(text: str) -> bool:
+    text = text.strip()
+    return "/" in text or text.lower() in BOARD_HOSTS
+
+
+COMPANY_SUFFIXES = {"inc", "incorporated", "ltd", "limited", "co", "corp", "corporation", "llc", "gmbh", "kk", "gk", "yk", "plc", "pte"}
+
+
+def name_slugs(name: str) -> list[str]:
+    # NFKD makes é and full-width Ａ plain ASCII; what's left non-ASCII, such as 株式会社, is dropped.
+    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    words = [
+        word
+        for part in re.split(r"[\s,]+", plain)
+        if re.sub(r"[^a-z0-9]", "", part) not in COMPANY_SUFFIXES
+        for word in re.findall(r"[a-z0-9]+", part)
+    ]
+    return [slug for slug in dict.fromkeys(["".join(words), "-".join(words)]) if SLUG.fullmatch(slug)]

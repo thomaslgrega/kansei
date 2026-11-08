@@ -86,7 +86,7 @@ export default function AddCompany({ followed, onFollowsChanged }: Props) {
     return (
         <>
             <form onSubmit={find}>
-                <input name="q" type="text" placeholder="Greenhouse, Lever or Ashby board or job URL" required />
+                <input name="q" type="text" placeholder="Company name, or a Greenhouse, Lever or Ashby board or job URL" required />
                 <button disabled={searching}>Find company</button>
             </form>
             {probe?.message && <p role="status">{probe.message}</p>}
