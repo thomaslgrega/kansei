@@ -223,7 +223,10 @@ def list_follows(user: CurrentUser, session: SessionDep) -> list[BoardOut]:
 
 @api.post("/me/follows", status_code=201)
 def follow(body: BoardIn, user: CurrentUser, session: SessionDep, response: Response) -> BoardOut:
-    board = session.scalar(select(Board).where(Board.source == body.source, Board.token == body.token))
+    # FOR SHARE waits out a concurrent removal, so no follow lands after its DELETE.
+    board = session.scalar(
+        select(Board).where(Board.source == body.source, Board.token == body.token).with_for_update(read=True)
+    )
     if board is None:
         raise HTTPException(status_code=404, detail="Board not found")
     if board.status == "removed":
