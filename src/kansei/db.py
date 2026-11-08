@@ -12,6 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
     column,
     create_engine,
+    exists,
     func,
     select,
 )
@@ -55,6 +56,10 @@ class Board(Base):
     name: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    @property
+    def company(self) -> str:
+        return self.name or self.token
+
 
 class Extraction(Base):
     __tablename__ = "extractions"
@@ -93,6 +98,9 @@ class Posting(Base):
             token,
         )
     )
+    has_board: Mapped[bool] = column_property(
+        exists().where(Board.source == source, Board.token == token)
+    )
 
 
 class User(Base):
@@ -130,6 +138,14 @@ class Tracked(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     posting: Mapped[Posting] = relationship(lazy="joined")
+
+
+class Follow(Base):
+    __tablename__ = "follows"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 engine = create_engine(settings.database_url.get_secret_value(), pool_pre_ping=True)

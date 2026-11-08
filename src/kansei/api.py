@@ -1,17 +1,26 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, select
-from sqlalchemy.dialects.postgresql import distinct_on
+from sqlalchemy import delete, select, tuple_
+from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 
 from kansei import auth, is_candidate, is_sales_or_support
-from kansei.auth import CurrentUser
+from kansei.auth import CurrentUser, SessionCookie, current_user
 from kansei.config import settings
-from kansei.db import Extraction, Posting, SessionDep, Tracked, TrackStatus
+from kansei.db import (
+    Board,
+    BoardSource,
+    Extraction,
+    Follow,
+    Posting,
+    SessionDep,
+    Tracked,
+    TrackStatus,
+)
 from kansei.llm import PostingFacts, prompt_snapshot
 
 api = APIRouter(prefix="/api")
@@ -26,6 +35,7 @@ class PostingOut(BaseModel):
     source: str
     token: str
     company: str
+    has_board: bool
     title: str
     location: str
     posted_at: datetime | None
@@ -57,7 +67,9 @@ OPEN_FOR = timedelta(days=2)
 
 
 @api.get("/postings")
-def list_postings(session: SessionDep, token: str | None = None) -> list[PostingWithFacts]:
+def list_postings(
+    session: SessionDep, token: str | None = None, following: bool = False, cookie: SessionCookie = None
+) -> list[PostingWithFacts]:
     prompt_sha, _ = prompt_snapshot()
     newest = (
         select(Extraction.posting_id, Extraction.facts)
@@ -74,6 +86,14 @@ def list_postings(session: SessionDep, token: str | None = None) -> list[Posting
     )
     if token is not None:
         statement = statement.where(Posting.token == token)
+    if following:
+        user = current_user(session, cookie)
+        followed = (
+            select(Board.source, Board.token)
+            .join(Follow, Follow.board_id == Board.id)
+            .where(Follow.user_id == user.id)
+        )
+        statement = statement.where(tuple_(Posting.source, Posting.token).in_(followed))
     return [
         PostingWithFacts(
             posting=PostingOut.model_validate(posting),
@@ -180,6 +200,53 @@ def untrack(tracked_id: int, user: CurrentUser, session: SessionDep) -> None:
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Tracked posting not found")
     session.commit()
+
+
+class BoardIn(BaseModel):
+    source: BoardSource
+    token: str
+
+
+class BoardOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source: BoardSource
+    token: str
+    company: str
+
+
+@api.get("/me/follows")
+def list_follows(user: CurrentUser, session: SessionDep) -> list[BoardOut]:
+    boards = session.scalars(select(Board).join(Follow, Follow.board_id == Board.id).where(Follow.user_id == user.id))
+    return [BoardOut.model_validate(board) for board in sorted(boards, key=lambda board: (board.company.lower(), board.id))]
+
+
+@api.post("/me/follows", status_code=201)
+def follow(body: BoardIn, user: CurrentUser, session: SessionDep, response: Response) -> BoardOut:
+    board = session.scalar(select(Board).where(Board.source == body.source, Board.token == body.token))
+    if board is None:
+        raise HTTPException(status_code=404, detail="Board not found")
+    created = session.scalar(
+        insert(Follow)
+        .values(user_id=user.id, board_id=board.id)
+        .on_conflict_do_nothing()
+        .returning(Follow.board_id)
+    )
+    session.commit()
+    if created is None:
+        response.status_code = 200
+    return BoardOut.model_validate(board)
+
+
+# Not `{token}`: current_user already takes a parameter by that name, for the session cookie.
+@api.delete("/me/follows/{source}/{board_token}", status_code=204)
+def unfollow(source: BoardSource, board_token: str, user: CurrentUser, session: SessionDep) -> None:
+    board_id = select(Board.id).where(Board.source == source, Board.token == board_token).scalar_subquery()
+    result = session.execute(delete(Follow).where(Follow.user_id == user.id, Follow.board_id == board_id))
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Board not followed")
+    session.commit()
+
 
 app = FastAPI(title="kansei")
 app.include_router(api)
