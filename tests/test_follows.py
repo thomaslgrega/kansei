@@ -40,6 +40,18 @@ def test_following_a_board_that_isnt_on_kansei_is_404_and_follows_nothing(client
     assert session.scalar(select(Board).where(Board.token == "kansei-missing")) is None
 
 
+def test_following_a_removed_board_is_409_and_follows_nothing(client, session, log_in_as, boards):
+    session.add(Board(source="ashby", token="kansei-removed", status="removed"))
+    session.flush()
+    log_in_as("ada@example.com")
+
+    response = client.post("/api/me/follows", json={"source": "ashby", "token": "kansei-removed"})
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "This company was removed from kansei and can't be added."}
+    assert client.get("/api/me/follows").json() == []
+
+
 def test_unfollowing_removes_only_that_follow(client, log_in_as, boards):
     log_in_as("bob@example.com")
     client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
@@ -127,18 +139,24 @@ def test_follow_endpoints_refuse_a_logged_out_user(client, boards, method, path,
 
 
 def test_a_posting_says_whether_it_has_a_board_to_follow(client, session, make_posting, boards):
+    session.add(Board(source="ashby", token="kansei-removed", status="removed"))
     ids = save_postings(
         session,
         [
             make_posting(token="kansei-test", url="https://example.com/board"),
             make_posting(source="url", token="kansei-test", url="https://example.com/pasted"),
+            make_posting(source="ashby", token="kansei-removed", url="https://example.com/removed"),
         ],
         datetime.now(UTC),
     )
 
     has_board = {url: client.get(f"/api/postings/{posting_id}").json()["posting"]["has_board"] for url, posting_id in ids.items()}
 
-    assert has_board == {"https://example.com/board": True, "https://example.com/pasted": False}
+    assert has_board == {
+        "https://example.com/board": True,
+        "https://example.com/pasted": False,
+        "https://example.com/removed": False,
+    }
 
 
 def test_unfollowing_a_board_you_dont_follow_is_404(client, log_in_as, boards):

@@ -226,6 +226,8 @@ def follow(body: BoardIn, user: CurrentUser, session: SessionDep, response: Resp
     board = session.scalar(select(Board).where(Board.source == body.source, Board.token == body.token))
     if board is None:
         raise HTTPException(status_code=404, detail="Board not found")
+    if board.status == "removed":
+        raise HTTPException(status_code=409, detail="This company was removed from kansei and can't be added.")
     created = session.scalar(
         insert(Follow)
         .values(user_id=user.id, board_id=board.id)
