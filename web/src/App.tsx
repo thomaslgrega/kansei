@@ -1,4 +1,5 @@
 import { type SubmitEvent, useEffect, useState } from 'react'
+import AddCompany from './AddCompany'
 import { type Board, boardKey, latestOnly } from './boards'
 import NewBadge from './NewBadge'
 import Postings from './Postings'
@@ -71,13 +72,17 @@ export default function App() {
     setSession((current) => current && { ...current, tracked: [tracked, ...current.tracked] })
   }
 
+  async function refreshFollows() {
+    const follows = await reloadFollows()
+    if (follows) setSession((current) => current && { ...current, follows })
+  }
+
   async function changeFollow(source: string, token: string, request: () => Promise<Response>) {
     const key = boardKey({ source, token })
     setPending((current) => new Set(current).add(key))
     try {
       await request()
-      const follows = await reloadFollows()
-      if (follows) setSession((current) => current && { ...current, follows })
+      await refreshFollows()
     } finally {
       setPending((current) => {
         const next = new Set(current)
@@ -144,6 +149,7 @@ export default function App() {
               </li>
             ))}
           </ul>
+          <AddCompany followed={new Set(session.follows.map(boardKey))} onFollowsChanged={refreshFollows} />
         </>
       )}
       <Postings

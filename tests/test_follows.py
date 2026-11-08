@@ -1,7 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
 from test_api import make_extraction
 
 from kansei import save_postings
@@ -28,16 +27,6 @@ def test_following_a_board_twice_leaves_one_follow(client, log_in_as, boards):
     assert client.get("/api/me/follows").json() == [
         {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
     ]
-
-
-def test_following_a_board_that_isnt_on_kansei_is_404_and_follows_nothing(client, session, log_in_as):
-    log_in_as("ada@example.com")
-
-    response = client.post("/api/me/follows", json={"source": "lever", "token": "kansei-missing"})
-
-    assert response.status_code == 404
-    assert client.get("/api/me/follows").json() == []
-    assert session.scalar(select(Board).where(Board.token == "kansei-missing")) is None
 
 
 def test_following_a_removed_board_is_409_and_follows_nothing(client, session, log_in_as, boards):
@@ -130,12 +119,15 @@ def test_following_postings_while_logged_out_is_401(client):
 @pytest.mark.parametrize(("method", "path", "body"), [
     ("GET", "/api/me/follows", None),
     ("POST", "/api/me/follows", {"source": "greenhouse", "token": "kansei-test"}),
+    ("POST", "/api/me/follows", {"source": "lever", "token": "kansei-missing"}),
     ("DELETE", "/api/me/follows/greenhouse/kansei-test", None),
+    ("GET", "/api/probe?q=https://jobs.lever.co/kansei-missing", None),
 ])
-def test_follow_endpoints_refuse_a_logged_out_user(client, boards, method, path, body):
+def test_follow_endpoints_refuse_a_logged_out_user(client, ats, boards, method, path, body):
     response = client.request(method, path, json=body)
 
     assert response.status_code == 401
+    assert ats.requested == []
 
 
 def test_a_posting_says_whether_it_has_a_board_to_follow(client, session, make_posting, boards):

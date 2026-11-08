@@ -1,14 +1,19 @@
+import asyncio
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, FastAPI, HTTPException, Response
+import httpx
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from kansei import auth, is_candidate, is_sales_or_support
+from kansei import auth, board_jobs, is_candidate, is_sales_or_support
 from kansei.auth import CurrentUser, SessionCookie, current_user
 from kansei.config import settings
 from kansei.db import (
@@ -22,9 +27,18 @@ from kansei.db import (
     TrackStatus,
 )
 from kansei.llm import PostingFacts, prompt_snapshot
+from kansei.sources import SLUG, NotABoard, fetch_board_name, parse_board_url
 
 api = APIRouter(prefix="/api")
 api.include_router(auth.router)
+
+
+async def get_http() -> AsyncIterator[httpx.AsyncClient]:
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        yield client
+
+
+HttpDep = Annotated[httpx.AsyncClient, Depends(get_http)]
 
 
 class PostingOut(BaseModel):
@@ -204,7 +218,7 @@ def untrack(tracked_id: int, user: CurrentUser, session: SessionDep) -> None:
 
 class BoardIn(BaseModel):
     source: BoardSource
-    token: str
+    token: str = Field(pattern=rf"^{SLUG.pattern}$")
 
 
 class BoardOut(BaseModel):
@@ -215,20 +229,68 @@ class BoardOut(BaseModel):
     company: str
 
 
+class ProbeHit(BaseModel):
+    source: BoardSource
+    token: str
+    company: str | None
+    titles: list[str]
+    candidates: int
+    state: Literal["not_on_kansei", "on_kansei", "removed"]
+    following: bool
+
+
+class ProbeOut(BaseModel):
+    hits: list[ProbeHit]
+    message: str | None = None
+
+
+@api.get("/probe")
+async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -> ProbeOut:
+    try:
+        source, token = parse_board_url(q)
+    except NotABoard as error:
+        return ProbeOut(hits=[], message=str(error))
+    jobs, name = await asyncio.gather(board_jobs(http, source, token), fetch_board_name(http, source, token))
+    if jobs is None:
+        return ProbeOut(hits=[], message="No board found at that URL.")
+    board = session.scalar(select(Board).where(Board.source == source, Board.token == token))
+    return ProbeOut(hits=[ProbeHit(
+        source=source,
+        token=token,
+        company=(board.name if board else None) or name,
+        titles=[job.title for job in jobs[:5]],
+        candidates=sum(is_candidate(job.title, job.location) for job in jobs),
+        state="not_on_kansei" if board is None else "removed" if board.status == "removed" else "on_kansei",
+        following=board is not None and session.get(Follow, (user.id, board.id)) is not None,
+    )])
+
+
 @api.get("/me/follows")
 def list_follows(user: CurrentUser, session: SessionDep) -> list[BoardOut]:
     boards = session.scalars(select(Board).join(Follow, Follow.board_id == Board.id).where(Follow.user_id == user.id))
     return [BoardOut.model_validate(board) for board in sorted(boards, key=lambda board: (board.company.lower(), board.id))]
 
 
-@api.post("/me/follows", status_code=201)
-def follow(body: BoardIn, user: CurrentUser, session: SessionDep, response: Response) -> BoardOut:
+def locked_board(session: Session, source: str, token: str) -> Board | None:
     # FOR SHARE waits out a concurrent removal, so no follow lands after its DELETE.
-    board = session.scalar(
-        select(Board).where(Board.source == body.source, Board.token == body.token).with_for_update(read=True)
+    return session.scalar(
+        select(Board).where(Board.source == source, Board.token == token).with_for_update(read=True)
     )
+
+
+@api.post("/me/follows", status_code=201)
+async def follow(body: BoardIn, user: CurrentUser, session: SessionDep, http: HttpDep, response: Response) -> BoardOut:
+    board = locked_board(session, body.source, body.token)
     if board is None:
-        raise HTTPException(status_code=404, detail="Board not found")
+        if await board_jobs(http, body.source, body.token) is None:
+            raise HTTPException(status_code=404, detail=f"No board {body.token} on {body.source}.")
+        name = await fetch_board_name(http, body.source, body.token)
+        session.execute(
+            insert(Board)
+            .values(source=body.source, token=body.token, name=name, added_by=user.id)
+            .on_conflict_do_nothing()
+        )
+        board = locked_board(session, body.source, body.token)
     if board.status == "removed":
         raise HTTPException(status_code=409, detail="This company was removed from kansei and can't be added.")
     created = session.scalar(
