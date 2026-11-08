@@ -16,8 +16,7 @@ docker build --platform linux/amd64 -t "$image" .
 docker push "$image"
 gcloud run jobs deploy migrate --image="$image" --wait
 gcloud run deploy kansei --image="$image"
-# Kill a run before the next one starts: the timeout stays under the scheduler interval (hourly at most),
-# and a retry would restart a killed run alongside the next one.
+# Timeout under the scheduler interval and no retries, so ingest runs never overlap.
 gcloud run jobs deploy ingest --image="$image" --task-timeout=50m --max-retries=0
 
 deployed=$(gcloud run jobs describe ingest --format='value(spec.template.spec.template.spec.containers[0].image)')
