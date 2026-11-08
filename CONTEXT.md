@@ -25,7 +25,7 @@ The facts the model read out of one posting's text, stored with that exact text,
 _Avoid_: Summary, parse
 
 **Pending extraction**:
-A candidate with no extraction for its current text under the current model and prompt. `LLM_MAX_POSTINGS` caps how many are sent per run.
+A candidate with no extraction for its current text under the current model and prompt. `LLM_MAX_POSTINGS` caps how many are sent per run, and `LLM_DAILY_LIMIT` caps how many extractions are created in any 24 hours.
 _Avoid_: Uncached, new or changed, stale
 
 **New**:
