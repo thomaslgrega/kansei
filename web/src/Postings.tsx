@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import NewBadge from "./NewBadge";
 
 type Facts = {
     role_summary: string
@@ -56,6 +57,7 @@ export default function Postings({ trackedIds, onTrack }: Props) {
             <ul className="postings">
                 {visible.map(({ posting, facts }) => (
                     <li key={posting.id}>
+                        <NewBadge firstSeenAt={posting.first_seen_at} />
                         <a href={posting.url} target="_blank">
                             {posting.title}
                         </a>
