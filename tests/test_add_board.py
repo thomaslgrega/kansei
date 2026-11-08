@@ -147,8 +147,9 @@ NO_BOARD_IN_URL = "That URL doesn't name a board."
     ("https://example.com/kansei-test", UNKNOWN_HOST),
     ("https://boards.greenhouse.io.example.com/kansei-test", UNKNOWN_HOST),
     ("https://boards-api.greenhouse.io/v1/boards/kansei-test", UNKNOWN_HOST),
-    ("Kansei Test", UNKNOWN_HOST),
+    ("example.com/careers", UNKNOWN_HOST),
     ("https://jobs.lever.co/", NO_BOARD_IN_URL),
+    ("jobs.lever.co", NO_BOARD_IN_URL),
     ("https://jobs.lever.co/..", NO_BOARD_IN_URL),
     ("https://jobs.lever.co/.hidden", NO_BOARD_IN_URL),
     ("https://jobs.lever.co/kansei%2F..%2Fother", NO_BOARD_IN_URL),
@@ -256,6 +257,112 @@ def test_probing_a_board_the_ats_doesnt_serve_finds_nothing(client, log_in_as, a
     response = client.get("/api/probe", params={"q": "https://jobs.lever.co/kansei-missing"})
 
     assert response.json() == {"hits": [], "message": "No board found at that URL."}
+
+
+TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever or Ashby board URL."
+
+
+def board_urls(*tokens: str) -> list[str]:
+    return sorted(url.format(token=token) for url in (GREENHOUSE_BOARD, LEVER_BOARD, ASHBY_BOARD) for token in tokens)
+
+
+@pytest.mark.parametrize(("name", "slugs"), [
+    ("Acme", ["acme"]),
+    ("  SmartHR  ", ["smarthr"]),
+    ("Woven by Toyota, Inc.", ["wovenbytoyota", "woven-by-toyota"]),
+    ("Kansei Test K.K.", ["kanseitest", "kansei-test"]),
+    ("Toyota Motor Co., Ltd.", ["toyotamotor", "toyota-motor"]),
+    ("Mercari 株式会社", ["mercari"]),
+    ("株式会社Mercari", ["mercari"]),
+    ("Monday.com", ["mondaycom", "monday-com"]),
+    ("Société Générale", ["societegenerale", "societe-generale"]),
+    ("ＡＣＭＥ Corp", ["acme"]),
+])
+def test_probing_a_name_with_no_hits_tries_each_guessed_slug_on_every_source(client, log_in_as, ats, name, slugs):
+    log_in_as("ada@example.com")
+
+    response = client.get("/api/probe", params={"q": name})
+
+    assert response.json() == {"hits": [], "message": TRY_THE_URL}
+    assert sorted(ats.requested) == board_urls(*slugs)
+
+
+def test_probing_a_name_returns_the_board_its_slug_finds(client, log_in_as, ats):
+    serve_lever_board(ats)
+    log_in_as("ada@example.com")
+
+    response = client.get("/api/probe", params={"q": "Kansei Lever Co., Ltd."})
+
+    assert response.json() == {
+        "message": None,
+        "hits": [{
+            "source": "lever",
+            "token": "kansei-lever",
+            "company": "Kansei Lever",
+            "titles": ["Site Reliability Engineer"],
+            "candidates": 1,
+            "state": "not_on_kansei",
+            "following": False,
+        }],
+    }
+
+
+def test_probing_a_name_returns_every_board_it_finds_across_sources(client, session, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    serve_ashby_board(ats, token="kanseitest")
+    serve_lever_board(ats, token="kansei-test")
+    session.add(Board(source="lever", token="kansei-test", name="Kansei Test (Lever)", status="removed"))
+    session.flush()
+    log_in_as("ada@example.com")
+
+    response = client.get("/api/probe", params={"q": "Kansei Test K.K."})
+
+    assert response.json() == {
+        "message": None,
+        "hits": [
+            {
+                "source": "greenhouse",
+                "token": "kansei-test",
+                "company": "Kansei Test K.K.",
+                "titles": [
+                    "Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer",
+                ],
+                "candidates": 3,
+                "state": "not_on_kansei",
+                "following": False,
+            },
+            {
+                "source": "lever",
+                "token": "kansei-test",
+                "company": "Kansei Test (Lever)",
+                "titles": ["Site Reliability Engineer"],
+                "candidates": 1,
+                "state": "removed",
+                "following": False,
+            },
+            {
+                "source": "ashby",
+                "token": "kanseitest",
+                "company": "Kansei Ashby",
+                "titles": ["Robotics Engineer"],
+                "candidates": 1,
+                "state": "not_on_kansei",
+                "following": False,
+            },
+        ],
+    }
+
+
+@pytest.mark.parametrize("name", ["株式会社メルカリ", "", "   ", "K.K.", "Inc., Ltd."])
+def test_probing_a_name_with_no_ascii_letters_or_digits_suggests_the_url_without_a_request(
+    client, log_in_as, ats, name
+):
+    log_in_as("ada@example.com")
+
+    response = client.get("/api/probe", params={"q": name})
+
+    assert response.json() == {"hits": [], "message": TRY_THE_URL}
+    assert ats.requested == []
 
 
 def test_adding_a_board_not_on_kansei_creates_it_with_its_name_and_adder_and_follows_it(

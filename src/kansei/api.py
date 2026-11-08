@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from kansei import auth, board_jobs, is_candidate, is_sales_or_support
+from kansei import JobPosting, auth, board_jobs, is_candidate, is_sales_or_support
 from kansei.auth import CurrentUser, SessionCookie, current_user
 from kansei.config import settings
 from kansei.db import (
@@ -25,9 +25,18 @@ from kansei.db import (
     SessionDep,
     Tracked,
     TrackStatus,
+    User,
 )
 from kansei.llm import PostingFacts, prompt_snapshot
-from kansei.sources import SLUG, NotABoard, fetch_board_name, parse_board_url
+from kansei.sources import (
+    SLUG,
+    SOURCES,
+    NotABoard,
+    fetch_board_name,
+    looks_like_url,
+    name_slugs,
+    parse_board_url,
+)
 
 api = APIRouter(prefix="/api")
 api.include_router(auth.router)
@@ -249,17 +258,19 @@ def board_named(source: str, token: str) -> Select[tuple[Board]]:
     return select(Board).where(Board.source == source, func.lower(Board.token) == token.lower())
 
 
-@api.get("/probe")
-async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -> ProbeOut:
-    try:
-        source, token = parse_board_url(q)
-    except NotABoard as error:
-        return ProbeOut(hits=[], message=str(error))
-    jobs, name = await asyncio.gather(board_jobs(http, source, token), fetch_board_name(http, source, token))
+TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever or Ashby board URL."
+
+
+async def fetch_board(http: httpx.AsyncClient, source: str, token: str) -> tuple[list[JobPosting], str | None] | None:
+    jobs = await board_jobs(http, source, token)
     if jobs is None:
-        return ProbeOut(hits=[], message="No board found at that URL.")
+        return None
+    return jobs, await fetch_board_name(http, source, token)
+
+
+def probe_hit(session: Session, user: User, source: str, token: str, jobs: list[JobPosting], name: str | None) -> ProbeHit:
     board = session.scalar(board_named(source, token))
-    return ProbeOut(hits=[ProbeHit(
+    return ProbeHit(
         source=source,
         token=board.token if board else token,
         company=(board.name if board else None) or name,
@@ -267,7 +278,27 @@ async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -
         candidates=sum(is_candidate(job.title, job.location) for job in jobs),
         state="not_on_kansei" if board is None else "removed" if board.status == "removed" else "on_kansei",
         following=board is not None and session.get(Follow, (user.id, board.id)) is not None,
-    )])
+    )
+
+
+@api.get("/probe")
+async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -> ProbeOut:
+    if looks_like_url(q):
+        try:
+            guesses = [parse_board_url(q)]
+        except NotABoard as error:
+            return ProbeOut(hits=[], message=str(error))
+        miss = "No board found at that URL."
+    else:
+        guesses = [(source, slug) for source in SOURCES for slug in name_slugs(q)]
+        miss = TRY_THE_URL
+    found = await asyncio.gather(*(fetch_board(http, source, token) for source, token in guesses))
+    hits = [
+        probe_hit(session, user, source, token, *board)
+        for (source, token), board in zip(guesses, found, strict=True)
+        if board is not None
+    ]
+    return ProbeOut(hits=hits, message=None if hits else miss)
 
 
 @api.get("/me/follows")
