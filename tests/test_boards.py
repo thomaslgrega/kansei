@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import get_args
 
 import httpx
@@ -6,8 +7,15 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 
 import kansei
-from kansei import boards_to_fetch, fetch_board_names, save_board_names, unnamed_boards
-from kansei.db import Board, BoardSource
+from kansei import (
+    boards_to_fetch,
+    fetch_board_names,
+    remove_board,
+    save_board_names,
+    save_postings,
+    unnamed_boards,
+)
+from kansei.db import Board, BoardSource, Follow, Posting, Tracked, User
 
 
 def test_boards_to_fetch_reads_the_table_in_id_order(session, monkeypatch):
@@ -19,6 +27,45 @@ def test_boards_to_fetch_reads_the_table_in_id_order(session, monkeypatch):
     session.flush()
 
     assert boards_to_fetch(session) == ["lever:b", "greenhouse:a"]
+
+
+def test_boards_to_fetch_skips_removed_boards(session, monkeypatch):
+    monkeypatch.setattr(kansei.settings, "boards", None)
+    session.execute(delete(Board))
+    session.add_all([
+        Board(source="lever", token="a"),
+        Board(source="greenhouse", token="b", status="removed"),
+        Board(source="ashby", token="c"),
+    ])
+    session.flush()
+
+    assert boards_to_fetch(session) == ["lever:a", "ashby:c"]
+
+
+def test_unnamed_boards_skips_removed_boards(session):
+    session.execute(delete(Board))
+    session.add_all([
+        Board(source="lever", token="a"),
+        Board(source="greenhouse", token="b", status="removed"),
+    ])
+    session.flush()
+
+    assert [(board.source, board.token) for board in unnamed_boards(session)] == [("lever", "a")]
+
+
+def test_a_new_board_is_active(session):
+    session.execute(delete(Board))
+    session.add(Board(source="lever", token="a"))
+    session.flush()
+
+    assert session.scalars(select(Board.status)).all() == ["active"]
+
+
+def test_the_database_rejects_an_unknown_board_status(session):
+    session.add(Board(source="lever", token="a", status="deleted"))
+
+    with pytest.raises(IntegrityError, match="ck_boards_status"):
+        session.flush()
 
 
 def test_boards_to_fetch_returns_the_override_whatever_the_table_holds(session, monkeypatch):
@@ -97,3 +144,50 @@ def test_the_database_rejects_a_board_named_the_empty_string(session):
 
     with pytest.raises(IntegrityError, match="ck_boards_name"):
         session.flush()
+
+
+def test_removing_a_board_deletes_only_its_follows_and_keeps_its_postings_and_tracked_rows(session, make_posting):
+    session.execute(delete(Board))
+    junk = Board(source="greenhouse", token="kansei-junk")
+    kept = Board(source="lever", token="kansei-kept")
+    ada = User(email="ada@example.com", password_hash="not a real hash")
+    bob = User(email="bob@example.com", password_hash="not a real hash")
+    session.add_all([junk, kept, ada, bob])
+    session.flush()
+    session.add_all([
+        Follow(user_id=ada.id, board_id=junk.id),
+        Follow(user_id=bob.id, board_id=junk.id),
+        Follow(user_id=ada.id, board_id=kept.id),
+    ])
+    ids = save_postings(
+        session,
+        [make_posting(token="kansei-junk", url="https://example.com/junk")],
+        datetime(2026, 11, 1, tzinfo=UTC),
+    )
+    session.add(Tracked(user_id=ada.id, posting_id=ids["https://example.com/junk"], status="applied", note="Called back"))
+    session.flush()
+
+    remove_board(session, "greenhouse:kansei-junk")
+
+    assert session.execute(select(Board.source, Board.token, Board.status).order_by(Board.id)).all() == [
+        ("greenhouse", "kansei-junk", "removed"),
+        ("lever", "kansei-kept", "active"),
+    ]
+    assert session.execute(select(Follow.user_id, Follow.board_id)).all() == [(ada.id, kept.id)]
+    assert session.execute(select(Posting.url, Posting.token)).all() == [("https://example.com/junk", "kansei-junk")]
+    assert session.execute(select(Tracked.user_id, Tracked.posting_id, Tracked.status, Tracked.note)).all() == [
+        (ada.id, ids["https://example.com/junk"], "applied", "Called back"),
+    ]
+
+
+@pytest.mark.parametrize("board", ["greenhouse:kansei-missing", "lever:kansei-junk", "kansei-junk"])
+def test_removing_a_board_that_isnt_on_kansei_fails_and_changes_nothing(session, board):
+    session.execute(delete(Board))
+    session.add(Board(source="greenhouse", token="kansei-junk"))
+    session.flush()
+
+    with pytest.raises(LookupError, match=f"^no board {board} on kansei$"):
+        remove_board(session, board)
+    assert session.execute(select(Board.source, Board.token, Board.status)).all() == [
+        ("greenhouse", "kansei-junk", "active"),
+    ]

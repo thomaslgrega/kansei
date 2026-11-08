@@ -40,6 +40,7 @@ class Base(DeclarativeBase):
 
 
 BoardSource = Literal["greenhouse", "lever", "ashby"]
+BoardStatus = Literal["active", "removed"]
 
 
 class Board(Base):
@@ -48,12 +49,14 @@ class Board(Base):
         UniqueConstraint("source", "token"),
         CheckConstraint(column("source").in_(get_args(BoardSource)), name="source"),
         CheckConstraint(column("name") != "", name="name"),
+        CheckConstraint(column("status").in_(get_args(BoardStatus)), name="status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     source: Mapped[BoardSource] = mapped_column(String)
     token: Mapped[str]
     name: Mapped[str | None]
+    status: Mapped[BoardStatus] = mapped_column(String, server_default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     @property
@@ -99,7 +102,7 @@ class Posting(Base):
         )
     )
     has_board: Mapped[bool] = column_property(
-        exists().where(Board.source == source, Board.token == token)
+        exists().where(Board.source == source, Board.token == token, Board.status == "active")
     )
 
 

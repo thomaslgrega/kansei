@@ -23,6 +23,7 @@ dependencies = [
 [project.scripts]
 kansei = "kansei:main"
 kansei-eval = "kansei.evals:main"
+kansei-remove-board = "kansei:remove_board_main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]

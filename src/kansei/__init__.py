@@ -12,12 +12,12 @@ import httpx
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse
 from pydantic import BaseModel, HttpUrl, ValidationError
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from kansei.config import settings
-from kansei.db import Board, BoardSource, Extraction, Posting, engine
+from kansei.db import Board, BoardSource, Extraction, Follow, Posting, engine
 from kansei.llm import PostingFacts, cost_usd, extract, openai_client, prompt_snapshot
 from kansei.sources import (
     SOURCES,
@@ -63,12 +63,27 @@ def is_sales_or_support(title: str) -> bool:
 def boards_to_fetch(session: Session) -> list[str]:
     if settings.boards is not None:
         return settings.boards
-    boards = session.scalars(select(Board).order_by(Board.id))
+    boards = session.scalars(select(Board).where(Board.status == "active").order_by(Board.id))
     return [f"{board.source}:{board.token}" for board in boards]
 
 
 def unnamed_boards(session: Session) -> list[Board]:
-    return list(session.scalars(select(Board).where(Board.name.is_(None)).order_by(Board.id)))
+    return list(session.scalars(
+        select(Board).where(Board.name.is_(None), Board.status == "active").order_by(Board.id)
+    ))
+
+
+def remove_board(session: Session, board: str) -> None:
+    source, _, token = board.partition(":")
+    board_id = session.scalar(
+        update(Board)
+        .where(Board.source == source, Board.token == token)
+        .values(status="removed")
+        .returning(Board.id)
+    )
+    if board_id is None:
+        raise LookupError(f"no board {board} on kansei")
+    session.execute(delete(Follow).where(Follow.board_id == board_id))
 
 
 async def fetch_board_names(client: httpx.AsyncClient, boards: list[Board]) -> dict[Board, str | None]:
@@ -349,6 +364,19 @@ async def ingest_url(url: str) -> None:
 
     show(response.output_parsed)
     print(f"{response.usage.input_tokens} input tokens, ${cost_usd(response.usage, response.model):.6f}, {seconds:.1f}s")
+
+
+def remove_board_main() -> None:
+    match sys.argv[1:]:
+        case [board]:
+            try:
+                with Session(engine) as session, session.begin():
+                    remove_board(session, board)
+            except LookupError as exc:
+                sys.exit(str(exc))
+            print(f"removed {board}")
+        case _:
+            sys.exit("usage: kansei-remove-board source:token")
 
 
 def main() -> None:
