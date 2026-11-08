@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from kansei import JobPosting
-from kansei.api import app
+from kansei.api import app, get_http
 from kansei.db import engine, get_session
 
 
@@ -44,9 +44,29 @@ def session():
         transaction.rollback()
 
 
+class FakeAts:
+    def __init__(self) -> None:
+        self.pages: dict[str, httpx.Response] = {}
+        self.requested: list[str] = []
+
+    def handle(self, request: httpx.Request) -> httpx.Response:
+        self.requested.append(str(request.url))
+        return self.pages.get(str(request.url), httpx.Response(404))
+
+
 @pytest.fixture
-def client(session):
+def ats():
+    return FakeAts()
+
+
+@pytest.fixture
+def client(session, ats):
+    async def fake_http():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(ats.handle)) as http:
+            yield http
+
     app.dependency_overrides[get_session] = lambda: session
+    app.dependency_overrides[get_http] = fake_http
     yield TestClient(app, base_url="https://testserver")
     app.dependency_overrides = {}
 

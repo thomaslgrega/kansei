@@ -121,6 +121,14 @@ def validate(jobs: list[dict]) -> tuple[list[JobPosting], list[tuple[int, str]]]
     return passed, failed
 
 
+async def board_jobs(client: httpx.AsyncClient, source: str, token: str) -> list[JobPosting] | None:
+    try:
+        jobs = await SOURCES[source](client, token)
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        return None
+    return validate(jobs)[0]
+
+
 def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -> dict[str, int]:
     if not jobs:
         return {}

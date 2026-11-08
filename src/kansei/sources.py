@@ -1,5 +1,6 @@
 import html
 import json
+import re
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 
@@ -218,3 +219,31 @@ async def fetch_board_name(client: httpx.AsyncClient, source: str, token: str) -
 
 SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch_ashby}
 NAMES = {"greenhouse": greenhouse_name, "lever": lever_name, "ashby": ashby_name}
+
+BOARD_HOSTS = {
+    "boards.greenhouse.io": "greenhouse",
+    "job-boards.greenhouse.io": "greenhouse",
+    "jobs.lever.co": "lever",
+    "jobs.ashbyhq.com": "ashby",
+}
+# Starts with a letter or digit, so `.` and `..` can't walk up the ATS's API paths.
+SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
+
+
+class NotABoard(ValueError):
+    pass
+
+
+def parse_board_url(url: str) -> tuple[str, str]:
+    url = url.strip()
+    parts = urlsplit(url if "://" in url else f"https://{url}")
+    source = BOARD_HOSTS.get((parts.hostname or "").lower())
+    if source is None:
+        raise NotABoard(
+            "kansei can only add boards on boards.greenhouse.io, job-boards.greenhouse.io, "
+            "jobs.lever.co and jobs.ashbyhq.com."
+        )
+    token = parts.path.split("/")[1] if parts.path.startswith("/") else ""
+    if not SLUG.fullmatch(token):
+        raise NotABoard("That URL doesn't name a board.")
+    return source, token

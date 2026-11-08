@@ -57,6 +57,8 @@ class Board(Base):
     token: Mapped[str]
     name: Mapped[str | None]
     status: Mapped[BoardStatus] = mapped_column(String, server_default="active")
+    # Empty for seeded boards.
+    added_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     @property
