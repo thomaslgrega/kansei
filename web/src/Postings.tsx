@@ -39,11 +39,12 @@ type Props = {
     trackedIds: Set<number> | null
     onTrack: (postingId: number) => void
     followed: Set<string> | null
+    pendingFollows: Set<string>
     onFollow: (source: string, token: string) => void
     onUnfollow: (source: string, token: string) => void
 }
 
-export default function Postings({ trackedIds, onTrack, followed, onFollow, onUnfollow }: Props) {
+export default function Postings({ trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
     const [showSales, setShowSales] = useState(false)
     const [followingOnly, setFollowingOnly] = useState(false)
@@ -97,9 +98,9 @@ export default function Postings({ trackedIds, onTrack, followed, onFollow, onUn
                         <p className="status">
                             {posting.company}
                             {followed && posting.has_board && (followed.has(boardKey(posting)) ? (
-                                <> <button onClick={() => onUnfollow(posting.source, posting.token)}>Unfollow</button></>
+                                <> <button disabled={pendingFollows.has(boardKey(posting))} onClick={() => onUnfollow(posting.source, posting.token)}>Unfollow</button></>
                             ) : (
-                                <> <button onClick={() => onFollow(posting.source, posting.token)}>Follow</button></>
+                                <> <button disabled={pendingFollows.has(boardKey(posting))} onClick={() => onFollow(posting.source, posting.token)}>Follow</button></>
                             ))}
                             {' '}· {posting.location} · first seen {new Date(posting.first_seen_at).toLocaleDateString('en-CA')}
                         </p>
