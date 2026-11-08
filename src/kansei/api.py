@@ -258,6 +258,7 @@ def board_named(source: str, token: str) -> Select[tuple[Board]]:
     return select(Board).where(Board.source == source, func.lower(Board.token) == token.lower())
 
 
+NO_BOARD_AT_URL = "No board found at that URL."
 TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever or Ashby board URL."
 
 
@@ -288,15 +289,15 @@ async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -
             guesses = [parse_board_url(q)]
         except NotABoard as error:
             return ProbeOut(hits=[], message=str(error))
-        miss = "No board found at that URL."
+        miss = NO_BOARD_AT_URL
     else:
         guesses = [(source, slug) for source in SOURCES for slug in name_slugs(q)]
         miss = TRY_THE_URL
     found = await asyncio.gather(*(fetch_board(http, source, token) for source, token in guesses))
     hits = [
-        probe_hit(session, user, source, token, *board)
-        for (source, token), board in zip(guesses, found, strict=True)
-        if board is not None
+        probe_hit(session, user, source, token, *fetched)
+        for (source, token), fetched in zip(guesses, found, strict=True)
+        if fetched is not None
     ]
     return ProbeOut(hits=hits, message=None if hits else miss)
 

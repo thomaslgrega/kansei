@@ -272,6 +272,7 @@ def board_urls(*tokens: str) -> list[str]:
     ("Woven by Toyota, Inc.", ["wovenbytoyota", "woven-by-toyota"]),
     ("Kansei Test K.K.", ["kanseitest", "kansei-test"]),
     ("Toyota Motor Co., Ltd.", ["toyotamotor", "toyota-motor"]),
+    ("Amazon Japan G.K.", ["amazonjapan", "amazon-japan"]),
     ("Mercari 株式会社", ["mercari"]),
     ("株式会社Mercari", ["mercari"]),
     ("Monday.com", ["mondaycom", "monday-com"]),
@@ -311,6 +312,7 @@ def test_probing_a_name_returns_every_board_it_finds_across_sources(client, sess
     serve_greenhouse_board(ats)
     serve_ashby_board(ats, token="kanseitest")
     serve_lever_board(ats, token="kansei-test")
+    ats.pages[GREENHOUSE_BOARD.format(token="kanseitest")] = httpx.Response(500)
     session.add(Board(source="lever", token="kansei-test", name="Kansei Test (Lever)", status="removed"))
     session.flush()
     log_in_as("ada@example.com")

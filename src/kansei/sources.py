@@ -250,12 +250,12 @@ def parse_board_url(url: str) -> tuple[str, str]:
     return source, token
 
 
-def looks_like_url(q: str) -> bool:
-    q = q.strip()
-    return "/" in q or q.lower() in BOARD_HOSTS
+def looks_like_url(text: str) -> bool:
+    text = text.strip()
+    return "/" in text or text.lower() in BOARD_HOSTS
 
 
-COMPANY_SUFFIXES = {"inc", "incorporated", "ltd", "limited", "co", "corp", "corporation", "llc", "gmbh", "kk", "plc", "pte"}
+COMPANY_SUFFIXES = {"inc", "incorporated", "ltd", "limited", "co", "corp", "corporation", "llc", "gmbh", "kk", "gk", "yk", "plc", "pte"}
 
 
 def name_slugs(name: str) -> list[str]:
