@@ -12,7 +12,7 @@ A change is done when all of these pass:
     uv run ruff check --fix .
     uv run pytest -q
     uv run alembic check                       # when db.py or migrations/ changed
-    cd web && npm run build && npm run lint    # when web/ changed
+    cd web && npm test && npm run build && npm run lint    # when web/ changed
 
 Tests use the local compose database (`docker compose up -d db`, then
 `uv run alembic upgrade head`). A fresh worktree needs `cp .env.example .env` first. Tests that
