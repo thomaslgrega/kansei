@@ -62,7 +62,7 @@ def test_a_tracked_posting_kansei_hasnt_seen_for_two_days_is_no_longer_listed(cl
 
     response = client.get("/api/me/tracked")
 
-    assert [(row["posting"]["id"], row["listed"]) for row in response.json()] == [
+    assert [(row["posting"]["id"], row["posting"]["listed"]) for row in response.json()] == [
         (ids[3], False),
         (ids[2], False),
         (ids[1], True),
@@ -75,7 +75,7 @@ def test_tracking_a_posting_that_is_no_longer_listed_says_so(client, log_in_as, 
 
     response = client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
 
-    assert response.json()["listed"] is False
+    assert response.json()["posting"]["listed"] is False
 
 
 def test_another_users_tracked_posting_looks_like_one_that_doesnt_exist(client, session, log_in_as, posting_ids):

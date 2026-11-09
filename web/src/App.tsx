@@ -10,8 +10,7 @@ type Tracked = {
   id: number
   status: string
   note: string
-  listed: boolean
-  posting: { id: number; title: string; url: string; location: string; first_seen_at: string }
+  posting: { id: number; title: string; url: string; location: string; first_seen_at: string; listed: boolean }
 }
 
 type Session = { user: User; tracked: Tracked[]; follows: Board[] }
@@ -135,7 +134,7 @@ export default function App() {
                 <br />
                 <span className="status">
                   {row.status} · {row.posting.location}
-                  {!row.listed && ' · No longer listed'}
+                  {!row.posting.listed && ' · No longer listed'}
                 </span>
               </li>
             ))}

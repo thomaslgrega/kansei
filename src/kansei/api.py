@@ -1,13 +1,13 @@
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Select, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
@@ -64,6 +64,7 @@ class PostingOut(BaseModel):
     posted_at: datetime | None
     first_seen_at: datetime
     last_seen_at: datetime
+    listed: bool
 
 
 class ExtractionOut(BaseModel):
@@ -86,9 +87,6 @@ class PostingWithFacts(BaseModel):
     sales_or_support: bool
 
 
-OPEN_FOR = timedelta(days=2)
-
-
 @api.get("/postings")
 def list_postings(
     session: SessionDep, token: str | None = None, following: bool = False, cookie: SessionCookie = None
@@ -104,7 +102,7 @@ def list_postings(
     statement = (
         select(Posting, newest.c.facts)
         .join(newest, newest.c.posting_id == Posting.id)
-        .where(Posting.last_seen_at > datetime.now(UTC) - OPEN_FOR)
+        .where(Posting.listed)
         .order_by(Posting.first_seen_at.desc(), Posting.id.desc())
     )
     if token is not None:
@@ -171,11 +169,6 @@ class TrackedOut(BaseModel):
     note: str
     created_at: datetime
     posting: PostingOut
-
-    @computed_field
-    @property
-    def listed(self) -> bool:
-        return self.posting.last_seen_at > datetime.now(UTC) - OPEN_FOR
 
 
 @api.get("/me/tracked")
