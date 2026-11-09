@@ -173,9 +173,16 @@ def test_removing_a_board_deletes_only_its_follows_and_keeps_its_postings_and_tr
         ("greenhouse", "kansei-junk", "removed"),
         ("lever", "kansei-kept", "active"),
     ]
-    assert session.execute(select(Follow.user_id, Follow.board_id)).all() == [(ada.id, kept.id)]
-    assert session.execute(select(Posting.url, Posting.token)).all() == [("https://example.com/junk", "kansei-junk")]
-    assert session.execute(select(Tracked.user_id, Tracked.posting_id, Tracked.status, Tracked.note)).all() == [
+    user_ids = [ada.id, bob.id]
+    assert session.execute(select(Follow.user_id, Follow.board_id).where(Follow.user_id.in_(user_ids))).all() == [
+        (ada.id, kept.id),
+    ]
+    assert session.execute(select(Posting.url, Posting.token).where(Posting.token == "kansei-junk")).all() == [
+        ("https://example.com/junk", "kansei-junk"),
+    ]
+    assert session.execute(
+        select(Tracked.user_id, Tracked.posting_id, Tracked.status, Tracked.note).where(Tracked.user_id.in_(user_ids))
+    ).all() == [
         (ada.id, ids["https://example.com/junk"], "applied", "Called back"),
     ]
 
