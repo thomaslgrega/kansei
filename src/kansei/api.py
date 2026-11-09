@@ -12,6 +12,8 @@ from sqlalchemy import Select, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Scope
 
 from kansei import JobPosting, auth, board_jobs, is_candidate, is_sales_or_support
 from kansei.auth import CurrentUser, SessionCookie, current_user
@@ -352,9 +354,22 @@ def unfollow(source: BoardSource, board_token: str, user: CurrentUser, session: 
     session.commit()
 
 
-app = FastAPI(title="kansei")
-app.include_router(api)
+class WebApp(StaticFiles):
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as error:
+            if error.status_code != 404 or path == "api" or path.startswith("api/"):
+                raise
+            return await super().get_response("index.html", scope)
 
-WEB_DIST = Path(__file__).parents[2] / "web" / "dist"
-if WEB_DIST.is_dir():
-    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
+
+def create_app(web_dist: Path) -> FastAPI:
+    app = FastAPI(title="kansei")
+    app.include_router(api)
+    if web_dist.is_dir():
+        app.mount("/", WebApp(directory=web_dist, html=True), name="web")
+    return app
+
+
+app = create_app(Path(__file__).parents[2] / "web" / "dist")

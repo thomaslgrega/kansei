@@ -1,8 +1,12 @@
-import { type SubmitEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Route, Routes } from 'react-router'
 import AddCompany from './AddCompany'
 import { type Board, boardKey, latestOnly } from './boards'
+import Header from './Header'
+import Login from './Login'
 import NewBadge from './NewBadge'
 import Postings from './Postings'
+import Title from './Title'
 
 type User = { id: number; email: string }
 
@@ -30,26 +34,13 @@ async function loadSession(): Promise<Session | null> {
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [error, setError] = useState('')
   const [pending, setPending] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadSession().then(setSession)
   }, [])
 
-  async function logIn(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
-    })
-    if (!response.ok) {
-      setError('Wrong email or password')
-      return
-    }
-    setError('')
+  async function reloadSession() {
     setSession(await loadSession())
   }
 
@@ -110,17 +101,10 @@ export default function App() {
 
   if (session === undefined) return null
 
-  return (
+  const home = (
     <main>
-      <h1>kansei</h1>
-      {session === null ? (
-        <form onSubmit={logIn}>
-          <input name="email" type="email" placeholder="Email" required />
-          <input name="password" type="password" placeholder="Password" required />
-          <button>Log in</button>
-          {error && <p role="alert">{error}</p>}
-        </form>
-      ) : (
+      <Title>kansei</Title>
+      {session !== null && (
         <>
           <p>
             {session.user.email} · <button onClick={logOut}>Log out</button>
@@ -162,5 +146,16 @@ export default function App() {
         onUnfollow={unfollow}
       />
     </main>
+  )
+
+  return (
+    <>
+      <Header email={session?.user.email ?? null} onLogOut={logOut} />
+      <Routes>
+        <Route path="/" element={home} />
+        <Route path="/login" element={<Login loggedIn={session !== null} onLoggedIn={reloadSession} />} />
+        <Route path="*" element={<main><Title>Not found · kansei</Title><p>Page not found.</p></main>} />
+      </Routes>
+    </>
   )
 }
