@@ -29,5 +29,5 @@ A candidate with no extraction for its current text under the current model and 
 _Avoid_: Uncached, new or changed, stale
 
 **New**:
-Said of a posting first seen within the last two days. It is the same for every user.
+Said of a candidate first seen within the last two days. It is the same for every user.
 _Avoid_: Fresh, recent, unseen

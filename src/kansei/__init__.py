@@ -273,7 +273,7 @@ async def amain() -> None:
     candidates = [job for job in postings if is_candidate(job.title, job.location)]
 
     with Session(engine) as session, session.begin():
-        ids = save_postings(session, postings, datetime.now(UTC))
+        ids = save_postings(session, candidates, datetime.now(UTC))
 
     total = total_passed + total_failed
     print(f"{total} jobs from {len(boards)}/{len(results)} boards in {elapsed:.2f}s")
