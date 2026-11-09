@@ -321,15 +321,10 @@ async def amain() -> None:
             for url, (response, _) in done.items()
         )
 
-    print(f"\n{len(done)}/{len(summaries)} summarized in {wall:.1f}s")
+    print(f"{len(done)}/{len(summaries)} summarized in {wall:.1f}s")
     for url, exc in errors.items():
         code = getattr(exc, "code", None) or ""
         print(f"    failed {url}: {type(exc).__name__} {code}")
-    by_url = {str(job.url): job for job in candidates}
-    for url, (response, _) in done.items():
-        facts = response.output_parsed
-        print(f"\n{by_url[url].title}")
-        show(facts)
 
     if len(done) < 2:
         return
@@ -337,7 +332,7 @@ async def amain() -> None:
     costs = [cost_usd(response.usage, response.model) for response, _ in done.values()]
     usages = [response.usage for response, _ in done.values()]
     print(
-        f"\ntokens: {sum(u.input_tokens for u in usages)} in "
+        f"tokens: {sum(u.input_tokens for u in usages)} in "
         f"({sum(u.input_tokens_details.cached_tokens for u in usages)} cached), "
         f"{sum(u.output_tokens for u in usages)} out "
         f"({sum(u.output_tokens_details.reasoning_tokens for u in usages)} reasoning)"
