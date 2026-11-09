@@ -9,7 +9,11 @@ export type Tracked = {
     posting: { id: number; title: string; url: string; location: string; first_seen_at: string; listed: boolean }
 }
 
-export default function TrackedPostings({ tracked }: { tracked: Tracked[] }) {
+type Props = {
+    tracked: Tracked[]
+}
+
+export default function TrackedPostings({ tracked }: Props) {
     return (
         <main>
             <Title>Tracked · kansei</Title>
