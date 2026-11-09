@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import get_args
 
 import pytest
@@ -49,6 +49,33 @@ def test_a_user_sees_only_their_own_tracked_postings_newest_first(client, log_in
     response = client.get("/api/me/tracked")
 
     assert [row["posting"]["id"] for row in response.json()] == [posting_ids[2], posting_ids[1]]
+
+
+def test_a_tracked_posting_kansei_hasnt_seen_for_two_days_is_no_longer_listed(client, session, log_in_as, make_posting):
+    now = datetime.now(UTC)
+    seen_at = [now, now - timedelta(days=2) + timedelta(minutes=1), now - timedelta(days=2, minutes=1), SEEN_AT]
+    urls = [f"https://example.com/{n}" for n in range(len(seen_at))]
+    ids = [save_postings(session, [make_posting(id=url, url=url)], when)[url] for url, when in zip(urls, seen_at)]
+    log_in_as("ada@example.com")
+    for posting_id in ids:
+        client.post("/api/me/tracked", json={"posting_id": posting_id})
+
+    response = client.get("/api/me/tracked")
+
+    assert [(row["posting"]["id"], row["posting"]["listed"]) for row in response.json()] == [
+        (ids[3], False),
+        (ids[2], False),
+        (ids[1], True),
+        (ids[0], True),
+    ]
+
+
+def test_tracking_a_posting_that_is_no_longer_listed_says_so(client, log_in_as, posting_ids):
+    log_in_as("ada@example.com")
+
+    response = client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+
+    assert response.json()["posting"]["listed"] is False
 
 
 def test_another_users_tracked_posting_looks_like_one_that_doesnt_exist(client, session, log_in_as, posting_ids):

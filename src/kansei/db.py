@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal, get_args
 
 from fastapi import Depends
@@ -17,6 +17,7 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -79,6 +80,9 @@ class Extraction(Base):
     facts: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+OPEN_FOR = timedelta(days=2)
+
+
 class Posting(Base):
     __tablename__ = "postings"
     __table_args__ = (CheckConstraint(column("company_name") != "", name="company_name"),)
@@ -106,6 +110,10 @@ class Posting(Base):
     has_board: Mapped[bool] = column_property(
         exists().where(Board.source == source, Board.token == token, Board.status == "active")
     )
+
+    @hybrid_property
+    def listed(self) -> bool:
+        return self.last_seen_at > datetime.now(UTC) - OPEN_FOR
 
 
 class User(Base):

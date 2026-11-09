@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -64,6 +64,7 @@ class PostingOut(BaseModel):
     posted_at: datetime | None
     first_seen_at: datetime
     last_seen_at: datetime
+    listed: bool
 
 
 class ExtractionOut(BaseModel):
@@ -86,9 +87,6 @@ class PostingWithFacts(BaseModel):
     sales_or_support: bool
 
 
-OPEN_FOR = timedelta(days=2)
-
-
 @api.get("/postings")
 def list_postings(
     session: SessionDep, token: str | None = None, following: bool = False, cookie: SessionCookie = None
@@ -104,7 +102,7 @@ def list_postings(
     statement = (
         select(Posting, newest.c.facts)
         .join(newest, newest.c.posting_id == Posting.id)
-        .where(Posting.last_seen_at > datetime.now(UTC) - OPEN_FOR)
+        .where(Posting.listed)
         .order_by(Posting.first_seen_at.desc(), Posting.id.desc())
     )
     if token is not None:

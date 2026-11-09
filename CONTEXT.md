@@ -16,6 +16,10 @@ _Avoid_: Match, Japan posting
 The name a board's company goes by, such as `Woven by Toyota` for `lever:woven-by-toyota`. A board may have none. A pasted posting has no board, so it goes by the `hiringOrganization` name its page declares. A posting with neither goes by its token.
 _Avoid_: Employer, organization
 
+**Listed**:
+Said of a posting kansei saw within the last two days. The postings page shows only listed candidates. A tracked posting that isn't listed shows as no longer listed, whether its board took it down or it stopped being a candidate, since kansei can't tell the two apart.
+_Avoid_: Closed, expired
+
 **Follow**:
 A user's choice to see one board's candidates on their own page.
 _Avoid_: Subscription, watch, favorite
