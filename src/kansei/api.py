@@ -121,7 +121,7 @@ def list_postings(
             sales_or_support=is_sales_or_support(posting.title),
         )
         for posting, facts in session.execute(statement)
-        if is_candidate(posting.title, posting.location)
+        if is_candidate(posting)
     ]
 
 
@@ -273,7 +273,7 @@ def probe_hit(session: Session, user_id: int, source: str, token: str, jobs: lis
         token=board.token if board else token,
         company=(board.name if board else None) or name,
         titles=[job.title for job in jobs[:5]],
-        candidates=sum(is_candidate(job.title, job.location) for job in jobs),
+        candidates=sum(is_candidate(job) for job in jobs),
         state="not_on_kansei" if board is None else "removed" if board.status == "removed" else "on_kansei",
         following=board is not None and session.get(Follow, (user_id, board.id)) is not None,
     )
@@ -288,7 +288,8 @@ async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -
             return ProbeOut(hits=[], message=str(error))
         miss = NO_BOARD_AT_URL
     else:
-        guesses = [(source, slug) for source in SOURCES for slug in name_slugs(q)]
+        # Probing an HRMOS board fetches its job pages, too many requests for a guess.
+        guesses = [(source, slug) for source in SOURCES if source != "hrmos" for slug in name_slugs(q)]
         miss = TRY_THE_URL
     user_id = user.id
     session.rollback()

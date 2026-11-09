@@ -24,6 +24,7 @@ from kansei.sources import (
     fetch_board_name,
     fetch_posting,
     fetch_url,
+    is_engineering,
 )
 
 
@@ -37,19 +38,24 @@ class JobPosting(BaseModel):
     location: str
     company_name: str | None = None
     description: str | None = None
+    headline: str | None = None
 
 
-def is_candidate(title: str, location: str) -> bool:
-    engineering = re.compile(r"engineer|developer|エンジニア|開発", re.IGNORECASE)
+def is_candidate(posting: JobPosting | Posting) -> bool:
     in_japan = re.compile(
         r"japan|tokyo|osaka|kyoto|fukuoka|nagoya|yokohama|sapporo|kobe"
         r"|日本|東京|大阪|京都|福岡|名古屋|横浜|札幌|神戸|北海道|県",
         re.IGNORECASE,
     )
     open_remote = re.compile(r"^remote$|anywhere|worldwide|global|apac|asia", re.IGNORECASE)
-    location = location.strip()
-    reachable = in_japan.search(location) or open_remote.search(location)
-    return bool(engineering.search(title) and reachable)
+    location = posting.location.strip()
+    reachable = (
+        in_japan.search(location)
+        or open_remote.search(location)
+        or (posting.source == "hrmos" and not location)
+    )
+    engineering = is_engineering(posting.title) or is_engineering(posting.headline or "")
+    return bool(engineering and reachable)
 
 
 def is_sales_or_support(title: str) -> bool:
@@ -142,6 +148,7 @@ def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -
             "location": job.location,
             "posted_at": job.posted_at,
             "company_name": job.company_name,
+            "headline": job.headline,
             "first_seen_at": seen_at,
             "last_seen_at": seen_at,
         }
@@ -155,6 +162,7 @@ def save_postings(session: Session, jobs: list[JobPosting], seen_at: datetime) -
             "location": statement.excluded.location,
             "posted_at": statement.excluded.posted_at,
             "company_name": statement.excluded.company_name,
+            "headline": statement.excluded.headline,
             "last_seen_at": statement.excluded.last_seen_at,
         },
     ).returning(Posting.url, Posting.id)
@@ -205,7 +213,7 @@ def show(facts: PostingFacts) -> None:
 
 
 async def model_input(http: httpx.AsyncClient, job: JobPosting) -> str:
-    posting = job.description or await fetch_posting(http, job.token, job.id)
+    posting = job.description if job.description is not None else await fetch_posting(http, job.token, job.id)
     return f"{job.title}\n\n{posting}"
 
 
@@ -270,7 +278,7 @@ async def amain() -> None:
         postings += passed_jobs
         total_failed += len(failed_jobs)
     total_passed = len(postings)
-    candidates = [job for job in postings if is_candidate(job.title, job.location)]
+    candidates = [job for job in postings if is_candidate(job)]
 
     with Session(engine) as session, session.begin():
         ids = save_postings(session, candidates, datetime.now(UTC))
