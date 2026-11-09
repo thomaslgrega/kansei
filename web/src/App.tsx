@@ -95,11 +95,13 @@ export default function App() {
 
   if (session === undefined) return null
 
+  const trackedIds = session && new Set(session.tracked.map((row) => row.posting.id))
+
   const home = (
     <main>
       <Title>kansei</Title>
       <Postings
-        trackedIds={session && new Set(session.tracked.map((row) => row.posting.id))}
+        trackedIds={trackedIds}
         onTrack={track}
         followed={session && new Set(session.follows.map(boardKey))}
         pendingFollows={pending}
@@ -126,14 +128,14 @@ export default function App() {
           path="/following"
           element={
             <RequireLogin loggedIn={session !== null}>
-              {session && (
+              {session && trackedIds && (
                 <Following
                   follows={session.follows}
                   pendingFollows={pending}
                   onFollow={follow}
                   onUnfollow={unfollow}
                   onFollowsChanged={refreshFollows}
-                  trackedIds={new Set(session.tracked.map((row) => row.posting.id))}
+                  trackedIds={trackedIds}
                   onTrack={track}
                 />
               )}

@@ -41,7 +41,7 @@ export default function Following({ follows, pendingFollows, onFollow, onUnfollo
             <AddCompany followed={followed} onFollowsChanged={onFollowsChanged} />
             {follows.length > 0 && (
                 <Postings
-                    following
+                    followingOnly
                     trackedIds={trackedIds}
                     onTrack={onTrack}
                     followed={followed}

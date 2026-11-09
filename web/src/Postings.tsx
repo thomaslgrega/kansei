@@ -36,7 +36,7 @@ function factLine(facts: Facts): string {
 }
 
 type Props = {
-    following?: boolean
+    followingOnly?: boolean
     trackedIds: Set<number> | null
     onTrack: (postingId: number) => void
     followed: Set<string> | null
@@ -45,34 +45,40 @@ type Props = {
     onUnfollow: (source: string, token: string) => void
 }
 
-export default function Postings({ following = false, trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
+export default function Postings({ followingOnly = false, trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
     const [showSales, setShowSales] = useState(false)
     const [failed, setFailed] = useState(false)
 
-    // Refetch when follows change, so a board's postings join or leave the following list.
-    const followsSignature = following && followed ? followsKey(followed) : ''
+    // Refetch when follows change, so a newly followed board's postings join the list.
+    const followsSignature = followingOnly && followed ? followsKey(followed) : ''
 
     useEffect(() => {
         let current = true
-        const url = following ? '/api/postings?following=true' : '/api/postings'
+        const url = followingOnly ? '/api/postings?following=true' : '/api/postings'
         fetch(url)
             .then((response) => {
                 if (!response.ok) throw new Error(`GET ${url}: ${response.status}`)
                 return response.json()
             })
-            .then((rows) => current && setRows(rows))
+            .then((rows) => {
+                if (!current) return
+                setRows(rows)
+                setFailed(false)
+            })
             .catch(() => current && setFailed(true))
         return () => {
             current = false
         }
-    }, [following, followsSignature])
+    }, [followingOnly, followsSignature])
 
     if (failed) return <p>Couldn't load postings. Try reloading the page.</p>
     if (rows === undefined) return <p>Loading postings...</p>
 
-    const hidden = rows.filter((row) => row.sales_or_support).length
-    const visible = showSales ? rows : rows.filter((row) => !row.sales_or_support)
+    // An unfollowed board's postings leave at once, without waiting for the refetch.
+    const shown = followingOnly && followed ? rows.filter(({ posting }) => followed.has(boardKey(posting))) : rows
+    const hidden = shown.filter((row) => row.sales_or_support).length
+    const visible = showSales ? shown : shown.filter((row) => !row.sales_or_support)
 
     return (
         <section>
