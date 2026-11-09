@@ -56,6 +56,28 @@ def test_probing_a_board_url_finds_the_board(client, log_in_as, ats):
     }
 
 
+def transaction_open_at_each_request(ats, session) -> list[bool]:
+    seen = []
+    handle = ats.handle
+
+    def watch(request: httpx.Request) -> httpx.Response:
+        seen.append(session.in_transaction())
+        return handle(request)
+
+    ats.handle = watch
+    return seen
+
+
+def test_probing_holds_no_transaction_while_waiting_on_the_ats(client, session, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    log_in_as("ada@example.com")
+    seen = transaction_open_at_each_request(ats, session)
+
+    response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
+
+    assert (response.status_code, response.json()["hits"][0]["state"], seen) == (200, "not_on_kansei", [False, False])
+
+
 def serve_lever_board(ats, token: str = "kansei-lever") -> None:
     ats.pages[LEVER_BOARD.format(token=token)] = httpx.Response(200, json=[{
         "id": "a1",
@@ -184,6 +206,7 @@ def test_probing_a_board_on_kansei_reports_its_state_and_name_on_kansei(
     if ada_follows:
         client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
     session.execute(update(Board).where(Board.token == "kansei-test").values(status=status))
+    session.commit()
 
     response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
 
@@ -384,6 +407,16 @@ def test_adding_a_board_not_on_kansei_creates_it_with_its_name_and_adder_and_fol
     assert client.get("/api/me/follows").json() == [
         {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
     ]
+
+
+def test_adding_a_board_holds_no_transaction_while_waiting_on_the_ats(client, session, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    log_in_as("ada@example.com")
+    seen = transaction_open_at_each_request(ats, session)
+
+    response = client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
+
+    assert (response.status_code, seen) == (201, [False, False])
 
 
 def test_adding_a_board_whose_name_cant_be_read_leaves_the_name_for_the_ingest(client, session, log_in_as, ats):
