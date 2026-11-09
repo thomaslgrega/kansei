@@ -106,9 +106,6 @@ export default function App() {
       <Title>kansei</Title>
       {session !== null && (
         <>
-          <p>
-            {session.user.email} · <button onClick={logOut}>Log out</button>
-          </p>
           <h2>Tracked postings</h2>
           <ul>
             {session.tracked.map((row) => (

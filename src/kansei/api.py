@@ -354,7 +354,7 @@ def unfollow(source: BoardSource, board_token: str, user: CurrentUser, session: 
     session.commit()
 
 
-class WebApp(StaticFiles):
+class SinglePageApp(StaticFiles):
     async def get_response(self, path: str, scope: Scope) -> Response:
         try:
             return await super().get_response(path, scope)
@@ -368,7 +368,7 @@ def create_app(web_dist: Path) -> FastAPI:
     app = FastAPI(title="kansei")
     app.include_router(api)
     if web_dist.is_dir():
-        app.mount("/", WebApp(directory=web_dist, html=True), name="web")
+        app.mount("/", SinglePageApp(directory=web_dist, html=True), name="web")
     return app
 
 
