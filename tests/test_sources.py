@@ -4,13 +4,14 @@ import httpx
 import pytest
 from bs4 import BeautifulSoup
 
-from kansei import is_candidate
+from kansei import JobPosting, is_candidate
 from kansei.sources import (
     fetch_ashby,
     fetch_board_name,
     fetch_url,
     from_ashby,
     from_greenhouse,
+    from_hrmos,
     from_lever,
     from_url,
     html_to_text,
@@ -66,6 +67,7 @@ def test_every_adapter_produces_exactly_the_same_keys():
         == from_lever(LEVER_RAW, "woven-by-toyota").keys()
         == from_ashby(ASHBY_RAW, "acme").keys()
         == from_url(PAGE_WITHOUT_LD, "https://example.com/1").keys()
+        == from_hrmos(PAGE_WITH_LD, "acme", "101", "SREエンジニア").keys()
     )
 
 
@@ -96,6 +98,7 @@ def test_from_ashby_maps_every_field():
         "location": "San Francisco / Tokyo / Remote - US",
         "company_name": None,
         "description": "Build the ledger.",
+        "headline": None,
     }
 
 
@@ -120,7 +123,7 @@ def test_from_ashby_joins_the_primary_and_secondary_locations_in_order(secondary
 def test_an_ashby_job_whose_only_japan_location_is_secondary_is_a_candidate():
     posting = from_ashby(ASHBY_RAW, "acme")
 
-    assert is_candidate(posting["title"], posting["location"]) is True
+    assert is_candidate(JobPosting.model_validate(posting)) is True
 
 
 async def test_fetch_ashby_makes_one_request_for_the_whole_board():
@@ -292,6 +295,7 @@ def test_from_url_takes_the_location_from_the_first_place_with_an_address(job_lo
         "location": location,
         "company_name": None,
         "description": "SRE",
+        "headline": None,
     }
 
 

@@ -1,12 +1,20 @@
+import asyncio
 import html
 import json
 import re
 import unicodedata
 from html.parser import HTMLParser
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
+from weakref import WeakKeyDictionary
 
 import httpx
 from bs4 import BeautifulSoup
+
+ENGINEERING = re.compile(r"engineer|developer|エンジニア|開発", re.IGNORECASE)
+
+
+def is_engineering(title: str) -> bool:
+    return bool(ENGINEERING.search(title))
 
 
 class TextOnly(HTMLParser):
@@ -95,6 +103,8 @@ query ApiOrganizationFromHostedJobsPageName(
   ) { name }
 }
 """
+HRMOS_BOARD = "https://hrmos.co/pages/{token}/jobs"
+HRMOS_JOB = "https://hrmos.co/pages/{token}/jobs/{job_id}"
 
 
 def from_greenhouse(raw: dict, token: str) -> dict:
@@ -108,6 +118,7 @@ def from_greenhouse(raw: dict, token: str) -> dict:
         "location": raw["location"]["name"],
         "company_name": None,
         "description": None,
+        "headline": None,
     }
 
 
@@ -122,6 +133,7 @@ def from_lever(raw: dict, token: str) -> dict:
         "location": raw["categories"]["location"],
         "company_name": None,
         "description": lever_text(raw),
+        "headline": None,
     }
 
 
@@ -137,6 +149,37 @@ def from_ashby(raw: dict, token: str) -> dict:
         "location": " / ".join(locations),
         "company_name": None,
         "description": raw["descriptionPlain"],
+        "headline": None,
+    }
+
+
+def hrmos_location(posting: dict) -> str:
+    places = posting.get("jobLocation") or []
+    if isinstance(places, dict):
+        places = [places]
+    locations = []
+    for place in places:
+        address = place.get("address") if isinstance(place, dict) else None
+        if isinstance(address, dict):
+            parts = [address.get("addressRegion"), address.get("addressLocality")]
+            locations.append(" ".join(part.strip() for part in parts if isinstance(part, str) and part.strip()))
+    return " / ".join(dict.fromkeys(location for location in locations if location))
+
+
+def from_hrmos(page: str, token: str, job_id: str, headline: str) -> dict:
+    posting = job_posting_ld(BeautifulSoup(page, "html.parser"))
+    description = posting.get("description")
+    return {
+        "source": "hrmos",
+        "token": token,
+        "id": job_id,
+        "title": posting.get("title"),
+        "url": HRMOS_JOB.format(token=token, job_id=job_id),
+        "posted_at": posting.get("datePosted"),
+        "location": hrmos_location(posting),
+        "company_name": None,
+        "description": html_to_text(description) if isinstance(description, str) else "",
+        "headline": headline,
     }
 
 
@@ -153,7 +196,8 @@ def from_url(page: str, url: str) -> dict:
         "posted_at": posting.get("datePosted"),
         "location": job_location(posting),
         "company_name": hiring_organization_name(posting),
-        "description": page_text(soup)
+        "description": page_text(soup),
+        "headline": None,
     }
 
 
@@ -180,6 +224,61 @@ async def fetch_ashby(client: httpx.AsyncClient, token: str) -> list[dict]:
     response = await client.get(ASHBY_BOARD.format(token=token))
     response.raise_for_status()
     return [from_ashby(raw, token) for raw in response.json()["jobs"]]
+
+
+HRMOS_CONCURRENCY = 4
+# Keyed by client so every board fetched through one client shares the cap.
+HRMOS_LIMITS: WeakKeyDictionary[httpx.AsyncClient, asyncio.Semaphore] = WeakKeyDictionary()
+
+
+async def hrmos_get(client: httpx.AsyncClient, url: str) -> str:
+    limit = HRMOS_LIMITS.setdefault(client, asyncio.Semaphore(HRMOS_CONCURRENCY))
+    async with limit:
+        response = await client.get(url)
+    response.raise_for_status()
+    return response.text
+
+
+def hrmos_headlines(soup: BeautifulSoup, token: str) -> dict[str, str]:
+    job_path = re.compile(rf"/pages/{re.escape(token)}/jobs/([^/]+)/?")
+    headlines = {}
+    for link in soup.find_all("a", href=True):
+        match = job_path.fullmatch(urlsplit(link["href"]).path)
+        if match and link.h2:
+            headlines[match[1]] = link.h2.get_text(" ", strip=True)
+    return headlines
+
+
+def links_to_page(soup: BeautifulSoup, page: int) -> bool:
+    return any(
+        parse_qs(urlsplit(link["href"]).query).get("page") == [str(page)]
+        for link in soup.find_all("a", href=True)
+    )
+
+
+async def fetch_hrmos(client: httpx.AsyncClient, token: str) -> list[dict]:
+    first_page = HRMOS_BOARD.format(token=token)
+    url: str | None = first_page
+    headlines: dict[str, str] = {}
+    page_number = 1
+    while url is not None:
+        listing = BeautifulSoup(await hrmos_get(client, url), "html.parser")
+        headlines |= hrmos_headlines(listing, token)
+        page_number += 1
+        url = f"{first_page}?page={page_number}" if links_to_page(listing, page_number) else None
+    to_open = {job_id: headline for job_id, headline in headlines.items() if is_engineering(headline)}
+    return list(await asyncio.gather(
+        *(fetch_hrmos_job(client, token, job_id, headline) for job_id, headline in to_open.items())
+    ))
+
+
+async def fetch_hrmos_job(client: httpx.AsyncClient, token: str, job_id: str, headline: str) -> dict:
+    try:
+        job_page = await hrmos_get(client, HRMOS_JOB.format(token=token, job_id=job_id))
+    except httpx.HTTPError:
+        # No page means no title, so validation counts the job invalid instead of failing the board.
+        job_page = ""
+    return from_hrmos(job_page, token, job_id, headline)
 
 
 async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
@@ -222,6 +321,11 @@ async def ashby_name(client: httpx.AsyncClient, token: str) -> str:
     return name if isinstance(name, str) else ""
 
 
+async def hrmos_name(client: httpx.AsyncClient, token: str) -> str:
+    heading = BeautifulSoup(await hrmos_get(client, HRMOS_BOARD.format(token=token)), "html.parser").h1
+    return re.sub(r"(すべての)?求人一覧$", "", heading.get_text(strip=True)) if heading else ""
+
+
 async def fetch_board_name(client: httpx.AsyncClient, source: str, token: str) -> str | None:
     try:
         name = await NAMES[source](client, token)
@@ -230,8 +334,8 @@ async def fetch_board_name(client: httpx.AsyncClient, source: str, token: str) -
     return name.strip() or None
 
 
-SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch_ashby}
-NAMES = {"greenhouse": greenhouse_name, "lever": lever_name, "ashby": ashby_name}
+SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch_ashby, "hrmos": fetch_hrmos}
+NAMES = {"greenhouse": greenhouse_name, "lever": lever_name, "ashby": ashby_name, "hrmos": hrmos_name}
 
 BOARD_HOSTS = {
     "boards.greenhouse.io": "greenhouse",

@@ -66,6 +66,26 @@ def test_list_postings_shows_each_open_candidate_once_with_its_newest_extraction
     ]
 
 
+def test_list_postings_shows_an_hrmos_candidate_by_its_headline_and_with_no_location(client, session, make_posting):
+    hrmos = {"source": "hrmos", "token": "kansei-test"}
+    ids = save_postings(
+        session,
+        [
+            make_posting("オープンポジション", "東京都 港区", **hrmos, headline="【エンジニア】オープンポジション"),
+            make_posting("インフラエンジニア", "", **hrmos, id="2", url="https://example.com/2"),
+            make_posting("経理", "", **hrmos, id="3", url="https://example.com/3", headline="経理"),
+        ],
+        datetime.now(UTC),
+    )
+    session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
+
+    response = client.get("/api/postings", params={"token": "kansei-test"})
+
+    assert sorted(row["posting"]["url"] for row in response.json()) == [
+        "https://example.com/1", "https://example.com/2",
+    ]
+
+
 def test_list_postings_puts_the_newest_first_seen_first(client, session, make_posting):
     now = datetime.now(UTC)
     ids = save_postings(session, [make_posting(token="kansei-test")], now - timedelta(days=1))

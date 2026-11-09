@@ -40,7 +40,7 @@ class Base(DeclarativeBase):
     })
 
 
-BoardSource = Literal["greenhouse", "lever", "ashby"]
+BoardSource = Literal["greenhouse", "lever", "ashby", "hrmos"]
 BoardStatus = Literal["active", "removed"]
 
 
@@ -97,6 +97,7 @@ class Posting(Base):
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Only pasted postings set it, from their page; a board posting's name comes from its board.
     company_name: Mapped[str | None] = mapped_column()
+    headline: Mapped[str | None]
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
