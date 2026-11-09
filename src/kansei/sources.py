@@ -260,19 +260,19 @@ async def fetch_hrmos(client: httpx.AsyncClient, token: str) -> list[dict]:
     first_page = HRMOS_BOARD.format(token=token)
     url: str | None = first_page
     headlines: dict[str, str] = {}
-    page = 1
+    page_number = 1
     while url is not None:
-        board = BeautifulSoup(await hrmos_get(client, url), "html.parser")
-        headlines |= hrmos_headlines(board, token)
-        page += 1
-        url = f"{first_page}?page={page}" if links_to_page(board, page) else None
-    engineering = {job_id: headline for job_id, headline in headlines.items() if is_engineering(headline)}
-    pages = await asyncio.gather(
-        *(hrmos_get(client, HRMOS_JOB.format(token=token, job_id=job_id)) for job_id in engineering)
+        listing = BeautifulSoup(await hrmos_get(client, url), "html.parser")
+        headlines |= hrmos_headlines(listing, token)
+        page_number += 1
+        url = f"{first_page}?page={page_number}" if links_to_page(listing, page_number) else None
+    to_open = {job_id: headline for job_id, headline in headlines.items() if is_engineering(headline)}
+    job_pages = await asyncio.gather(
+        *(hrmos_get(client, HRMOS_JOB.format(token=token, job_id=job_id)) for job_id in to_open)
     )
     return [
-        from_hrmos(page, token, job_id, headline)
-        for (job_id, headline), page in zip(engineering.items(), pages)
+        from_hrmos(job_page, token, job_id, headline)
+        for (job_id, headline), job_page in zip(to_open.items(), job_pages)
     ]
 
 

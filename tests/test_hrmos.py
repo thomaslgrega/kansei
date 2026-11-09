@@ -204,7 +204,9 @@ async def test_fetch_hrmos_reads_every_board_page():
     })
 
     assert [job["title"] for job in await fetch(hrmos)] == ["SRE", "QA", "iOS"]
-    assert hrmos.requested[:3] == [BOARD, f"{BOARD}?page=2", f"{BOARD}?page=3"]
+    assert hrmos.requested == [
+        BOARD, f"{BOARD}?page=2", f"{BOARD}?page=3", f"{BOARD}/101", f"{BOARD}/102", f"{BOARD}/103",
+    ]
 
 
 async def test_fetch_hrmos_opens_job_pages_only_for_engineering_headlines():
@@ -241,7 +243,7 @@ async def test_fetch_hrmos_keeps_at_most_four_requests_open_across_boards():
         return hrmos.handle(request)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(slow)) as client:
-        boards = await asyncio.gather(fetch_hrmos(client, "acme"), fetch_hrmos(client, "globex"))
+        jobs_per_board = await asyncio.gather(fetch_hrmos(client, "acme"), fetch_hrmos(client, "globex"))
 
-    assert [len(jobs) for jobs in boards] == [6, 6]
+    assert [len(jobs) for jobs in jobs_per_board] == [6, 6]
     assert most_open == 4
