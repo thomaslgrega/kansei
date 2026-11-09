@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { boardKey } from "./boards";
+import { boardKey, followsKey } from "./boards";
 import NewBadge from "./NewBadge";
 
 type Facts = {
@@ -36,6 +36,7 @@ function factLine(facts: Facts): string {
 }
 
 type Props = {
+    following?: boolean
     trackedIds: Set<number> | null
     onTrack: (postingId: number) => void
     followed: Set<string> | null
@@ -44,15 +45,13 @@ type Props = {
     onUnfollow: (source: string, token: string) => void
 }
 
-export default function Postings({ trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
+export default function Postings({ following = false, trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
     const [showSales, setShowSales] = useState(false)
-    const [followingOnly, setFollowingOnly] = useState(false)
     const [failed, setFailed] = useState(false)
 
-    const following = followingOnly && followed !== null
-    // Refetch the following list when follows change, so an unfollowed board's postings leave it.
-    const followsSignature = following ? [...followed].sort().join(' ') : ''
+    // Refetch when follows change, so a board's postings join or leave the following list.
+    const followsSignature = following && followed ? followsKey(followed) : ''
 
     useEffect(() => {
         let current = true
@@ -78,12 +77,6 @@ export default function Postings({ trackedIds, onTrack, followed, pendingFollows
     return (
         <section>
             <h2>Postings ({visible.length})</h2>
-            {followed && (
-                <label>
-                    <input type="checkbox" checked={followingOnly} onChange={(event) => setFollowingOnly(event.target.checked)} />
-                    Following only
-                </label>
-            )}
             <label>
                 <input type="checkbox" checked={showSales} onChange={(event) => setShowSales(event.target.checked)} />
                 Show sales and support roles ({hidden})

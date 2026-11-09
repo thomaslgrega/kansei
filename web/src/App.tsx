@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
-import AddCompany from './AddCompany'
 import { type Board, boardKey, latestOnly } from './boards'
+import Following from './Following'
 import Header from './Header'
 import Login from './Login'
 import Postings from './Postings'
@@ -98,22 +98,6 @@ export default function App() {
   const home = (
     <main>
       <Title>kansei</Title>
-      {session !== null && (
-        <>
-          <h2>Following</h2>
-          <ul>
-            {session.follows.map((board) => (
-              <li key={boardKey(board)}>
-                {board.company}{' '}
-                <button disabled={pending.has(boardKey(board))} onClick={() => unfollow(board.source, board.token)}>
-                  Unfollow
-                </button>
-              </li>
-            ))}
-          </ul>
-          <AddCompany followed={new Set(session.follows.map(boardKey))} onFollowsChanged={refreshFollows} />
-        </>
-      )}
       <Postings
         trackedIds={session && new Set(session.tracked.map((row) => row.posting.id))}
         onTrack={track}
@@ -135,6 +119,24 @@ export default function App() {
           element={
             <RequireLogin loggedIn={session !== null}>
               {session && <TrackedPostings tracked={session.tracked} />}
+            </RequireLogin>
+          }
+        />
+        <Route
+          path="/following"
+          element={
+            <RequireLogin loggedIn={session !== null}>
+              {session && (
+                <Following
+                  follows={session.follows}
+                  pendingFollows={pending}
+                  onFollow={follow}
+                  onUnfollow={unfollow}
+                  onFollowsChanged={refreshFollows}
+                  trackedIds={new Set(session.tracked.map((row) => row.posting.id))}
+                  onTrack={track}
+                />
+              )}
             </RequireLogin>
           }
         />
