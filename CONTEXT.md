@@ -35,3 +35,11 @@ _Avoid_: Uncached, new or changed, stale
 **New**:
 Said of a candidate first seen within the last two days. It is the same for every user.
 _Avoid_: Fresh, recent, unseen
+
+**Japanese requirement**:
+How much Japanese a candidate asks for: basic, conversational, business or native; none, when Japanese is only preferred or not required; or not stated, when the posting says nothing about it. A JLPT level stands in when no level is named: N1 and N2 are business, N3 conversational, N4 and N5 basic. Japanese that is required with no level is business.
+_Avoid_: Japanese level, language requirement
+
+**Updated**:
+The last time kansei saw a posting on any board. A pasted posting doesn't move it, so it says when the boards were last read.
+_Avoid_: Last run, refreshed, synced
