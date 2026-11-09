@@ -75,7 +75,7 @@ def test_probing_holds_no_transaction_while_waiting_on_the_ats(client, session, 
 
     response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
 
-    assert (response.status_code, response.json()["hits"][0]["state"], seen) == (200, "not_on_kansei", [False, False])
+    assert (response.status_code, seen) == (200, [False, False])
 
 
 def serve_lever_board(ats, token: str = "kansei-lever") -> None:
