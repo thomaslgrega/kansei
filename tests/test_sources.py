@@ -244,6 +244,55 @@ def test_from_url_takes_the_body_from_the_page_not_the_json_ld_description():
     assert "出店戦略と新業態を主導するポジションです。" in posting["description"]
 
 
+def page_with_job_location(job_location) -> str:
+    ld = json.dumps({"@type": "JobPosting", "title": "SRE", "jobLocation": job_location})
+    return (
+        f'<html><head><script type="application/ld+json">{ld}</script></head>'
+        "<body><h1>SRE</h1></body></html>"
+    )
+
+
+@pytest.mark.parametrize(
+    ("job_location", "location"),
+    [
+        pytest.param(
+            [
+                {"@type": "Place", "address": None},
+                {"@type": "Place", "address": {}},
+                {"@type": "Place", "address": {"addressLocality": "東京都渋谷区"}},
+                {"@type": "Place", "address": {"addressLocality": "大阪府大阪市"}},
+            ],
+            "東京都渋谷区",
+            id="a list of places",
+        ),
+        pytest.param(
+            {"@type": "Place", "address": {"addressLocality": "東京都渋谷区"}},
+            "東京都渋谷区",
+            id="a single place",
+        ),
+        pytest.param(
+            [{"@type": "Place", "address": None}, {"@type": "Place", "address": {}}],
+            "",
+            id="a list of places with no address",
+        ),
+    ],
+)
+def test_from_url_takes_the_location_from_the_first_place_with_an_address(job_location, location):
+    posting = from_url(page_with_job_location(job_location), "https://hrmos.co/pages/acme/jobs/1")
+
+    assert posting == {
+        "source": "url",
+        "token": "hrmos.co",
+        "id": "https://hrmos.co/pages/acme/jobs/1",
+        "title": "SRE",
+        "url": "https://hrmos.co/pages/acme/jobs/1",
+        "posted_at": None,
+        "location": location,
+        "company_name": None,
+        "description": "SRE",
+    }
+
+
 def test_from_url_still_produces_a_record_when_the_page_declares_nothing():
     posting = from_url(PAGE_WITHOUT_LD, "https://job-boards.greenhouse.io/gitlab/jobs/85566")
 
