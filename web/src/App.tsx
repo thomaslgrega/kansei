@@ -4,18 +4,12 @@ import AddCompany from './AddCompany'
 import { type Board, boardKey, latestOnly } from './boards'
 import Header from './Header'
 import Login from './Login'
-import NewBadge from './NewBadge'
 import Postings from './Postings'
+import RequireLogin from './RequireLogin'
 import Title from './Title'
+import TrackedPostings, { type Tracked } from './TrackedPostings'
 
 type User = { id: number; email: string }
-
-type Tracked = {
-  id: number
-  status: string
-  note: string
-  posting: { id: number; title: string; url: string; location: string; first_seen_at: string; listed: boolean }
-}
 
 type Session = { user: User; tracked: Tracked[]; follows: Board[] }
 
@@ -106,20 +100,6 @@ export default function App() {
       <Title>kansei</Title>
       {session !== null && (
         <>
-          <h2>Tracked postings</h2>
-          <ul>
-            {session.tracked.map((row) => (
-              <li key={row.id}>
-                <NewBadge firstSeenAt={row.posting.first_seen_at} />
-                <a href={row.posting.url}>{row.posting.title}</a>
-                <br />
-                <span className="status">
-                  {row.status} · {row.posting.location}
-                  {!row.posting.listed && ' · No longer listed'}
-                </span>
-              </li>
-            ))}
-          </ul>
           <h2>Following</h2>
           <ul>
             {session.follows.map((board) => (
@@ -150,6 +130,14 @@ export default function App() {
       <Header email={session?.user.email ?? null} onLogOut={logOut} />
       <Routes>
         <Route path="/" element={home} />
+        <Route
+          path="/tracked"
+          element={
+            <RequireLogin loggedIn={session !== null}>
+              {session && <TrackedPostings tracked={session.tracked} />}
+            </RequireLogin>
+          }
+        />
         <Route path="/login" element={<Login loggedIn={session !== null} onLoggedIn={reloadSession} />} />
         <Route path="*" element={<main><Title>Not found · kansei</Title><p>Page not found.</p></main>} />
       </Routes>
