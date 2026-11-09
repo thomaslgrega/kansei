@@ -188,6 +188,25 @@ async def test_fetch_board_name_reads_the_hrmos_board_heading(page, name):
     assert hrmos.requested == [BOARD]
 
 
+async def test_a_job_page_that_fails_counts_as_invalid_and_keeps_the_rest_of_the_board():
+    hrmos = FakeHrmos({
+        BOARD: board_page({"101": "SREエンジニア", "102": "QAエンジニア", "103": "iOSエンジニア"}),
+        f"{BOARD}/101": job_page("SRE"),
+        f"{BOARD}/103": job_page("iOS"),
+    })
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/103"):
+            raise httpx.ReadTimeout("timed out", request=request)
+        return hrmos.handle(request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        jobs, invalid = validate(await fetch_hrmos(client, "acme"))
+
+    assert [job.id for job in jobs] == ["101"]
+    assert [job_id for job_id, _ in invalid] == ["102", "103"]
+
+
 async def test_fetch_hrmos_fails_for_a_token_hrmos_does_not_know():
     with pytest.raises(httpx.HTTPStatusError):
         await fetch(FakeHrmos({}), token="kansei-missing")

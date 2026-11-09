@@ -267,13 +267,18 @@ async def fetch_hrmos(client: httpx.AsyncClient, token: str) -> list[dict]:
         page_number += 1
         url = f"{first_page}?page={page_number}" if links_to_page(listing, page_number) else None
     to_open = {job_id: headline for job_id, headline in headlines.items() if is_engineering(headline)}
-    job_pages = await asyncio.gather(
-        *(hrmos_get(client, HRMOS_JOB.format(token=token, job_id=job_id)) for job_id in to_open)
-    )
-    return [
-        from_hrmos(job_page, token, job_id, headline)
-        for (job_id, headline), job_page in zip(to_open.items(), job_pages)
-    ]
+    return list(await asyncio.gather(
+        *(fetch_hrmos_job(client, token, job_id, headline) for job_id, headline in to_open.items())
+    ))
+
+
+async def fetch_hrmos_job(client: httpx.AsyncClient, token: str, job_id: str, headline: str) -> dict:
+    try:
+        job_page = await hrmos_get(client, HRMOS_JOB.format(token=token, job_id=job_id))
+    except httpx.HTTPError:
+        # No page means no title, so validation counts the job invalid instead of failing the board.
+        job_page = ""
+    return from_hrmos(job_page, token, job_id, headline)
 
 
 async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
