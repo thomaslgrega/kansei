@@ -56,6 +56,19 @@ def hiring_organization_name(posting: dict) -> str | None:
     return name.strip() or None
 
 
+def job_location(posting: dict) -> str:
+    places = posting.get("jobLocation") or []
+    if isinstance(places, dict):
+        places = [places]
+    for place in places:
+        address = place.get("address") if isinstance(place, dict) else None
+        if isinstance(address, dict):
+            location = address.get("addressLocality") or address.get("addressCountry")
+            if location:
+                return location
+    return ""
+
+
 def lever_text(raw: dict) -> str:
     parts = [raw["descriptionPlain"]]
     for section in raw.get("lists", []):
@@ -130,7 +143,6 @@ def from_ashby(raw: dict, token: str) -> dict:
 def from_url(page: str, url: str) -> dict:
     soup = BeautifulSoup(page, "html.parser")
     posting = job_posting_ld(soup)
-    address = (posting.get("jobLocation") or {}).get("address") or {}
     heading = soup.h1 or soup.title
     return {
         "source": "url",
@@ -139,7 +151,7 @@ def from_url(page: str, url: str) -> dict:
         "title": posting.get("title") or (heading.get_text(strip=True) if heading else ""),
         "url": url,
         "posted_at": posting.get("datePosted"),
-        "location": address.get("addressLocality") or address.get("addressCountry") or "",
+        "location": job_location(posting),
         "company_name": hiring_organization_name(posting),
         "description": page_text(soup)
     }
