@@ -25,7 +25,6 @@ from kansei.db import (
     SessionDep,
     Tracked,
     TrackStatus,
-    User,
 )
 from kansei.llm import PostingFacts, prompt_snapshot
 from kansei.sources import (
@@ -267,7 +266,7 @@ async def fetch_board(http: httpx.AsyncClient, source: str, token: str) -> tuple
     return jobs, await fetch_board_name(http, source, token)
 
 
-def probe_hit(session: Session, user: User, source: str, token: str, jobs: list[JobPosting], name: str | None) -> ProbeHit:
+def probe_hit(session: Session, user_id: int, source: str, token: str, jobs: list[JobPosting], name: str | None) -> ProbeHit:
     board = session.scalar(board_named(source, token))
     return ProbeHit(
         source=source,
@@ -276,7 +275,7 @@ def probe_hit(session: Session, user: User, source: str, token: str, jobs: list[
         titles=[job.title for job in jobs[:5]],
         candidates=sum(is_candidate(job.title, job.location) for job in jobs),
         state="not_on_kansei" if board is None else "removed" if board.status == "removed" else "on_kansei",
-        following=board is not None and session.get(Follow, (user.id, board.id)) is not None,
+        following=board is not None and session.get(Follow, (user_id, board.id)) is not None,
     )
 
 
@@ -291,9 +290,11 @@ async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -
     else:
         guesses = [(source, slug) for source in SOURCES for slug in name_slugs(q)]
         miss = TRY_THE_URL
+    user_id = user.id
+    session.rollback()
     found = await asyncio.gather(*(fetch_board(http, source, token) for source, token in guesses))
     hits = [
-        probe_hit(session, user, source, token, *fetched)
+        probe_hit(session, user_id, source, token, *fetched)
         for (source, token), fetched in zip(guesses, found, strict=True)
         if fetched is not None
     ]
@@ -313,14 +314,16 @@ def locked_board(session: Session, source: str, token: str) -> Board | None:
 
 @api.post("/me/follows", status_code=201)
 async def follow(body: BoardIn, user: CurrentUser, session: SessionDep, http: HttpDep, response: Response) -> BoardOut:
+    user_id = user.id
     board = locked_board(session, body.source, body.token)
     if board is None:
+        session.rollback()
         if await board_jobs(http, body.source, body.token) is None:
             raise HTTPException(status_code=404, detail=f"No board {body.token} on {body.source}.")
         name = await fetch_board_name(http, body.source, body.token)
         session.execute(
             insert(Board)
-            .values(source=body.source, token=body.token, name=name, added_by=user.id)
+            .values(source=body.source, token=body.token, name=name, added_by=user_id)
             .on_conflict_do_nothing()
         )
         board = locked_board(session, body.source, body.token)
@@ -328,7 +331,7 @@ async def follow(body: BoardIn, user: CurrentUser, session: SessionDep, http: Ht
         raise HTTPException(status_code=409, detail="This company was removed from kansei and can't be added.")
     created = session.scalar(
         insert(Follow)
-        .values(user_id=user.id, board_id=board.id)
+        .values(user_id=user_id, board_id=board.id)
         .on_conflict_do_nothing()
         .returning(Follow.board_id)
     )
