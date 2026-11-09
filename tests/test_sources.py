@@ -259,6 +259,8 @@ def page_with_job_location(job_location) -> str:
             [
                 {"@type": "Place", "address": None},
                 {"@type": "Place", "address": {}},
+                {"@type": "Place"},
+                {"@type": "Place", "address": {"@type": "PostalAddress"}},
                 {"@type": "Place", "address": {"addressLocality": "東京都渋谷区"}},
                 {"@type": "Place", "address": {"addressLocality": "大阪府大阪市"}},
             ],
