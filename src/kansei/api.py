@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 from sqlalchemy import Select, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
@@ -171,6 +171,11 @@ class TrackedOut(BaseModel):
     note: str
     created_at: datetime
     posting: PostingOut
+
+    @computed_field
+    @property
+    def listed(self) -> bool:
+        return self.posting.last_seen_at > datetime.now(UTC) - OPEN_FOR
 
 
 @api.get("/me/tracked")
