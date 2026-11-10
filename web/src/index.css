@@ -38,8 +38,15 @@ header {
   font-size: 1.1rem;
 }
 
-.numbers {
-  margin: 1rem 0 0;
+.postings-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0 1rem;
+}
+
+.postings-heading span {
   font-size: 0.9em;
 }
 
