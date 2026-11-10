@@ -42,6 +42,19 @@ def test_a_forged_leftmost_forwarded_for_entry_is_ignored(client, clock):
     assert codes == [401] * 10 + [429]
 
 
+def test_a_forged_forwarded_for_header_line_before_the_front_ends_is_ignored(client, clock):
+    codes = [
+        client.post(
+            "/api/login",
+            json={"email": f"user{n}@example.com", "password": PASSWORD},
+            headers=[("X-Forwarded-For", f"198.51.100.{n}"), ("X-Forwarded-For", "203.0.113.7")],
+        ).status_code
+        for n in range(11)
+    ]
+
+    assert codes == [401] * 10 + [429]
+
+
 def test_without_forwarded_for_the_socket_address_is_counted(client, clock):
     codes = [log_in(client, f"user{n}@example.com") for n in range(10)]
     codes.append(log_in(client, "other@example.com", ip="203.0.113.7"))

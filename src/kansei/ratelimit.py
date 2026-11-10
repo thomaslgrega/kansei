@@ -12,7 +12,7 @@ from kansei.db import RateLimit
 
 class Limit(NamedTuple):
     name: str
-    count: int
+    allowed: int
     per: timedelta
 
 
@@ -20,6 +20,8 @@ LOGIN_PER_IP = Limit("login-ip", 10, timedelta(minutes=1))
 LOGIN_PER_EMAIL = Limit("login-email", 10, timedelta(hours=1))
 SIGNUP_PER_IP = Limit("signup-ip", 5, timedelta(hours=1))
 PROBE_PER_USER = Limit("probe-user", 30, timedelta(minutes=1))
+
+TRUSTED_HOPS = 1
 
 
 def utcnow() -> datetime:
@@ -30,11 +32,11 @@ Now = Annotated[datetime, Depends(utcnow)]
 
 
 def client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded is None:
+    forwarded = ",".join(request.headers.getlist("x-forwarded-for")).split(",")
+    if forwarded == [""]:
         return request.client.host if request.client else "unknown"
     # Clients can prepend entries; Google's front end appends the address it saw.
-    return forwarded.split(",")[-1].strip()
+    return forwarded[-min(TRUSTED_HOPS, len(forwarded))].strip()
 
 
 def window_end(now: datetime, per: timedelta) -> datetime:
@@ -54,7 +56,7 @@ def rate_limit(session: Session, limit: Limit, key: str, now: datetime) -> None:
     expired = select(RateLimit.key, RateLimit.ends_at).where(RateLimit.ends_at <= now).with_for_update(skip_locked=True)
     session.execute(delete(RateLimit).where(tuple_(RateLimit.key, RateLimit.ends_at).in_(expired)))
     session.commit()
-    if count > limit.count:
+    if count > limit.allowed:
         raise HTTPException(
             status_code=429,
             detail="Too many attempts. Try again later.",
