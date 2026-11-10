@@ -478,11 +478,12 @@ def test_adding_an_hrmos_board_not_on_kansei_creates_it_and_follows_it(client, s
 
     response = client.post("/api/me/follows", json={"source": "hrmos", "token": "visional"})
 
+    ada = session.scalar(select(User.id).where(User.email == "ada@example.com"))
     board = session.scalar(select(Board).where(Board.source == "hrmos"))
     assert (response.status_code, response.json()) == (
         201, {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社"},
     )
-    assert (board.token, board.name, board.status) == ("visional", "ビジョナル株式会社", "active")
+    assert (board.token, board.name, board.status, board.added_by) == ("visional", "ビジョナル株式会社", "active", ada)
     assert client.get("/api/me/follows").json() == [
         {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社"},
     ]
