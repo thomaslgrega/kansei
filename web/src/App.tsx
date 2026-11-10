@@ -114,7 +114,13 @@ export default function App() {
 
   if (session === undefined) return null
 
-  const trackedIds = session && new Set(session.tracked.map((row) => row.posting.id))
+  const tracking = session && {
+    ids: new Set(session.tracked.map((row) => row.posting.id)),
+    pending: pendingTracks,
+    track,
+    untrack,
+  }
+  const following = session && { keys: new Set(session.follows.map(boardKey)), pending: pendingFollows, follow, unfollow }
 
   const home = (
     <main>
@@ -125,16 +131,7 @@ export default function App() {
           <p>Each posting shows the Japanese level it asks for, so you can filter out the ones that need more than you have.</p>
         </div>
       )}
-      <Postings
-        trackedIds={trackedIds}
-        pendingTracks={pendingTracks}
-        onTrack={track}
-        onUntrack={untrack}
-        followed={session && new Set(session.follows.map(boardKey))}
-        pendingFollows={pendingFollows}
-        onFollow={follow}
-        onUnfollow={unfollow}
-      />
+      <Postings tracking={tracking} following={following} />
     </main>
   )
 
@@ -155,18 +152,8 @@ export default function App() {
           path="/following"
           element={
             <RequireLogin loggedIn={session !== null}>
-              {session && trackedIds && (
-                <Following
-                  follows={session.follows}
-                  pendingFollows={pendingFollows}
-                  onFollow={follow}
-                  onUnfollow={unfollow}
-                  onFollowsChanged={refreshFollows}
-                  trackedIds={trackedIds}
-                  pendingTracks={pendingTracks}
-                  onTrack={track}
-                  onUntrack={untrack}
-                />
+              {session && tracking && following && (
+                <Following follows={session.follows} following={following} onFollowsChanged={refreshFollows} tracking={tracking} />
               )}
             </RequireLogin>
           }

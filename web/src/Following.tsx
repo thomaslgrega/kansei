@@ -1,22 +1,17 @@
 import AddCompany from './AddCompany'
-import { type Board, boardKey } from './boards'
+import { type Board, boardKey, type FollowControls } from './boards'
 import Postings from './Postings'
 import Title from './Title'
+import type { TrackControls } from './tracked'
 
 type Props = {
     follows: Board[]
-    pendingFollows: Set<string>
-    onFollow: (source: string, token: string) => void
-    onUnfollow: (source: string, token: string) => void
+    following: FollowControls
     onFollowsChanged: () => Promise<void>
-    trackedIds: Set<number>
-    pendingTracks: Set<number>
-    onTrack: (postingId: number) => void
-    onUntrack: (postingId: number) => void
+    tracking: TrackControls
 }
 
-export default function Following({ follows, pendingFollows, onFollow, onUnfollow, onFollowsChanged, trackedIds, pendingTracks, onTrack, onUntrack }: Props) {
-    const followed = new Set(follows.map(boardKey))
+export default function Following({ follows, following, onFollowsChanged, tracking }: Props) {
 
     return (
         <main>
@@ -32,7 +27,7 @@ export default function Following({ follows, pendingFollows, onFollow, onUnfollo
                     {follows.map((board) => (
                         <li key={boardKey(board)}>
                             {board.company}{' '}
-                            <button disabled={pendingFollows.has(boardKey(board))} onClick={() => onUnfollow(board.source, board.token)}>
+                            <button disabled={following.pending.has(boardKey(board))} onClick={() => following.unfollow(board.source, board.token)}>
                                 Unfollow
                             </button>
                         </li>
@@ -40,19 +35,9 @@ export default function Following({ follows, pendingFollows, onFollow, onUnfollo
                 </ul>
             )}
             <h2 id="add-company">Add a company</h2>
-            <AddCompany followed={followed} onFollowsChanged={onFollowsChanged} />
+            <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} />
             {follows.length > 0 && (
-                <Postings
-                    followingOnly
-                    trackedIds={trackedIds}
-                    pendingTracks={pendingTracks}
-                    onTrack={onTrack}
-                    onUntrack={onUntrack}
-                    followed={followed}
-                    pendingFollows={pendingFollows}
-                    onFollow={onFollow}
-                    onUnfollow={onUnfollow}
-                />
+                <Postings followingOnly tracking={tracking} following={following} />
             )}
         </main>
     )
