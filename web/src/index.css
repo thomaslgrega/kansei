@@ -157,6 +157,52 @@ li {
   font-size: 0.85em;
 }
 
+.track {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+button.track {
+  cursor: pointer;
+}
+
+.track.tracked {
+  border-color: transparent;
+  background: light-dark(#dcf5e5, #143d27);
+  color: light-dark(#17663a, #6fe0a0);
+}
+
+.follow {
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border: 1px solid light-dark(#b9c3d3, #3c4656);
+  border-radius: 999px;
+  background: none;
+  color: light-dark(#2a5bd7, #8fb0ff);
+  font: inherit;
+  font-size: 0.8em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.follow.followed {
+  border-color: transparent;
+  background: var(--chip);
+  color: var(--muted);
+}
+
+.follow:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

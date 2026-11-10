@@ -61,26 +61,26 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
     const checkedAt = followingOnly ? null : lastChecked(rows)
 
-    function actions(posting: Posting) {
-        if (!trackedIds && !followed) return null
+    function postingAction(posting: Posting) {
+        if (!trackedIds) return null
+        if (trackedIds.has(posting.id)) return <span className="track tracked">✓ Tracked</span>
+        return <button className="track" onClick={() => onTrack(posting.id)}>Track</button>
+    }
+
+    function companyAction(posting: Posting) {
+        if (!followed || !posting.has_board) return null
         const key = boardKey(posting)
+        const isFollowed = followed.has(key)
         return (
-            <>
-                {trackedIds && (trackedIds.has(posting.id) ? (
-                    <span className="muted">Tracked</span>
-                ) : (
-                    <button onClick={() => onTrack(posting.id)}>Track</button>
-                ))}
-                {followed && posting.has_board && (followed.has(key) ? (
-                    <button disabled={pendingFollows.has(key)} onClick={() => onUnfollow(posting.source, posting.token)} aria-label={`Unfollow ${posting.company}`}>
-                        Unfollow
-                    </button>
-                ) : (
-                    <button disabled={pendingFollows.has(key)} onClick={() => onFollow(posting.source, posting.token)} aria-label={`Follow ${posting.company}`}>
-                        Follow
-                    </button>
-                ))}
-            </>
+            <button
+                className={isFollowed ? 'follow followed' : 'follow'}
+                aria-pressed={isFollowed}
+                aria-label={isFollowed ? `Unfollow ${posting.company}` : `Follow ${posting.company}`}
+                disabled={pendingFollows.has(key)}
+                onClick={() => isFollowed ? onUnfollow(posting.source, posting.token) : onFollow(posting.source, posting.token)}
+            >
+                {isFollowed ? 'Following ✓' : '+ Follow'}
+            </button>
         )
     }
 
@@ -113,7 +113,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
             </div>
             <ul className="postings">
                 {visible.map(({ posting, facts }) => (
-                    <PostingRow key={posting.id} posting={posting} facts={facts} actions={actions(posting)} />
+                    <PostingRow key={posting.id} posting={posting} facts={facts} actions={postingAction(posting)} companyAction={companyAction(posting)} />
                 ))}
             </ul>
         </section>

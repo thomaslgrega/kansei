@@ -24,9 +24,10 @@ type Props = {
     posting: Posting
     facts: Facts
     actions?: ReactNode
+    companyAction?: ReactNode
 }
 
-export default function PostingRow({ posting, facts, actions }: Props) {
+export default function PostingRow({ posting, facts, actions, companyAction }: Props) {
     const [now] = useState(Date.now)
     const [failedLogo, setFailedLogo] = useState<string | null>(null)
     const logo = shownLogo(posting.logo_url, failedLogo)
@@ -56,7 +57,8 @@ export default function PostingRow({ posting, facts, actions }: Props) {
                     </a>
                 </h3>
                 <p className="muted">
-                    <span className="posting-company">{posting.company}</span> · {posting.location} · first seen{' '}
+                    <span className="posting-company">{posting.company}</span>
+                    {companyAction} · {posting.location} · first seen{' '}
                     <time dateTime={posting.first_seen_at} title={new Date(posting.first_seen_at).toLocaleDateString('en-CA')}>
                         {firstSeenAgo(posting.first_seen_at, now)}
                     </time>
