@@ -30,7 +30,7 @@ async function loadSession(): Promise<Session | null> {
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [pending, setPending] = useState<Set<string>>(new Set())
+  const [pendingFollows, setPendingFollows] = useState<Set<string>>(new Set())
   const [pendingTracks, setPendingTracks] = useState<Set<number>>(new Set())
 
   useEffect(() => {
@@ -97,12 +97,12 @@ export default function App() {
 
   async function changeFollow(source: string, token: string, request: () => Promise<Response>) {
     const key = boardKey({ source, token })
-    setPending((current) => new Set(current).add(key))
+    setPendingFollows((current) => new Set(current).add(key))
     try {
       await request()
       await refreshFollows()
     } finally {
-      setPending((current) => {
+      setPendingFollows((current) => {
         const next = new Set(current)
         next.delete(key)
         return next
@@ -145,7 +145,7 @@ export default function App() {
         onTrack={track}
         onUntrack={untrack}
         followed={session && new Set(session.follows.map(boardKey))}
-        pendingFollows={pending}
+        pendingFollows={pendingFollows}
         onFollow={follow}
         onUnfollow={unfollow}
       />
@@ -172,7 +172,7 @@ export default function App() {
               {session && trackedIds && (
                 <Following
                   follows={session.follows}
-                  pendingFollows={pending}
+                  pendingFollows={pendingFollows}
                   onFollow={follow}
                   onUnfollow={unfollow}
                   onFollowsChanged={refreshFollows}
