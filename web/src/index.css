@@ -56,3 +56,19 @@ li {
   background: #c0392b;
   vertical-align: middle;
 }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+.japanese {
+  padding: 0 0.3em;
+  border: 1px solid currentColor;
+  border-radius: 0.2em;
+  font-size: 0.7em;
+  white-space: nowrap;
+  vertical-align: middle;
+  opacity: 0.8;
+}
