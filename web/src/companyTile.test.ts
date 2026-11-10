@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { companyTile } from './companyTile'
+import { companyTile, shownLogo } from './companyTile'
 
 test("a company's tile is the first letter of its name on a color picked from the name", () => {
     const names = ['Stripe', 'mercari', 'Woven by Toyota', 'ビジョナル株式会社', '  Stripe']
@@ -11,4 +11,15 @@ test("a company's tile is the first letter of its name on a color picked from th
         { letter: 'ビ', color: '#b91c1c' },
         { letter: 'S', color: '#be185d' },
     ])
+})
+
+test('a row shows its logo unless there is none or that image failed to load', () => {
+    const logo = 'https://example.com/logo.png'
+
+    expect([
+        shownLogo(logo, null),
+        shownLogo(null, null),
+        shownLogo(logo, logo),
+        shownLogo(logo, 'https://example.com/old.png'),
+    ]).toEqual([logo, null, null, logo])
 })

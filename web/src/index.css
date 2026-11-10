@@ -92,6 +92,15 @@ li {
   color: white;
 }
 
+/* Square for every logo, so the rows line up; a wide wordmark shrinks to fit. */
+.tile-logo {
+  box-sizing: border-box;
+  padding: 3px;
+  border: 1px solid var(--line);
+  background: white;
+  object-fit: contain;
+}
+
 .posting-title {
   margin: 0;
   font-size: 1.05rem;

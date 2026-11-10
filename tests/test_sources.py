@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from kansei import JobPosting, is_candidate
 from kansei.sources import (
     fetch_ashby,
+    fetch_board_logo,
     fetch_board_name,
     fetch_url,
     from_ashby,
@@ -414,3 +415,113 @@ def times_out(request):
 async def test_fetch_board_name_gives_no_name_when_the_request_fails(source, handler):
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         assert await fetch_board_name(client, source, "mujin") is None
+
+
+ASHBY_LOGO = "https://app.ashbyhq.com/api/images/org-theme-logo/acme.png"
+HRMOS_LOGO = "https://hrmos.co/images/acme/logo.png"
+LEVER_LOGO = "https://lever-client-logos.s3.us-west-2.amazonaws.com/acme.png"
+GREENHOUSE_LOGO = "https://s4-recruiting.cdn.greenhouse.io/external_greenhouse_job_boards/logos/acme.png?1763575446"
+
+
+def html_page(body: str) -> httpx.Response:
+    return httpx.Response(200, headers={"content-type": "text/html"}, text=f"<html>{body}</html>")
+
+
+@pytest.mark.parametrize(
+    "source, url, response, logo",
+    [
+        pytest.param(
+            "ashby",
+            "https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiOrganizationFromHostedJobsPageName",
+            httpx.Response(200, json={"data": {"organization": {"theme": {"logoSquareImageUrl": ASHBY_LOGO}}}}),
+            ASHBY_LOGO,
+            id="ashby theme logo",
+        ),
+        pytest.param(
+            "hrmos",
+            "https://hrmos.co/pages/acme/jobs",
+            html_page(
+                f'<head><meta property="og:title" content="アクメ株式会社">'
+                f'<meta property="og:image" content="{HRMOS_LOGO}"></head><body><h1>求人一覧</h1></body>'
+            ),
+            HRMOS_LOGO,
+            id="hrmos og:image",
+        ),
+        pytest.param(
+            "lever",
+            "https://jobs.lever.co/acme",
+            html_page(
+                '<body><img src="https://example.com/banner.png" alt="Banner">'
+                f'<div class="main-header-logo"><a href="https://acme.com"><img src="{LEVER_LOGO}" alt="Acme logo"></a></div>'
+                "</body>"
+            ),
+            LEVER_LOGO,
+            id="lever header logo",
+        ),
+        pytest.param(
+            "greenhouse",
+            "https://job-boards.greenhouse.io/acme",
+            html_page(
+                '<body><img src="https://example.com/office.jpg" alt="Our office">'
+                f'<img src="{GREENHOUSE_LOGO}" alt="Acme Logo"></body>'
+            ),
+            GREENHOUSE_LOGO,
+            id="greenhouse image alt ending in Logo",
+        ),
+        pytest.param(
+            "greenhouse",
+            "https://job-boards.greenhouse.io/acme",
+            html_page('<body><img src="https://example.com/office.jpg" alt="Our office"></body>'),
+            None,
+            id="greenhouse page without a logo",
+        ),
+        pytest.param(
+            "greenhouse",
+            "https://job-boards.greenhouse.io/acme",
+            httpx.Response(302, headers={"location": "https://acme.com/careers"}),
+            None,
+            id="greenhouse board that redirects to its own careers site",
+        ),
+        pytest.param(
+            "lever",
+            "https://jobs.lever.co/acme",
+            html_page('<body><div class="main-header-logo"><img src="javascript:alert(1)"></div></body>'),
+            None,
+            id="lever logo that isn't an http URL",
+        ),
+        pytest.param(
+            "ashby",
+            "https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiOrganizationFromHostedJobsPageName",
+            httpx.Response(200, json={"data": {"organization": {"theme": None}}}),
+            None,
+            id="ashby without a theme",
+        ),
+    ],
+)
+async def test_fetch_board_logo_reads_each_ats_logo_url(source, url, response, logo):
+    requested = []
+
+    def handler(request):
+        requested.append(str(request.url))
+        return response
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await fetch_board_logo(client, source, "acme") == logo
+    assert requested == [url]
+
+
+async def test_fetch_board_logo_asks_ashby_for_the_theme_logo_of_the_board():
+    def handler(request):
+        body = json.loads(request.content)
+        assert body["variables"] == {"organizationHostedJobsPageName": "acme", "searchContext": "JobBoard"}
+        assert "logoSquareImageUrl" in body["query"]
+        return httpx.Response(200, json={"data": {"organization": {"theme": {"logoSquareImageUrl": ASHBY_LOGO}}}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await fetch_board_logo(client, "ashby", "acme") == ASHBY_LOGO
+
+
+@pytest.mark.parametrize("source", ["greenhouse", "lever", "ashby", "hrmos"])
+async def test_fetch_board_logo_gives_none_when_the_request_fails(source):
+    async with httpx.AsyncClient(transport=httpx.MockTransport(times_out)) as client:
+        assert await fetch_board_logo(client, source, "acme") is None

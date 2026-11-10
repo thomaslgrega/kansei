@@ -159,3 +159,31 @@ def test_a_pasted_posting_shows_the_company_name_its_page_declared(client, sessi
     response = client.get(f"/api/postings/{ids['https://example.com/1']}")
 
     assert response.json()["posting"]["company"] == "Example K.K."
+
+
+def test_a_posting_carries_its_boards_logo_url_or_null(client, session, make_posting):
+    session.add_all([
+        Board(source="greenhouse", token="kansei-test", logo_url="https://example.com/logo.png"),
+        Board(source="greenhouse", token="no-logo"),
+        Board(source="greenhouse", token="example.com", logo_url="https://example.com/board.png"),
+    ])
+    ids = save_postings(
+        session,
+        [
+            make_posting(token="kansei-test"),
+            make_posting(token="no-logo", id="2", url="https://example.com/2"),
+            make_posting(source="url", token="example.com", id="3", url="https://example.com/3"),
+        ],
+        datetime.now(UTC),
+    )
+    session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
+
+    rows = client.get("/api/postings").json()
+
+    assert sorted(
+        (row["posting"]["url"], row["posting"]["logo_url"]) for row in rows if row["posting"]["url"] in ids
+    ) == [
+        ("https://example.com/1", "https://example.com/logo.png"),
+        ("https://example.com/2", None),
+        ("https://example.com/3", None),
+    ]

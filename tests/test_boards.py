@@ -9,8 +9,11 @@ from sqlalchemy.exc import IntegrityError
 import kansei
 from kansei import (
     boards_to_fetch,
+    boards_without_logo,
+    fetch_board_logos,
     fetch_board_names,
     remove_board,
+    save_board_logos,
     save_board_names,
     save_postings,
     unnamed_boards,
@@ -146,6 +149,13 @@ def test_the_database_rejects_a_board_named_the_empty_string(session):
         session.flush()
 
 
+def test_the_database_rejects_a_board_logo_url_of_the_empty_string(session):
+    session.add(Board(source="greenhouse", token="a", logo_url=""))
+
+    with pytest.raises(IntegrityError, match="ck_boards_logo_url"):
+        session.flush()
+
+
 def test_removing_a_board_deletes_only_its_follows_and_keeps_its_postings_and_tracked_rows(session, make_posting):
     session.execute(delete(Board))
     junk = Board(source="greenhouse", token="kansei-junk")
@@ -197,4 +207,54 @@ def test_removing_a_board_that_isnt_on_kansei_fails_and_changes_nothing(session,
         remove_board(session, board)
     assert session.execute(select(Board.source, Board.token, Board.status)).all() == [
         ("greenhouse", "kansei-junk", "active"),
+    ]
+
+
+async def test_the_ingest_fills_a_missing_logo_and_leaves_an_existing_one_alone(session):
+    session.execute(delete(Board))
+    session.add_all([
+        Board(source="lever", token="mujininc", logo_url="https://example.com/mujin.png"),
+        Board(source="greenhouse", token="anthropic"),
+        Board(source="greenhouse", token="gone"),
+        Board(source="lever", token="removed", status="removed"),
+    ])
+    session.flush()
+    requested = []
+
+    def handler(request):
+        requested.append(str(request.url))
+        if request.url.path == "/anthropic":
+            return httpx.Response(200, text='<html><img src="https://example.com/anthropic.png" alt="Anthropic Logo"></html>')
+        return httpx.Response(404)
+
+    without_logo = boards_without_logo(session)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        logos = await fetch_board_logos(client, without_logo)
+    save_board_logos(session, logos)
+
+    assert sorted(requested) == [
+        "https://job-boards.greenhouse.io/anthropic",
+        "https://job-boards.greenhouse.io/gone",
+    ]
+    assert session.execute(select(Board.token, Board.logo_url).order_by(Board.id)).all() == [
+        ("mujininc", "https://example.com/mujin.png"),
+        ("anthropic", "https://example.com/anthropic.png"),
+        ("gone", None),
+        ("removed", None),
+    ]
+
+
+def test_save_board_logos_never_overwrites_a_logo_set_after_the_read(session):
+    session.execute(delete(Board))
+    replaced = Board(source="lever", token="mujininc")
+    fetched = Board(source="greenhouse", token="anthropic")
+    session.add_all([replaced, fetched])
+    session.flush()
+    session.execute(update(Board).where(Board.id == replaced.id).values(logo_url="https://example.com/new.png"))
+
+    save_board_logos(session, {replaced: "https://example.com/old.png", fetched: "https://example.com/anthropic.png"})
+
+    assert session.execute(select(Board.token, Board.logo_url).order_by(Board.id)).all() == [
+        ("mujininc", "https://example.com/new.png"),
+        ("anthropic", "https://example.com/anthropic.png"),
     ]

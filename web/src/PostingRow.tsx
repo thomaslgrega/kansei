@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { type ChipFacts, postingChips } from './chips'
-import { companyTile } from './companyTile'
+import { companyTile, shownLogo } from './companyTile'
 import { firstSeenAgo } from './firstSeen'
 import NewBadge from './NewBadge'
 
@@ -10,6 +10,7 @@ export type Posting = {
     source: string
     token: string
     company: string
+    logo_url: string | null
     has_board: boolean
     title: string
     location: string
@@ -26,13 +27,26 @@ type Props = {
 
 export default function PostingRow({ posting, facts, actions }: Props) {
     const [now] = useState(Date.now)
+    const [failedLogo, setFailedLogo] = useState<string | null>(null)
+    const logo = shownLogo(posting.logo_url, failedLogo)
     const tile = companyTile(posting.company)
 
     return (
         <li className="posting">
-            <span className="tile" style={{ background: tile.color }} aria-hidden="true">
-                {tile.letter}
-            </span>
+            {logo ? (
+                <img
+                    className="tile tile-logo"
+                    src={logo}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={() => setFailedLogo(logo)}
+                />
+            ) : (
+                <span className="tile" style={{ background: tile.color }} aria-hidden="true">
+                    {tile.letter}
+                </span>
+            )}
             <div className="posting-body">
                 <h3 className="posting-title">
                     <NewBadge firstSeenAt={posting.first_seen_at} />

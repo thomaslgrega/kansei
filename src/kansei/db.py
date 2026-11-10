@@ -51,12 +51,14 @@ class Board(Base):
         CheckConstraint(column("source").in_(get_args(BoardSource)), name="source"),
         CheckConstraint(column("name") != "", name="name"),
         CheckConstraint(column("status").in_(get_args(BoardStatus)), name="status"),
+        CheckConstraint(column("logo_url") != "", name="logo_url"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     source: Mapped[BoardSource] = mapped_column(String)
     token: Mapped[str]
     name: Mapped[str | None]
+    logo_url: Mapped[str | None]
     status: Mapped[BoardStatus] = mapped_column(String, server_default="active")
     # Empty for seeded boards.
     added_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -107,6 +109,9 @@ class Posting(Base):
             company_name,
             token,
         )
+    )
+    logo_url: Mapped[str | None] = column_property(
+        select(Board.logo_url).where(Board.source == source, Board.token == token).scalar_subquery()
     )
     has_board: Mapped[bool] = column_property(
         exists().where(Board.source == source, Board.token == token, Board.status == "active")
