@@ -49,7 +49,7 @@ export default function PostingRow({ posting, facts, actions }: Props) {
                 <p className="muted">{facts.role_summary}</p>
                 <ul className="chips">
                     {postingChips(facts).map((chip, index) => (
-                        <li key={index} className={chip.kind === 'japanese' ? `chip japanese-${chip.requirement}` : `chip ${chip.kind}`}>
+                        <li key={index} className={chip.kind === 'japanese' ? `chip japanese japanese-${chip.requirement}` : `chip ${chip.kind}`}>
                             {chip.label}
                         </li>
                     ))}

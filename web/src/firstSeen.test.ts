@@ -28,6 +28,12 @@ test('first seen reads in days for a month, then in months, then in years', () =
     ])
 })
 
+test('a first seen just ahead of the browser clock reads today', () => {
+    const now = Date.parse('2026-11-08T12:00:00Z')
+
+    expect(firstSeenAgo('2026-11-08T12:00:05+00:00', now)).toEqual('today')
+})
+
 test('reads the API timestamp format, with microseconds and an offset', () => {
     const now = Date.parse('2026-11-08T12:00:00Z')
 

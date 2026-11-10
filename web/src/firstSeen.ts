@@ -1,11 +1,12 @@
 const DAY_MS = 24 * 60 * 60 * 1000
 
-const days = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-const longer = new Intl.RelativeTimeFormat('en', { numeric: 'always' })
+const inDays = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+const inMonthsOrYears = new Intl.RelativeTimeFormat('en', { numeric: 'always' })
 
 export function firstSeenAgo(firstSeenAt: string, now: number): string {
-    const elapsed = Math.floor((now - new Date(firstSeenAt).getTime()) / DAY_MS)
-    if (elapsed < 30) return days.format(-elapsed, 'day')
-    if (elapsed < 365) return longer.format(-Math.floor(elapsed / 30), 'month')
-    return longer.format(-Math.floor(elapsed / 365), 'year')
+    // A browser clock behind the server's would otherwise say "tomorrow".
+    const elapsedDays = Math.max(0, Math.floor((now - new Date(firstSeenAt).getTime()) / DAY_MS))
+    if (elapsedDays < 30) return inDays.format(-elapsedDays, 'day')
+    if (elapsedDays < 365) return inMonthsOrYears.format(-Math.floor(elapsedDays / 30), 'month')
+    return inMonthsOrYears.format(-Math.floor(elapsedDays / 365), 'year')
 }

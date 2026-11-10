@@ -8,13 +8,9 @@
 }
 
 body {
-  max-width: 40rem;
+  max-width: 54rem;
   margin: 2rem auto;
   padding: 0 1rem;
-}
-
-body:has(.postings) {
-  max-width: 54rem;
 }
 
 header {
@@ -73,7 +69,7 @@ li {
 
 .posting {
   display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  grid-template-columns: 3rem minmax(0, 1fr);
   gap: 1rem;
   margin: 0;
   padding: 1.1rem 0;
@@ -118,6 +114,8 @@ li {
 }
 
 .posting-actions {
+  grid-row: 1;
+  grid-column: 3;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -156,7 +154,7 @@ li {
   color: var(--muted);
 }
 
-.chip[class*="japanese-"] {
+.chip.japanese {
   font-weight: 600;
 }
 
@@ -202,6 +200,7 @@ li {
   }
 
   .posting-actions {
+    grid-row: auto;
     grid-column: 2;
     flex-direction: row;
   }

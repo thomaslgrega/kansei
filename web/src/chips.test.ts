@@ -54,10 +54,25 @@ test('each remote policy and seniority has its own label', () => {
         facts({ seniority: 'staff_plus' }),
     ]
 
-    expect(cases.map((value) => postingChips(value).map((chip) => chip.label))).toEqual([
-        ['No Japanese', 'Remote', 'Intern'],
-        ['Japanese preferred', 'On-site', 'Junior'],
-        ['Japanese not stated', 'Hybrid', 'Mid-level'],
-        ['Japanese not stated', 'Staff+'],
+    expect(cases.map(postingChips)).toEqual([
+        [
+            { kind: 'japanese', label: 'No Japanese', requirement: 'none' },
+            { kind: 'fact', label: 'Remote' },
+            { kind: 'fact', label: 'Intern' },
+        ],
+        [
+            { kind: 'japanese', label: 'Japanese preferred', requirement: 'none' },
+            { kind: 'fact', label: 'On-site' },
+            { kind: 'fact', label: 'Junior' },
+        ],
+        [
+            { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
+            { kind: 'fact', label: 'Hybrid' },
+            { kind: 'fact', label: 'Mid-level' },
+        ],
+        [
+            { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
+            { kind: 'fact', label: 'Staff+' },
+        ],
     ])
 })
