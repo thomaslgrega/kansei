@@ -286,9 +286,6 @@ async def amain() -> None:
     for board, name in names.items():
         if name is None:
             print(f"  no company name for {board.source}:{board.token}")
-    for board, logo in logos.items():
-        if logo is None:
-            print(f"  no logo for {board.source}:{board.token}")
 
     with Session(engine) as session:
         to_fetch = boards_to_fetch(session)
