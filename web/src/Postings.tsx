@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import { boardKey, followsKey } from "./boards";
+import { boardKey, type FollowControls, followsKey } from "./boards";
 import { type Filters, filtersToSearch, readFilters } from "./filters";
 import { capitalize, JAPANESE_CHOICES, japaneseRequirement, passesJapanese, readJapaneseChoice } from "./japanese";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo, lastChecked } from "./checked";
+import type { TrackControls } from "./tracked";
 
 type Row = {
     posting: Posting
@@ -14,15 +15,11 @@ type Row = {
 
 type Props = {
     followingOnly?: boolean
-    trackedIds: Set<number> | null
-    onTrack: (postingId: number) => void
-    followed: Set<string> | null
-    pendingFollows: Set<string>
-    onFollow: (source: string, token: string) => void
-    onUnfollow: (source: string, token: string) => void
+    tracking: TrackControls | null
+    following: FollowControls | null
 }
 
-export default function Postings({ followingOnly = false, trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
+export default function Postings({ followingOnly = false, tracking, following }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
     const [searchParams, setSearchParams] = useSearchParams()
     const filters = readFilters(searchParams)
@@ -30,7 +27,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     const [now] = useState(Date.now)
 
     // Refetch when follows change, so a newly followed board's postings join the list.
-    const followsSignature = followingOnly && followed ? followsKey(followed) : ''
+    const followsSignature = followingOnly && following ? followsKey(following.keys) : ''
 
     useEffect(() => {
         let current = true
@@ -55,29 +52,39 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     if (rows === undefined) return <p>Loading postings...</p>
 
     // An unfollowed board's postings leave at once, without waiting for the refetch.
-    const shown = followingOnly && followed ? rows.filter(({ posting }) => followed.has(boardKey(posting))) : rows
+    const shown = followingOnly && following ? rows.filter(({ posting }) => following.keys.has(boardKey(posting))) : rows
     const passing = shown.filter(({ facts }) => passesJapanese(japaneseRequirement(facts), filters.japanese))
     const hidden = passing.filter((row) => row.sales_or_support).length
     const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
     const checkedAt = followingOnly ? null : lastChecked(rows)
 
     function postingAction(posting: Posting) {
-        if (!trackedIds) return null
-        if (trackedIds.has(posting.id)) return <span className="track tracked">✓ Tracked</span>
-        return <button className="track" onClick={() => onTrack(posting.id)}>Track</button>
+        if (!tracking) return null
+        const isTracked = tracking.ids.has(posting.id)
+        return (
+            <button
+                className={isTracked ? 'track tracked' : 'track'}
+                aria-pressed={isTracked}
+                aria-label={isTracked ? `Untrack ${posting.title}` : `Track ${posting.title}`}
+                disabled={tracking.pending.has(posting.id)}
+                onClick={() => isTracked ? tracking.untrack(posting.id) : tracking.track(posting.id)}
+            >
+                {isTracked ? '✓ Tracked' : 'Track'}
+            </button>
+        )
     }
 
     function companyAction(posting: Posting) {
-        if (!followed || !posting.has_board) return null
+        if (!following || !posting.has_board) return null
         const key = boardKey(posting)
-        const isFollowed = followed.has(key)
+        const isFollowed = following.keys.has(key)
         return (
             <button
                 className={isFollowed ? 'follow followed' : 'follow'}
                 aria-pressed={isFollowed}
                 aria-label={isFollowed ? `Unfollow ${posting.company}` : `Follow ${posting.company}`}
-                disabled={pendingFollows.has(key)}
-                onClick={() => isFollowed ? onUnfollow(posting.source, posting.token) : onFollow(posting.source, posting.token)}
+                disabled={following.pending.has(key)}
+                onClick={() => isFollowed ? following.unfollow(posting.source, posting.token) : following.follow(posting.source, posting.token)}
             >
                 {isFollowed ? 'Following ✓' : '+ Follow'}
             </button>

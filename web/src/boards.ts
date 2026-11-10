@@ -1,5 +1,12 @@
 export type Board = { source: string; token: string; company: string }
 
+export type FollowControls = {
+    keys: Set<string>
+    pending: Set<string>
+    follow: (source: string, token: string) => void
+    unfollow: (source: string, token: string) => void
+}
+
 export function boardKey(board: { source: string; token: string }): string {
     return `${board.source}:${board.token}`
 }

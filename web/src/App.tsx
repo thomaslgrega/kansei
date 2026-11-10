@@ -8,6 +8,8 @@ import Postings from './Postings'
 import RequireLogin from './RequireLogin'
 import Signup from './Signup'
 import Title from './Title'
+import { whilePending } from './pending'
+import { trackedRowId, withoutPosting } from './tracked'
 import TrackedPostings, { type Tracked } from './TrackedPostings'
 
 type User = { id: number; email: string }
@@ -29,7 +31,8 @@ async function loadSession(): Promise<Session | null> {
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [pending, setPending] = useState<Set<string>>(new Set())
+  const [pendingFollows, setPendingFollows] = useState<Set<string>>(new Set())
+  const [pendingTracks, setPendingTracks] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadSession().then(setSession)
@@ -44,18 +47,41 @@ export default function App() {
     setSession(null)
   }
 
-  async function track(postingId: number) {
-    const response = await fetch('/api/me/tracked', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ posting_id: postingId }),
+  function changeTrack(postingId: number, request: () => Promise<Response>, onDone: (response: Response) => Promise<void>) {
+    return whilePending(setPendingTracks, postingId, async () => {
+      const response = await request()
+      if (!response.ok) {
+        setSession(await loadSession())
+        return
+      }
+      await onDone(response)
     })
-    if (!response.ok) {
-      setSession(await loadSession())
-      return
-    }
-    const tracked: Tracked = await response.json()
-    setSession((current) => current && { ...current, tracked: [tracked, ...current.tracked] })
+  }
+
+  function track(postingId: number) {
+    return changeTrack(
+      postingId,
+      () =>
+        fetch('/api/me/tracked', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ posting_id: postingId }),
+        }),
+      async (response) => {
+        const tracked: Tracked = await response.json()
+        setSession((current) => current && { ...current, tracked: [tracked, ...current.tracked] })
+      },
+    )
+  }
+
+  function untrack(postingId: number) {
+    const id = session ? trackedRowId(session.tracked, postingId) : null
+    if (id === null) return
+    return changeTrack(
+      postingId,
+      () => fetch(`/api/me/tracked/${id}`, { method: 'DELETE' }),
+      async () => setSession((current) => current && { ...current, tracked: withoutPosting(current.tracked, postingId) }),
+    )
   }
 
   async function refreshFollows() {
@@ -63,19 +89,11 @@ export default function App() {
     if (follows) setSession((current) => current && { ...current, follows })
   }
 
-  async function changeFollow(source: string, token: string, request: () => Promise<Response>) {
-    const key = boardKey({ source, token })
-    setPending((current) => new Set(current).add(key))
-    try {
+  function changeFollow(source: string, token: string, request: () => Promise<Response>) {
+    return whilePending(setPendingFollows, boardKey({ source, token }), async () => {
       await request()
       await refreshFollows()
-    } finally {
-      setPending((current) => {
-        const next = new Set(current)
-        next.delete(key)
-        return next
-      })
-    }
+    })
   }
 
   function follow(source: string, token: string) {
@@ -96,7 +114,13 @@ export default function App() {
 
   if (session === undefined) return null
 
-  const trackedIds = session && new Set(session.tracked.map((row) => row.posting.id))
+  const tracking = session && {
+    ids: new Set(session.tracked.map((row) => row.posting.id)),
+    pending: pendingTracks,
+    track,
+    untrack,
+  }
+  const following = session && { keys: new Set(session.follows.map(boardKey)), pending: pendingFollows, follow, unfollow }
 
   const home = (
     <main>
@@ -107,14 +131,7 @@ export default function App() {
           <p>Each posting shows the Japanese level it asks for, so you can filter out the ones that need more than you have.</p>
         </div>
       )}
-      <Postings
-        trackedIds={trackedIds}
-        onTrack={track}
-        followed={session && new Set(session.follows.map(boardKey))}
-        pendingFollows={pending}
-        onFollow={follow}
-        onUnfollow={unfollow}
-      />
+      <Postings tracking={tracking} following={following} />
     </main>
   )
 
@@ -135,16 +152,8 @@ export default function App() {
           path="/following"
           element={
             <RequireLogin loggedIn={session !== null}>
-              {session && trackedIds && (
-                <Following
-                  follows={session.follows}
-                  pendingFollows={pending}
-                  onFollow={follow}
-                  onUnfollow={unfollow}
-                  onFollowsChanged={refreshFollows}
-                  trackedIds={trackedIds}
-                  onTrack={track}
-                />
+              {session && tracking && following && (
+                <Following follows={session.follows} following={following} onFollowsChanged={refreshFollows} tracking={tracking} />
               )}
             </RequireLogin>
           }
