@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { boardKey, followsKey } from "./boards";
+import { type Filters, filtersToSearch, readFilters } from "./filters";
+import {
+    capitalize,
+    JAPANESE_CHOICES,
+    type JapaneseFacts,
+    japaneseBadge,
+    japaneseRequirement,
+    passesJapanese,
+    readJapaneseChoice,
+} from "./japanese";
 import NewBadge from "./NewBadge";
 
-type Facts = {
+type Facts = JapaneseFacts & {
     role_summary: string
     seniority: string
     must_have_skills: string[]
-    japanese_required: string
-    japanese_level: string
-    jlpt: string
     remote_policy: string
 }
 
@@ -29,8 +37,7 @@ type Row = {
 }
 
 function factLine(facts: Facts): string {
-    const japanese = facts.japanese_required === 'not_stated' ? 'Japanese not stated' : `Japanese ${facts.japanese_required}`
-    return [japanese, facts.japanese_level, facts.jlpt, facts.remote_policy, facts.seniority]
+    return [facts.remote_policy, facts.seniority, facts.jlpt]
         .filter((value) => value !== 'not_stated')
         .join(' · ')
 }
@@ -47,7 +54,8 @@ type Props = {
 
 export default function Postings({ followingOnly = false, trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
-    const [showSales, setShowSales] = useState(false)
+    const [searchParams, setSearchParams] = useSearchParams()
+    const filters = readFilters(searchParams)
     const [failed, setFailed] = useState(false)
 
     // Refetch when follows change, so a newly followed board's postings join the list.
@@ -77,16 +85,34 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
 
     // An unfollowed board's postings leave at once, without waiting for the refetch.
     const shown = followingOnly && followed ? rows.filter(({ posting }) => followed.has(boardKey(posting))) : rows
-    const hidden = shown.filter((row) => row.sales_or_support).length
-    const visible = showSales ? shown : shown.filter((row) => !row.sales_or_support)
+    const passing = shown.filter(({ facts }) => passesJapanese(japaneseRequirement(facts), filters.japanese))
+    const hidden = passing.filter((row) => row.sales_or_support).length
+    const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
+
+    function setFilters(change: Partial<Filters>) {
+        setSearchParams(filtersToSearch({ ...filters, ...change }), { replace: true })
+    }
 
     return (
         <section>
             <h2>Postings ({visible.length})</h2>
-            <label>
-                <input type="checkbox" checked={showSales} onChange={(event) => setShowSales(event.target.checked)} />
-                Show sales and support roles ({hidden})
-            </label>
+            <div className="filters">
+                <label>
+                    My Japanese{' '}
+                    <select
+                        value={filters.japanese}
+                        onChange={(event) => setFilters({ japanese: readJapaneseChoice(event.target.value) })}
+                    >
+                        {JAPANESE_CHOICES.map((choice) => (
+                            <option key={choice} value={choice}>{capitalize(choice)}</option>
+                        ))}
+                    </select>
+                </label>
+                <label>
+                    <input type="checkbox" checked={filters.showSales} onChange={(event) => setFilters({ showSales: event.target.checked })} />
+                    Show sales and support roles ({hidden})
+                </label>
+            </div>
             <ul className="postings">
                 {visible.map(({ posting, facts }) => (
                     <li key={posting.id}>
@@ -94,6 +120,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
                         <a href={posting.url} target="_blank">
                             {posting.title}
                         </a>
+                        {' '}<span className="japanese">{japaneseBadge(facts)}</span>
                         <p className="status">
                             {posting.company}
                             {followed && posting.has_board && (followed.has(boardKey(posting)) ? (
