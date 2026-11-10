@@ -2,44 +2,13 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { boardKey, followsKey } from "./boards";
 import { type Filters, filtersToSearch, readFilters } from "./filters";
-import {
-    capitalize,
-    JAPANESE_CHOICES,
-    type JapaneseFacts,
-    japaneseBadge,
-    japaneseRequirement,
-    passesJapanese,
-    readJapaneseChoice,
-} from "./japanese";
-import NewBadge from "./NewBadge";
-
-type Facts = JapaneseFacts & {
-    role_summary: string
-    seniority: string
-    must_have_skills: string[]
-    remote_policy: string
-}
+import { capitalize, JAPANESE_CHOICES, japaneseRequirement, passesJapanese, readJapaneseChoice } from "./japanese";
+import PostingRow, { type Facts, type Posting } from "./PostingRow";
 
 type Row = {
-    posting: {
-        id: number
-        url: string
-        source: string
-        token: string
-        company: string
-        has_board: boolean
-        title: string
-        location: string
-        first_seen_at: string
-    }
+    posting: Posting
     facts: Facts
     sales_or_support: boolean
-}
-
-function factLine(facts: Facts): string {
-    return [facts.remote_policy, facts.seniority, facts.jlpt]
-        .filter((value) => value !== 'not_stated')
-        .join(' · ')
 }
 
 type Props = {
@@ -89,6 +58,29 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     const hidden = passing.filter((row) => row.sales_or_support).length
     const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
 
+    function actions(posting: Posting) {
+        if (!trackedIds && !followed) return null
+        const key = boardKey(posting)
+        return (
+            <>
+                {trackedIds && (trackedIds.has(posting.id) ? (
+                    <span className="muted">Tracked</span>
+                ) : (
+                    <button onClick={() => onTrack(posting.id)}>Track</button>
+                ))}
+                {followed && posting.has_board && (followed.has(key) ? (
+                    <button disabled={pendingFollows.has(key)} onClick={() => onUnfollow(posting.source, posting.token)} aria-label={`Unfollow ${posting.company}`}>
+                        Unfollow
+                    </button>
+                ) : (
+                    <button disabled={pendingFollows.has(key)} onClick={() => onFollow(posting.source, posting.token)} aria-label={`Follow ${posting.company}`}>
+                        Follow
+                    </button>
+                ))}
+            </>
+        )
+    }
+
     function setFilters(change: Partial<Filters>) {
         setSearchParams(filtersToSearch({ ...filters, ...change }), { replace: true })
     }
@@ -115,31 +107,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
             </div>
             <ul className="postings">
                 {visible.map(({ posting, facts }) => (
-                    <li key={posting.id}>
-                        <NewBadge firstSeenAt={posting.first_seen_at} />
-                        <a href={posting.url} target="_blank">
-                            {posting.title}
-                        </a>
-                        {' '}<span className="japanese">{japaneseBadge(facts)}</span>
-                        <p className="status">
-                            {posting.company}
-                            {followed && posting.has_board && (followed.has(boardKey(posting)) ? (
-                                <> <button disabled={pendingFollows.has(boardKey(posting))} onClick={() => onUnfollow(posting.source, posting.token)}>Unfollow</button></>
-                            ) : (
-                                <> <button disabled={pendingFollows.has(boardKey(posting))} onClick={() => onFollow(posting.source, posting.token)}>Follow</button></>
-                            ))}
-                            {' '}· {posting.location} · first seen {new Date(posting.first_seen_at).toLocaleDateString('en-CA')}
-                        </p>
-                        <p className="facts">{factLine(facts)}</p>
-                        {facts.must_have_skills.length > 0 && <p className="status">{facts.must_have_skills.join(', ')}</p>}
-                        <p>{facts.role_summary}</p>
-                        {trackedIds && (trackedIds.has(posting.id) ?
-                            (
-                                <span className="status">Tracked</span>
-                            ) : (
-                                <button onClick={() => onTrack(posting.id)}>Track</button>
-                            ))}
-                    </li>
+                    <PostingRow key={posting.id} posting={posting} facts={facts} actions={actions(posting)} />
                 ))}
             </ul>
         </section>

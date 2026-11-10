@@ -2,10 +2,13 @@
   font-family: system-ui, sans-serif;
   line-height: 1.5;
   color-scheme: light dark;
+  --muted: light-dark(#5f6672, #9aa3b2);
+  --line: light-dark(#e3e6eb, #2a303a);
+  --chip: light-dark(#eef0f3, #232933);
 }
 
 body {
-  max-width: 40rem;
+  max-width: 54rem;
   margin: 2rem auto;
   padding: 0 1rem;
 }
@@ -38,14 +41,6 @@ li {
   opacity: 0.7;
 }
 
-.postings p {
-  margin: 0;
-}
-
-.facts {
-  font-weight: 600;
-}
-
 .new {
   margin-right: 0.4em;
   padding: 0 0.3em;
@@ -63,12 +58,150 @@ li {
   gap: 0.5rem 1.5rem;
 }
 
-.japanese {
-  padding: 0 0.3em;
-  border: 1px solid currentColor;
-  border-radius: 0.2em;
-  font-size: 0.7em;
+.muted {
+  color: var(--muted);
+}
+
+.postings {
+  padding: 0;
+  list-style: none;
+}
+
+.posting {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.posting p {
+  margin: 0.15rem 0 0;
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.6rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: white;
+}
+
+.posting-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.posting-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.posting-title a:hover {
+  text-decoration: underline;
+}
+
+.posting-company {
+  font-weight: 600;
+  color: light-dark(#2b3038, #d5dae2);
+}
+
+.posting-actions {
+  grid-row: 1;
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  min-width: 5rem;
+  font-size: 0.85em;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  margin: 0;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  font-size: 0.78rem;
+  background: var(--chip);
   white-space: nowrap;
-  vertical-align: middle;
-  opacity: 0.8;
+}
+
+.chip.skill {
+  font-family: ui-monospace, monospace;
+  font-size: 0.74rem;
+}
+
+.chip.more {
+  padding: 0.1rem 0.2rem;
+  background: none;
+  color: var(--muted);
+}
+
+.chip.japanese {
+  font-weight: 600;
+}
+
+.chip.japanese-none {
+  background: light-dark(#dcf5e5, #143d27);
+  color: light-dark(#17663a, #6fe0a0);
+}
+
+.chip.japanese-basic,
+.chip.japanese-conversational {
+  background: light-dark(#e2effc, #15304d);
+  color: light-dark(#1d5a99, #8cc3ff);
+}
+
+.chip.japanese-business {
+  background: light-dark(#fdecd8, #4a2e10);
+  color: light-dark(#94520c, #ffb766);
+}
+
+.chip.japanese-native {
+  background: light-dark(#fbe0e0, #4d1818);
+  color: light-dark(#9b2424, #ff9494);
+}
+
+.chip.japanese-not_stated {
+  border-style: dashed;
+  border-color: var(--muted);
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+@media (max-width: 36rem) {
+  .posting {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .tile {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.1rem;
+  }
+
+  .posting-actions {
+    grid-row: auto;
+    grid-column: 2;
+    flex-direction: row;
+  }
 }
