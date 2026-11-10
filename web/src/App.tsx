@@ -6,6 +6,7 @@ import Header from './Header'
 import Login from './Login'
 import Postings from './Postings'
 import RequireLogin from './RequireLogin'
+import Signup from './Signup'
 import Title from './Title'
 import TrackedPostings, { type Tracked } from './TrackedPostings'
 
@@ -149,6 +150,7 @@ export default function App() {
           }
         />
         <Route path="/login" element={<Login loggedIn={session !== null} onLoggedIn={reloadSession} />} />
+        <Route path="/signup" element={<Signup loggedIn={session !== null} onSignedUp={reloadSession} />} />
         <Route path="*" element={<main><Title>Not found · kansei</Title><p>Page not found.</p></main>} />
       </Routes>
     </>

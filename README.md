@@ -2,7 +2,7 @@
 
 Kansei is a job board for engineering jobs you can do from Japan. Each posting shows the Japanese level it asks for. I'm building it for my own job search in Japan, where I want to quickly find the skills, Japanese level, and work arrangements a role requires.
 
-Live: https://kansei-3dr6p2i5tq-an.a.run.app/ (the postings page is public; signup isn't open yet).
+Live: https://kansei.cloud.run/
 
 ## What it does
 
@@ -138,7 +138,7 @@ The `run` command makes paid API calls. Cloning the repo gives you the saved res
 
 - `GET /api/postings` lists what the postings page shows: postings that pass the candidate rule, were seen on their board in the last two days, and have an extraction for the configured model and prompt. Each appears once, with the facts from its newest extraction, newest first seen first. Filter by board with `token`. There's no paging: the candidate rule runs in Python after the query, so a SQL limit would cut before it. In production the full list is about 158 postings (122 KB).
 - `GET /api/postings/{id}` returns one posting with its newest extraction for the configured model and prompt, or `null` if it hasn't been extracted.
-- `POST /api/signup` and `POST /api/login` take `{"email", "password"}`. Passwords need at least 15 characters and are stored as Argon2id hashes. Login sets an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie that lasts 14 days.
+- `POST /api/signup` and `POST /api/login` take `{"email", "password"}`. Passwords need at least 15 characters and are stored as Argon2id hashes. Signup and login set an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie that lasts 14 days.
 - `GET /api/me` returns the logged-in user, or 401. `POST /api/logout` deletes the session on the server, so a copied cookie stops working.
 - `GET /api/me/tracked` lists the postings you're tracking, newest first. `POST /api/me/tracked` takes `{"posting_id", "status", "note"}`, `PATCH /api/me/tracked/{id}` changes the status or note, and `DELETE /api/me/tracked/{id}` stops tracking a posting. Status is one of `saved`, `applied`, `interviewing`, `offer`, `rejected`, and Postgres enforces it too. Another user's tracked posting returns the same 404 as one that doesn't exist.
 
@@ -186,4 +186,4 @@ The tests cover parsing, validation, the code around model calls, cost calculati
 
 ## What's next
 
-Kansei is a web app with a public postings page, user accounts and per-user tracked postings, deployed on Cloud Run with Cloud SQL. Next is following companies by name from the web app, then a demo account and signup.
+Kansei is a web app with a public postings page, open signup, and per-user tracked postings and followed companies, deployed on Cloud Run with Cloud SQL. Next is a demo account.

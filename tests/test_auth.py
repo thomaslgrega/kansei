@@ -24,8 +24,25 @@ def test_me_without_a_cookie_is_401(client):
     assert response.status_code == 401
 
 
+def test_signing_up_logs_the_new_user_in(client):
+    signed_up = client.post("/api/signup", json={"email": EMAIL, "password": PASSWORD})
+
+    response = client.get("/api/me")
+
+    assert response.status_code == 200
+    assert response.json() == {"id": signed_up.json()["id"], "email": EMAIL}
+
+
+def test_the_signup_cookie_is_httponly_secure_and_lax(client):
+    response = client.post("/api/signup", json={"email": EMAIL, "password": PASSWORD})
+
+    attributes = {part.strip() for part in response.headers["set-cookie"].split(";")}
+    assert {"HttpOnly", "Secure", "SameSite=lax"} <= attributes
+
+
 def test_wrong_password_is_401_and_sets_no_cookie(client):
     sign_up(client)
+    client.cookies.clear()
 
     response = client.post("/api/login", json={"email": EMAIL, "password": "wrong password"})
 

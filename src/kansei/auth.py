@@ -7,6 +7,7 @@ from pwdlib import PasswordHash
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from kansei import sha256
 from kansei.db import SessionDep, User, UserSession
@@ -62,8 +63,22 @@ def current_user(session: SessionDep, token: SessionCookie = None) -> User:
 CurrentUser = Annotated[User, Depends(current_user)]
 
 
+def start_session(session: Session, user: User, response: Response) -> None:
+    token = secrets.token_urlsafe(32)
+    session.add(UserSession(id=sha256(token), user_id=user.id, expires_at=datetime.now(UTC) + SESSION_LIFETIME))
+    session.commit()
+    response.set_cookie(
+        COOKIE,
+        token,
+        max_age=int(SESSION_LIFETIME.total_seconds()),
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
+
+
 @router.post("/signup", status_code=201)
-def signup(body: Signup, session: SessionDep, request: Request, now: Now) -> UserOut:
+def signup(body: Signup, session: SessionDep, request: Request, response: Response, now: Now) -> UserOut:
     rate_limit(session, SIGNUP_PER_IP, client_ip(request), now)
     user = User(email=body.email.lower(), password_hash=password_hash.hash(body.password))
     session.add(user)
@@ -72,6 +87,7 @@ def signup(body: Signup, session: SessionDep, request: Request, now: Now) -> Use
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=409, detail="Email already registered")
+    start_session(session, user, response)
     return UserOut.model_validate(user)
 
 
@@ -85,18 +101,7 @@ def login(body: Login, session: SessionDep, request: Request, response: Response
         raise HTTPException(status_code=401, detail="Wrong email or password")
     if not password_hash.verify(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Wrong email or password")
-
-    token = secrets.token_urlsafe(32)
-    session.add(UserSession(id=sha256(token), user_id=user.id, expires_at=datetime.now(UTC) + SESSION_LIFETIME))
-    session.commit()
-    response.set_cookie(
-        COOKIE,
-        token,
-        max_age=int(SESSION_LIFETIME.total_seconds()),
-        httponly=True,
-        secure=True,
-        samesite="lax",
-    )
+    start_session(session, user, response)
 
 
 @router.post("/logout", status_code=204)
