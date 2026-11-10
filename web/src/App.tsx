@@ -99,7 +99,13 @@ export default function App() {
 
   const home = (
     <main>
-      <Title>kansei</Title>
+      <Title>kansei · Engineering jobs you can do from Japan</Title>
+      {session === null && (
+        <div className="pitch">
+          <h1>Engineering jobs you can do from Japan.</h1>
+          <p>Each posting shows the Japanese level it asks for, so you can filter out the ones that need more than you have.</p>
+        </div>
+      )}
       <Postings
         trackedIds={trackedIds}
         onTrack={track}

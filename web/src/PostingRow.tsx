@@ -15,6 +15,7 @@ export type Posting = {
     title: string
     location: string
     first_seen_at: string
+    last_seen_at: string
 }
 
 export type Facts = ChipFacts & { role_summary: string }

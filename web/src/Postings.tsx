@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { boardKey, followsKey } from "./boards";
-import { type Filters, filtersToSearch, readFilters } from "./filters";
-import { capitalize, JAPANESE_CHOICES, japaneseRequirement, passesJapanese, readJapaneseChoice } from "./japanese";
+import { type Filters, filterRows, filtersToSearch, readFilters } from "./filters";
+import { capitalize, JAPANESE_CHOICES, readJapaneseChoice } from "./japanese";
+import { numbersLine, siteNumbers } from "./numbers";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 
 type Row = {
@@ -26,6 +27,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     const [searchParams, setSearchParams] = useSearchParams()
     const filters = readFilters(searchParams)
     const [failed, setFailed] = useState(false)
+    const [now] = useState(Date.now)
 
     // Refetch when follows change, so a newly followed board's postings join the list.
     const followsSignature = followingOnly && followed ? followsKey(followed) : ''
@@ -54,9 +56,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
 
     // An unfollowed board's postings leave at once, without waiting for the refetch.
     const shown = followingOnly && followed ? rows.filter(({ posting }) => followed.has(boardKey(posting))) : rows
-    const passing = shown.filter(({ facts }) => passesJapanese(japaneseRequirement(facts), filters.japanese))
-    const hidden = passing.filter((row) => row.sales_or_support).length
-    const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
+    const { visible, hiddenSales } = filterRows(shown, filters)
 
     function actions(posting: Posting) {
         if (!trackedIds && !followed) return null
@@ -87,6 +87,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
 
     return (
         <section>
+            {!followingOnly && <p className="numbers muted">{numbersLine(siteNumbers(rows), now)}</p>}
             <h2>Postings ({visible.length})</h2>
             <div className="filters">
                 <label>
@@ -102,7 +103,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
                 </label>
                 <label>
                     <input type="checkbox" checked={filters.showSales} onChange={(event) => setFilters({ showSales: event.target.checked })} />
-                    Show sales and support roles ({hidden})
+                    Show sales and support roles ({hiddenSales})
                 </label>
             </div>
             <ul className="postings">
