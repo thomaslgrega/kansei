@@ -4,7 +4,7 @@ import json
 import re
 import unicodedata
 from html.parser import HTMLParser
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 from weakref import WeakKeyDictionary
 
 import httpx
@@ -91,6 +91,7 @@ GREENHOUSE_JOB = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_i
 LEVER_BOARD = "https://api.lever.co/v0/postings/{token}?mode=json"
 GREENHOUSE_BOARD_INFO = "https://boards-api.greenhouse.io/v1/boards/{token}"
 LEVER_BOARD_PAGE = "https://jobs.lever.co/{token}"
+GREENHOUSE_BOARD_PAGE = "https://job-boards.greenhouse.io/{token}"
 ASHBY_BOARD = "https://api.ashbyhq.com/posting-api/job-board/{token}"
 ASHBY_GRAPHQL = "https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiOrganizationFromHostedJobsPageName"
 ASHBY_ORGANIZATION_QUERY = """
@@ -100,7 +101,7 @@ query ApiOrganizationFromHostedJobsPageName(
   organization: organizationFromHostedJobsPageName(
     organizationHostedJobsPageName: $organizationHostedJobsPageName,
     searchContext: $searchContext
-  ) { name }
+  ) { name theme { logoSquareImageUrl } }
 }
 """
 HRMOS_BOARD = "https://hrmos.co/pages/{token}/jobs"
@@ -307,7 +308,7 @@ async def lever_name(client: httpx.AsyncClient, token: str) -> str:
     return title.get_text() if title else ""
 
 
-async def ashby_name(client: httpx.AsyncClient, token: str) -> str:
+async def ashby_organization(client: httpx.AsyncClient, token: str) -> dict:
     response = await client.post(ASHBY_GRAPHQL, json={
         "operationName": "ApiOrganizationFromHostedJobsPageName",
         "variables": {"organizationHostedJobsPageName": token, "searchContext": "JobBoard"},
@@ -317,7 +318,11 @@ async def ashby_name(client: httpx.AsyncClient, token: str) -> str:
     body = response.json()
     data = body.get("data") if isinstance(body, dict) else None
     organization = data.get("organization") if isinstance(data, dict) else None
-    name = organization.get("name") if isinstance(organization, dict) else None
+    return organization if isinstance(organization, dict) else {}
+
+
+async def ashby_name(client: httpx.AsyncClient, token: str) -> str:
+    name = (await ashby_organization(client, token)).get("name")
     return name if isinstance(name, str) else ""
 
 
@@ -334,8 +339,49 @@ async def fetch_board_name(client: httpx.AsyncClient, source: str, token: str) -
     return name.strip() or None
 
 
+def image_url(page: httpx.Response, src: str | None) -> str:
+    return urljoin(str(page.url), src.strip()) if src and src.strip() else ""
+
+
+async def greenhouse_logo(client: httpx.AsyncClient, token: str) -> str:
+    response = await client.get(GREENHOUSE_BOARD_PAGE.format(token=token))
+    response.raise_for_status()
+    images = BeautifulSoup(response.text, "html.parser").find_all("img", alt=True)
+    logo = next((image for image in images if image["alt"].strip().lower().endswith("logo")), None)
+    return image_url(response, logo.get("src") if logo else None)
+
+
+async def lever_logo(client: httpx.AsyncClient, token: str) -> str:
+    response = await client.get(LEVER_BOARD_PAGE.format(token=token))
+    response.raise_for_status()
+    logo = BeautifulSoup(response.text, "html.parser").select_one(".main-header-logo img")
+    return image_url(response, logo.get("src") if logo else None)
+
+
+async def ashby_logo(client: httpx.AsyncClient, token: str) -> str:
+    theme = (await ashby_organization(client, token)).get("theme")
+    logo = theme.get("logoSquareImageUrl") if isinstance(theme, dict) else None
+    return logo if isinstance(logo, str) else ""
+
+
+async def hrmos_logo(client: httpx.AsyncClient, token: str) -> str:
+    page = BeautifulSoup(await hrmos_get(client, HRMOS_BOARD.format(token=token)), "html.parser")
+    image = page.find("meta", property="og:image")
+    return image.get("content", "") if image else ""
+
+
+async def fetch_board_logo(client: httpx.AsyncClient, source: str, token: str) -> str | None:
+    try:
+        logo = (await LOGOS[source](client, token)).strip()
+    except (httpx.HTTPError, ValueError):
+        return None
+    # The page puts it in an <img src>, so only a web address will do.
+    return logo if urlsplit(logo).scheme in {"http", "https"} else None
+
+
 SOURCES = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch_ashby, "hrmos": fetch_hrmos}
 NAMES = {"greenhouse": greenhouse_name, "lever": lever_name, "ashby": ashby_name, "hrmos": hrmos_name}
+LOGOS = {"greenhouse": greenhouse_logo, "lever": lever_logo, "ashby": ashby_logo, "hrmos": hrmos_logo}
 
 BOARD_HOSTS = {
     "boards.greenhouse.io": "greenhouse",

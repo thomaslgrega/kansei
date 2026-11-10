@@ -21,6 +21,7 @@ from kansei.db import Board, BoardSource, Extraction, Follow, Posting, engine
 from kansei.llm import PostingFacts, cost_usd, extract, openai_client, prompt_snapshot
 from kansei.sources import (
     SOURCES,
+    fetch_board_logo,
     fetch_board_name,
     fetch_posting,
     fetch_url,
@@ -104,6 +105,27 @@ def save_board_names(session: Session, names: dict[Board, str | None]) -> None:
         if name is not None:
             session.execute(
                 update(Board).where(Board.id == board.id, Board.name.is_(None)).values(name=name)
+            )
+
+
+def boards_without_logo(session: Session) -> list[Board]:
+    return list(session.scalars(
+        select(Board).where(Board.logo_url.is_(None), Board.status == "active").order_by(Board.id)
+    ))
+
+
+async def fetch_board_logos(client: httpx.AsyncClient, boards: list[Board]) -> dict[Board, str | None]:
+    logos = await asyncio.gather(
+        *(fetch_board_logo(client, board.source, board.token) for board in boards)
+    )
+    return dict(zip(boards, logos))
+
+
+def save_board_logos(session: Session, logos: dict[Board, str | None]) -> None:
+    for board, logo in logos.items():
+        if logo is not None:
+            session.execute(
+                update(Board).where(Board.id == board.id, Board.logo_url.is_(None)).values(logo_url=logo)
             )
 
 
@@ -253,10 +275,14 @@ async def extract_batch(
 async def amain() -> None:
     with Session(engine) as session:
         unnamed = unnamed_boards(session)
+        without_logo = boards_without_logo(session)
     async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-        names = await fetch_board_names(client, unnamed)
+        names, logos = await asyncio.gather(
+            fetch_board_names(client, unnamed), fetch_board_logos(client, without_logo)
+        )
     with Session(engine) as session, session.begin():
         save_board_names(session, names)
+        save_board_logos(session, logos)
     for board, name in names.items():
         if name is None:
             print(f"  no company name for {board.source}:{board.token}")

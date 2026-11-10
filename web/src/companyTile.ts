@@ -6,3 +6,7 @@ export function companyTile(name: string): { letter: string; color: string } {
     const sum = characters.reduce((total, character) => total + (character.codePointAt(0) ?? 0), 0)
     return { letter: (characters[0] ?? '?').toUpperCase(), color: COLORS[sum % COLORS.length] }
 }
+
+export function shownLogo(logoUrl: string | null, failedUrl: string | null): string | null {
+    return logoUrl !== failedUrl ? logoUrl : null
+}

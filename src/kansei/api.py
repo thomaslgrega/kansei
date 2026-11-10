@@ -59,6 +59,7 @@ class PostingOut(BaseModel):
     source: str
     token: str
     company: str
+    logo_url: str | None
     has_board: bool
     title: str
     location: str
