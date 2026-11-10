@@ -15,14 +15,16 @@ type Row = {
 type Props = {
     followingOnly?: boolean
     trackedIds: Set<number> | null
+    pendingTracks: Set<number>
     onTrack: (postingId: number) => void
+    onUntrack: (postingId: number) => void
     followed: Set<string> | null
     pendingFollows: Set<string>
     onFollow: (source: string, token: string) => void
     onUnfollow: (source: string, token: string) => void
 }
 
-export default function Postings({ followingOnly = false, trackedIds, onTrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
+export default function Postings({ followingOnly = false, trackedIds, pendingTracks, onTrack, onUntrack, followed, pendingFollows, onFollow, onUnfollow }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
     const [searchParams, setSearchParams] = useSearchParams()
     const filters = readFilters(searchParams)
@@ -63,8 +65,18 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
 
     function postingAction(posting: Posting) {
         if (!trackedIds) return null
-        if (trackedIds.has(posting.id)) return <span className="track tracked">✓ Tracked</span>
-        return <button className="track" onClick={() => onTrack(posting.id)}>Track</button>
+        const isTracked = trackedIds.has(posting.id)
+        return (
+            <button
+                className={isTracked ? 'track tracked' : 'track'}
+                aria-pressed={isTracked}
+                aria-label={isTracked ? `Untrack ${posting.title}` : `Track ${posting.title}`}
+                disabled={pendingTracks.has(posting.id)}
+                onClick={() => isTracked ? onUntrack(posting.id) : onTrack(posting.id)}
+            >
+                {isTracked ? '✓ Tracked' : 'Track'}
+            </button>
+        )
     }
 
     function companyAction(posting: Posting) {

@@ -8,6 +8,7 @@ import Postings from './Postings'
 import RequireLogin from './RequireLogin'
 import Signup from './Signup'
 import Title from './Title'
+import { trackedRowId, withoutPosting } from './tracked'
 import TrackedPostings, { type Tracked } from './TrackedPostings'
 
 type User = { id: number; email: string }
@@ -30,6 +31,7 @@ async function loadSession(): Promise<Session | null> {
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [pending, setPending] = useState<Set<string>>(new Set())
+  const [pendingTracks, setPendingTracks] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadSession().then(setSession)
@@ -44,18 +46,48 @@ export default function App() {
     setSession(null)
   }
 
-  async function track(postingId: number) {
-    const response = await fetch('/api/me/tracked', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ posting_id: postingId }),
-    })
-    if (!response.ok) {
-      setSession(await loadSession())
-      return
+  async function changeTrack(postingId: number, request: () => Promise<Response>, onDone: (response: Response) => Promise<void>) {
+    setPendingTracks((current) => new Set(current).add(postingId))
+    try {
+      const response = await request()
+      if (!response.ok) {
+        setSession(await loadSession())
+        return
+      }
+      await onDone(response)
+    } finally {
+      setPendingTracks((current) => {
+        const next = new Set(current)
+        next.delete(postingId)
+        return next
+      })
     }
-    const tracked: Tracked = await response.json()
-    setSession((current) => current && { ...current, tracked: [tracked, ...current.tracked] })
+  }
+
+  function track(postingId: number) {
+    return changeTrack(
+      postingId,
+      () =>
+        fetch('/api/me/tracked', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ posting_id: postingId }),
+        }),
+      async (response) => {
+        const tracked: Tracked = await response.json()
+        setSession((current) => current && { ...current, tracked: [tracked, ...current.tracked] })
+      },
+    )
+  }
+
+  async function untrack(postingId: number) {
+    const id = session ? trackedRowId(session.tracked, postingId) : null
+    if (id === null) return
+    await changeTrack(
+      postingId,
+      () => fetch(`/api/me/tracked/${id}`, { method: 'DELETE' }),
+      async () => setSession((current) => current && { ...current, tracked: withoutPosting(current.tracked, postingId) }),
+    )
   }
 
   async function refreshFollows() {
@@ -109,7 +141,9 @@ export default function App() {
       )}
       <Postings
         trackedIds={trackedIds}
+        pendingTracks={pendingTracks}
         onTrack={track}
+        onUntrack={untrack}
         followed={session && new Set(session.follows.map(boardKey))}
         pendingFollows={pending}
         onFollow={follow}
@@ -143,7 +177,9 @@ export default function App() {
                   onUnfollow={unfollow}
                   onFollowsChanged={refreshFollows}
                   trackedIds={trackedIds}
+                  pendingTracks={pendingTracks}
                   onTrack={track}
+                  onUntrack={untrack}
                 />
               )}
             </RequireLogin>

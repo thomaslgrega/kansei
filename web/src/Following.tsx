@@ -10,10 +10,12 @@ type Props = {
     onUnfollow: (source: string, token: string) => void
     onFollowsChanged: () => Promise<void>
     trackedIds: Set<number>
+    pendingTracks: Set<number>
     onTrack: (postingId: number) => void
+    onUntrack: (postingId: number) => void
 }
 
-export default function Following({ follows, pendingFollows, onFollow, onUnfollow, onFollowsChanged, trackedIds, onTrack }: Props) {
+export default function Following({ follows, pendingFollows, onFollow, onUnfollow, onFollowsChanged, trackedIds, pendingTracks, onTrack, onUntrack }: Props) {
     const followed = new Set(follows.map(boardKey))
 
     return (
@@ -43,7 +45,9 @@ export default function Following({ follows, pendingFollows, onFollow, onUnfollo
                 <Postings
                     followingOnly
                     trackedIds={trackedIds}
+                    pendingTracks={pendingTracks}
                     onTrack={onTrack}
+                    onUntrack={onUntrack}
                     followed={followed}
                     pendingFollows={pendingFollows}
                     onFollow={onFollow}
