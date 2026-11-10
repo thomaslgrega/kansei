@@ -259,7 +259,7 @@ def board_named(source: str, token: str) -> Select[tuple[Board]]:
 
 
 NO_BOARD_AT_URL = "No board found at that URL."
-TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever or Ashby board URL."
+TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever, Ashby or HRMOS board URL."
 
 
 async def fetch_board(http: httpx.AsyncClient, source: str, token: str) -> tuple[list[JobPosting], str | None] | None:
