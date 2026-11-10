@@ -388,6 +388,7 @@ BOARD_HOSTS = {
     "job-boards.greenhouse.io": "greenhouse",
     "jobs.lever.co": "lever",
     "jobs.ashbyhq.com": "ashby",
+    "hrmos.co": "hrmos",
 }
 # Starts with a letter or digit, so `.` and `..` can't walk up the ATS's API paths.
 SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
@@ -404,9 +405,13 @@ def parse_board_url(url: str) -> tuple[str, str]:
     if source is None:
         raise NotABoard(
             "kansei can only add boards on boards.greenhouse.io, job-boards.greenhouse.io, "
-            "jobs.lever.co and jobs.ashbyhq.com."
+            "jobs.lever.co, jobs.ashbyhq.com and hrmos.co."
         )
-    token = parts.path.split("/")[1] if parts.path.startswith("/") else ""
+    segments = parts.path.split("/")[1:] if parts.path.startswith("/") else []
+    if source == "hrmos":
+        # HRMOS boards live at /pages/{token}/jobs.
+        segments = segments[1:] if segments[:1] == ["pages"] else []
+    token = segments[0] if segments else ""
     if not SLUG.fullmatch(token):
         raise NotABoard("That URL doesn't name a board.")
     return source, token

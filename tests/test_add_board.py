@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 from sqlalchemy import select, update
@@ -8,6 +10,8 @@ from kansei.sources import (
     ASHBY_GRAPHQL,
     GREENHOUSE_BOARD,
     GREENHOUSE_BOARD_INFO,
+    HRMOS_BOARD,
+    HRMOS_JOB,
     LEVER_BOARD,
     LEVER_BOARD_PAGE,
 )
@@ -103,6 +107,39 @@ def serve_ashby_board(ats, token: str = "kansei-ashby") -> None:
     ats.pages[ASHBY_GRAPHQL] = httpx.Response(200, json={"data": {"organization": {"name": "Kansei Ashby"}}})
 
 
+def hrmos_job_page(title: str, region: str) -> str:
+    ld = json.dumps({
+        "@type": "JobPosting",
+        "title": title,
+        "datePosted": "2026-11-01T00:00:00Z",
+        "description": "<p>開発</p>",
+        "jobLocation": [{"@type": "Place", "address": {"addressRegion": region}}],
+    }, ensure_ascii=False)
+    return f'<html><head><script type="application/ld+json">{ld}</script></head></html>'
+
+
+def serve_hrmos_board(ats, token: str = "visional") -> None:
+    board = HRMOS_BOARD.format(token=token)
+    headlines = {"101": "【東京】バックエンドエンジニア", "102": "経理", "103": "【US】SREエンジニア"}
+    links = "".join(f'<a href="{board}/{job_id}"><h2>{headline}</h2></a>' for job_id, headline in headlines.items())
+    ats.pages[board] = httpx.Response(200, text=f"<h1>ビジョナル株式会社 すべての求人一覧</h1>{links}")
+    ats.pages[HRMOS_JOB.format(token=token, job_id="101")] = httpx.Response(
+        200, text=hrmos_job_page("バックエンドエンジニア", "東京都"),
+    )
+    ats.pages[HRMOS_JOB.format(token=token, job_id="103")] = httpx.Response(
+        200, text=hrmos_job_page("SREエンジニア", "California"),
+    )
+
+
+HRMOS_HIT = {
+    "source": "hrmos",
+    "token": "visional",
+    "company": "ビジョナル株式会社",
+    "titles": ["バックエンドエンジニア", "SREエンジニア"],
+    "candidates": 1,
+}
+
+
 @pytest.mark.parametrize(("serve", "url", "hit"), [
     (
         serve_greenhouse_board,
@@ -148,6 +185,9 @@ def serve_ashby_board(ats, token: str = "kansei-ashby") -> None:
             "candidates": 1,
         },
     ),
+    (serve_hrmos_board, "https://hrmos.co/pages/visional/jobs", HRMOS_HIT),
+    (serve_hrmos_board, "hrmos.co/pages/visional/jobs", HRMOS_HIT),
+    (serve_hrmos_board, "https://hrmos.co/pages/visional/jobs/2070775774525681664", HRMOS_HIT),
 ])
 def test_probing_a_single_job_url_finds_its_whole_board(client, log_in_as, ats, serve, url, hit):
     serve(ats)
@@ -160,7 +200,7 @@ def test_probing_a_single_job_url_finds_its_whole_board(client, log_in_as, ats, 
 
 UNKNOWN_HOST = (
     "kansei can only add boards on boards.greenhouse.io, job-boards.greenhouse.io, "
-    "jobs.lever.co and jobs.ashbyhq.com."
+    "jobs.lever.co, jobs.ashbyhq.com and hrmos.co."
 )
 NO_BOARD_IN_URL = "That URL doesn't name a board."
 
@@ -177,6 +217,11 @@ NO_BOARD_IN_URL = "That URL doesn't name a board."
     ("https://jobs.lever.co/kansei%2F..%2Fother", NO_BOARD_IN_URL),
     ("https://jobs.lever.co/kansei test", NO_BOARD_IN_URL),
     ("https://jobs.ashbyhq.com/カンセイ", NO_BOARD_IN_URL),
+    ("hrmos.co", NO_BOARD_IN_URL),
+    ("https://hrmos.co/pages/", NO_BOARD_IN_URL),
+    ("https://hrmos.co/pages", NO_BOARD_IN_URL),
+    ("https://hrmos.co/visional/jobs", NO_BOARD_IN_URL),
+    ("https://hrmos.co/pages/../jobs", NO_BOARD_IN_URL),
 ])
 def test_probing_a_url_that_isnt_a_board_is_refused_without_a_request(client, log_in_as, ats, q, message):
     log_in_as("ada@example.com")
@@ -272,17 +317,35 @@ def test_a_board_on_kansei_is_found_whatever_the_case_of_the_pasted_token(client
     ]
 
 
-@pytest.mark.parametrize("status", [404, 500])
-def test_probing_a_board_the_ats_doesnt_serve_finds_nothing(client, log_in_as, ats, status):
-    ats.pages[LEVER_BOARD.format(token="kansei-missing")] = httpx.Response(status)
+def test_an_hrmos_board_on_kansei_is_found_whatever_the_case_of_the_pasted_token(client, session, log_in_as, ats):
+    serve_hrmos_board(ats, token="Visional")
+    session.add(Board(source="hrmos", token="visional", name="ビジョナル"))
+    session.flush()
     log_in_as("ada@example.com")
 
-    response = client.get("/api/probe", params={"q": "https://jobs.lever.co/kansei-missing"})
+    response = client.get("/api/probe", params={"q": "https://hrmos.co/pages/Visional/jobs"})
+
+    assert response.json() == {
+        "message": None,
+        "hits": [{**HRMOS_HIT, "company": "ビジョナル", "state": "on_kansei", "following": False}],
+    }
+
+
+@pytest.mark.parametrize(("url", "q"), [
+    (LEVER_BOARD.format(token="kansei-missing"), "https://jobs.lever.co/kansei-missing"),
+    (HRMOS_BOARD.format(token="kansei-missing"), "https://hrmos.co/pages/kansei-missing/jobs"),
+])
+@pytest.mark.parametrize("status", [404, 500])
+def test_probing_a_board_the_ats_doesnt_serve_finds_nothing(client, log_in_as, ats, status, url, q):
+    ats.pages[url] = httpx.Response(status)
+    log_in_as("ada@example.com")
+
+    response = client.get("/api/probe", params={"q": q})
 
     assert response.json() == {"hits": [], "message": "No board found at that URL."}
 
 
-TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever or Ashby board URL."
+TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever, Ashby or HRMOS board URL."
 
 
 def board_urls(*tokens: str) -> list[str]:
@@ -406,6 +469,23 @@ def test_adding_a_board_not_on_kansei_creates_it_with_its_name_and_adder_and_fol
     assert (board.source, board.name, board.status, board.added_by) == ("greenhouse", "Kansei Test K.K.", "active", ada)
     assert client.get("/api/me/follows").json() == [
         {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
+    ]
+
+
+def test_adding_an_hrmos_board_not_on_kansei_creates_it_and_follows_it(client, session, log_in_as, ats):
+    serve_hrmos_board(ats)
+    log_in_as("ada@example.com")
+
+    response = client.post("/api/me/follows", json={"source": "hrmos", "token": "visional"})
+
+    ada = session.scalar(select(User.id).where(User.email == "ada@example.com"))
+    board = session.scalar(select(Board).where(Board.source == "hrmos"))
+    assert (response.status_code, response.json()) == (
+        201, {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社"},
+    )
+    assert (board.token, board.name, board.status, board.added_by) == ("visional", "ビジョナル株式会社", "active", ada)
+    assert client.get("/api/me/follows").json() == [
+        {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社"},
     ]
 
 
