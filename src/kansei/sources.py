@@ -4,7 +4,7 @@ import json
 import re
 import unicodedata
 from html.parser import HTMLParser
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 from weakref import WeakKeyDictionary
 
 import httpx
@@ -339,19 +339,23 @@ async def fetch_board_name(client: httpx.AsyncClient, source: str, token: str) -
     return name.strip() or None
 
 
+def image_url(page: httpx.Response, src: str | None) -> str:
+    return urljoin(str(page.url), src.strip()) if src and src.strip() else ""
+
+
 async def greenhouse_logo(client: httpx.AsyncClient, token: str) -> str:
     response = await client.get(GREENHOUSE_BOARD_PAGE.format(token=token))
     response.raise_for_status()
     images = BeautifulSoup(response.text, "html.parser").find_all("img", alt=True)
     logo = next((image for image in images if image["alt"].strip().lower().endswith("logo")), None)
-    return logo.get("src", "") if logo else ""
+    return image_url(response, logo.get("src") if logo else None)
 
 
 async def lever_logo(client: httpx.AsyncClient, token: str) -> str:
     response = await client.get(LEVER_BOARD_PAGE.format(token=token))
     response.raise_for_status()
     logo = BeautifulSoup(response.text, "html.parser").select_one(".main-header-logo img")
-    return logo.get("src", "") if logo else ""
+    return image_url(response, logo.get("src") if logo else None)
 
 
 async def ashby_logo(client: httpx.AsyncClient, token: str) -> str:

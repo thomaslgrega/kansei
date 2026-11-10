@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from kansei import JobPosting, is_candidate
 from kansei.sources import (
+    ASHBY_ORGANIZATION_QUERY,
     fetch_ashby,
     fetch_board_logo,
     fetch_board_name,
@@ -471,6 +472,13 @@ def html_page(body: str) -> httpx.Response:
         pytest.param(
             "greenhouse",
             "https://job-boards.greenhouse.io/acme",
+            html_page('<body><img src="//s4-recruiting.cdn.greenhouse.io/logos/acme.png" alt="Acme Logo"></body>'),
+            "https://s4-recruiting.cdn.greenhouse.io/logos/acme.png",
+            id="greenhouse logo without a scheme",
+        ),
+        pytest.param(
+            "greenhouse",
+            "https://job-boards.greenhouse.io/acme",
             html_page('<body><img src="https://example.com/office.jpg" alt="Our office"></body>'),
             None,
             id="greenhouse page without a logo",
@@ -514,7 +522,7 @@ async def test_fetch_board_logo_asks_ashby_for_the_theme_logo_of_the_board():
     def handler(request):
         body = json.loads(request.content)
         assert body["variables"] == {"organizationHostedJobsPageName": "acme", "searchContext": "JobBoard"}
-        assert "logoSquareImageUrl" in body["query"]
+        assert body["query"] == ASHBY_ORGANIZATION_QUERY
         return httpx.Response(200, json={"data": {"organization": {"theme": {"logoSquareImageUrl": ASHBY_LOGO}}}})
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
