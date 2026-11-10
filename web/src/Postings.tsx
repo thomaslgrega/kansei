@@ -2,16 +2,21 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { boardKey, followsKey } from "./boards";
 import { type Filters, filtersToSearch, readFilters } from "./filters";
-import { CHOICES, capitalize, japaneseBadge, japaneseChoice, japaneseRequirement, passesJapanese } from "./japanese";
+import {
+    capitalize,
+    JAPANESE_CHOICES,
+    type JapaneseFacts,
+    japaneseBadge,
+    japaneseRequirement,
+    passesJapanese,
+    readJapaneseChoice,
+} from "./japanese";
 import NewBadge from "./NewBadge";
 
-type Facts = {
+type Facts = JapaneseFacts & {
     role_summary: string
     seniority: string
     must_have_skills: string[]
-    japanese_required: string
-    japanese_level: string
-    jlpt: string
     remote_policy: string
 }
 
@@ -96,9 +101,9 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
                     My Japanese{' '}
                     <select
                         value={filters.japanese}
-                        onChange={(event) => setFilters({ japanese: japaneseChoice(event.target.value) })}
+                        onChange={(event) => setFilters({ japanese: readJapaneseChoice(event.target.value) })}
                     >
-                        {CHOICES.map((choice) => (
+                        {JAPANESE_CHOICES.map((choice) => (
                             <option key={choice} value={choice}>{capitalize(choice)}</option>
                         ))}
                     </select>

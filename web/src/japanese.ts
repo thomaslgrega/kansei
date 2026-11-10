@@ -1,5 +1,5 @@
 export type JapaneseFacts = {
-    japanese_required: string
+    japanese_required: 'required' | 'preferred' | 'not_required' | 'not_stated'
     japanese_level: string
     jlpt: string
 }
@@ -12,10 +12,10 @@ export type JapaneseRequirement = Level | 'none' | 'not_stated'
 
 export type JapaneseChoice = 'any' | 'none' | Level
 
-export const CHOICES: readonly JapaneseChoice[] = ['any', 'none', ...LEVELS]
+export const JAPANESE_CHOICES: readonly JapaneseChoice[] = ['any', 'none', ...LEVELS]
 
-export function japaneseChoice(value: string | null): JapaneseChoice {
-    return CHOICES.find((choice) => choice === value) ?? 'any'
+export function readJapaneseChoice(value: string | null): JapaneseChoice {
+    return JAPANESE_CHOICES.find((choice) => choice === value) ?? 'any'
 }
 
 const JLPT_LEVELS = new Map<string, Level>([
@@ -31,11 +31,10 @@ function isLevel(value: string): value is Level {
 }
 
 export function japaneseRequirement(facts: JapaneseFacts): JapaneseRequirement {
-    if (facts.japanese_required === 'preferred' || facts.japanese_required === 'not_required') return 'none'
+    if (facts.japanese_required === 'not_stated') return 'not_stated'
+    if (facts.japanese_required !== 'required') return 'none'
     if (isLevel(facts.japanese_level)) return facts.japanese_level
-    const jlpt = JLPT_LEVELS.get(facts.jlpt)
-    if (jlpt) return jlpt
-    return facts.japanese_required === 'required' ? 'business' : 'not_stated'
+    return JLPT_LEVELS.get(facts.jlpt) ?? 'business'
 }
 
 export function capitalize(value: string): string {

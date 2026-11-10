@@ -8,7 +8,7 @@ import {
     passesJapanese,
 } from './japanese'
 
-function facts(japanese_required: string, japanese_level: string, jlpt: string): JapaneseFacts {
+function facts(japanese_required: JapaneseFacts['japanese_required'], japanese_level: string, jlpt: string): JapaneseFacts {
     return { japanese_required, japanese_level, jlpt }
 }
 
@@ -51,14 +51,14 @@ test('preferred and not required are none, whatever level they name', () => {
     expect(cases.map(japaneseRequirement)).toEqual(['none', 'none', 'none', 'none'])
 })
 
-test('not stated is not stated, unless a level or JLPT is named anyway', () => {
+test('not stated is not stated, whatever level or JLPT it names', () => {
     const cases = [
         facts('not_stated', 'not_stated', 'not_stated'),
         facts('not_stated', 'business', 'not_stated'),
         facts('not_stated', 'not_stated', 'N3'),
     ]
 
-    expect(cases.map(japaneseRequirement)).toEqual(['not_stated', 'business', 'conversational'])
+    expect(cases.map(japaneseRequirement)).toEqual(['not_stated', 'not_stated', 'not_stated'])
 })
 
 test('the badge names the level, and tells preferred, not required and not stated apart', () => {

@@ -1,9 +1,9 @@
-import { type JapaneseChoice, japaneseChoice } from './japanese'
+import { type JapaneseChoice, readJapaneseChoice } from './japanese'
 
 export type Filters = { japanese: JapaneseChoice; showSales: boolean }
 
 export function readFilters(params: URLSearchParams): Filters {
-    return { japanese: japaneseChoice(params.get('japanese')), showSales: params.get('sales') === '1' }
+    return { japanese: readJapaneseChoice(params.get('japanese')), showSales: params.get('sales') === '1' }
 }
 
 export function filtersToSearch(filters: Filters): string {
