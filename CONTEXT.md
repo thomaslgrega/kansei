@@ -40,6 +40,6 @@ _Avoid_: Fresh, recent, unseen
 How much Japanese a candidate asks for: basic, conversational, business or native; none, when Japanese is only preferred or not required; or not stated, when the posting says nothing about it. A JLPT level stands in when no level is named: N1 and N2 are business, N3 conversational, N4 and N5 basic. Japanese that is required with no level is business.
 _Avoid_: Japanese level, language requirement
 
-**Updated**:
-The last time kansei saw a posting on any board. A pasted posting doesn't move it, so it says when the boards were last read.
-_Avoid_: Last run, refreshed, synced
+**Checked**:
+The last time kansei saw a posting on any board. A pasted posting doesn't move it, so it says when the boards were last read, whether or not anything on them changed.
+_Avoid_: Updated, last run, refreshed, synced

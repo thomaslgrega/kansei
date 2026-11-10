@@ -4,7 +4,7 @@ import { boardKey, followsKey } from "./boards";
 import { type Filters, filtersToSearch, readFilters } from "./filters";
 import { capitalize, JAPANESE_CHOICES, japaneseRequirement, passesJapanese, readJapaneseChoice } from "./japanese";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
-import { lastUpdated, updatedAgo } from "./updated";
+import { checkedAgo, lastChecked } from "./checked";
 
 type Row = {
     posting: Posting
@@ -59,7 +59,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     const passing = shown.filter(({ facts }) => passesJapanese(japaneseRequirement(facts), filters.japanese))
     const hidden = passing.filter((row) => row.sales_or_support).length
     const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
-    const updatedAt = followingOnly ? null : lastUpdated(rows)
+    const checkedAt = followingOnly ? null : lastChecked(rows)
 
     function actions(posting: Posting) {
         if (!trackedIds && !followed) return null
@@ -92,7 +92,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
         <section>
             <div className="postings-heading">
                 <h2>Postings ({visible.length})</h2>
-                {updatedAt && <span className="muted">updated {updatedAgo(updatedAt, now)}</span>}
+                {checkedAt && <span className="muted">checked {checkedAgo(checkedAt, now)}</span>}
             </div>
             <div className="filters">
                 <label>

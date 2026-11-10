@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest'
-import { lastUpdated, updatedAgo } from './updated'
+import { checkedAgo, lastChecked } from './checked'
 
 function row(source: string, lastSeenAt: string, salesOrSupport = false) {
     return { posting: { source, last_seen_at: lastSeenAt }, sales_or_support: salesOrSupport }
 }
 
-test('updated is the newest board posting, counting sales roles and ignoring pasted postings', () => {
+test('checked is the newest board posting, counting sales roles and ignoring pasted postings', () => {
     const rows = [
         row('greenhouse', '2026-11-10T03:00:00+00:00'),
         row('lever', '2026-11-10T13:30:00+09:00'),
@@ -13,16 +13,16 @@ test('updated is the newest board posting, counting sales roles and ignoring pas
         row('url', '2026-11-10T09:00:00+00:00'),
     ]
 
-    expect(lastUpdated(rows)).toEqual('2026-11-10T05:00:00+00:00')
+    expect(lastChecked(rows)).toEqual('2026-11-10T05:00:00+00:00')
 })
 
-test('with no board postings there is no updated time', () => {
-    expect([lastUpdated([row('url', '2026-11-10T09:00:00+00:00')]), lastUpdated([])]).toEqual([null, null])
+test('with no board postings there is no checked time', () => {
+    expect([lastChecked([row('url', '2026-11-10T09:00:00+00:00')]), lastChecked([])]).toEqual([null, null])
 })
 
-test('updated reads in minutes, then hours, then days', () => {
+test('checked reads in minutes, then hours, then days', () => {
     const now = Date.parse('2026-11-10T12:00:00Z')
-    const updated = [
+    const checked = [
         '2026-11-10T12:00:05+00:00', // just ahead of the browser clock
         '2026-11-10T11:59:30+00:00', // 30 seconds
         '2026-11-10T11:59:00+00:00', // a minute
@@ -34,7 +34,7 @@ test('updated reads in minutes, then hours, then days', () => {
         '2026-11-07T12:00:00+00:00', // three days
     ]
 
-    expect(updated.map((value) => updatedAgo(value, now))).toEqual([
+    expect(checked.map((value) => checkedAgo(value, now))).toEqual([
         'just now',
         'just now',
         '1 minute ago',
