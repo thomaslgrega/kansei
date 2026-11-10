@@ -14,10 +14,14 @@ const MINUTE_MS = 60 * 1000
 
 const ago = new Intl.RelativeTimeFormat('en', { numeric: 'always' })
 
+function isPasted(posting: { source: string }): boolean {
+    return posting.source === 'url'
+}
+
 export function siteNumbers(rows: NumbersRow[]): Numbers {
     let updatedAt: string | null = null
     for (const { posting } of rows) {
-        if (posting.source === 'url') continue
+        if (isPasted(posting)) continue
         if (updatedAt === null || Date.parse(posting.last_seen_at) > Date.parse(updatedAt)) updatedAt = posting.last_seen_at
     }
     return { postings: filterRows(rows, DEFAULT_FILTERS).visible.length, updatedAt }
