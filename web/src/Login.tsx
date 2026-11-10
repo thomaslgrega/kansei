@@ -1,5 +1,6 @@
 import { type SubmitEvent, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
+import { loginError } from './loginError'
 import { returnTo } from './loginRedirect'
 import Title from './Title'
 
@@ -23,7 +24,7 @@ export default function Login({ loggedIn, onLoggedIn }: Props) {
             body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
         })
         if (!response.ok) {
-            setError('Wrong email or password')
+            setError(loginError(response.status))
             return
         }
         await onLoggedIn()

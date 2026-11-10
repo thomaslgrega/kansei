@@ -167,6 +167,14 @@ class Follow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class RateLimit(Base):
+    __tablename__ = "rate_limits"
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True, index=True)
+    count: Mapped[int]
+
+
 engine = create_engine(settings.database_url.get_secret_value(), pool_pre_ping=True)
 
 

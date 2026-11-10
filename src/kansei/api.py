@@ -29,6 +29,7 @@ from kansei.db import (
     TrackStatus,
 )
 from kansei.llm import PostingFacts, prompt_snapshot
+from kansei.ratelimit import PROBE_PER_USER, Now, rate_limit
 from kansei.sources import (
     SLUG,
     SOURCES,
@@ -283,7 +284,9 @@ def probe_hit(session: Session, user_id: int, source: str, token: str, jobs: lis
 
 
 @api.get("/probe")
-async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -> ProbeOut:
+async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep, now: Now) -> ProbeOut:
+    user_id = user.id
+    rate_limit(session, PROBE_PER_USER, str(user_id), now)
     if looks_like_url(q):
         try:
             guesses = [parse_board_url(q)]
@@ -294,7 +297,6 @@ async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep) -
         # Probing an HRMOS board fetches its job pages, too many requests for a guess.
         guesses = [(source, slug) for source in SOURCES if source != "hrmos" for slug in name_slugs(q)]
         miss = TRY_THE_URL
-    user_id = user.id
     session.rollback()
     found = await asyncio.gather(*(fetch_board(http, source, token) for source, token in guesses))
     hits = [

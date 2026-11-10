@@ -2,7 +2,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from pwdlib import PasswordHash
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import delete, select
@@ -10,6 +10,14 @@ from sqlalchemy.exc import IntegrityError
 
 from kansei import sha256
 from kansei.db import SessionDep, User, UserSession
+from kansei.ratelimit import (
+    LOGIN_PER_EMAIL,
+    LOGIN_PER_IP,
+    SIGNUP_PER_IP,
+    Now,
+    client_ip,
+    rate_limit,
+)
 
 COOKIE = "kansei_session"
 SESSION_LIFETIME = timedelta(days=14)
@@ -55,7 +63,8 @@ CurrentUser = Annotated[User, Depends(current_user)]
 
 
 @router.post("/signup", status_code=201)
-def signup(body: Signup, session: SessionDep) -> UserOut:
+def signup(body: Signup, session: SessionDep, request: Request, now: Now) -> UserOut:
+    rate_limit(session, SIGNUP_PER_IP, client_ip(request), now)
     user = User(email=body.email.lower(), password_hash=password_hash.hash(body.password))
     session.add(user)
     try:
@@ -67,7 +76,9 @@ def signup(body: Signup, session: SessionDep) -> UserOut:
 
 
 @router.post("/login", status_code=204)
-def login(body: Login, session: SessionDep, response: Response) -> None:
+def login(body: Login, session: SessionDep, request: Request, response: Response, now: Now) -> None:
+    rate_limit(session, LOGIN_PER_IP, client_ip(request), now)
+    rate_limit(session, LOGIN_PER_EMAIL, body.email.lower(), now)
     user = session.scalar(select(User).where(User.email == body.email.lower()))
     if user is None:
         password_hash.verify(body.password, DUMMY_HASH)
