@@ -8,6 +8,7 @@ import Postings from './Postings'
 import RequireLogin from './RequireLogin'
 import Signup from './Signup'
 import Title from './Title'
+import { whilePending } from './pending'
 import { trackedRowId, withoutPosting } from './tracked'
 import TrackedPostings, { type Tracked } from './TrackedPostings'
 
@@ -46,22 +47,15 @@ export default function App() {
     setSession(null)
   }
 
-  async function changeTrack(postingId: number, request: () => Promise<Response>, onDone: (response: Response) => Promise<void>) {
-    setPendingTracks((current) => new Set(current).add(postingId))
-    try {
+  function changeTrack(postingId: number, request: () => Promise<Response>, onDone: (response: Response) => Promise<void>) {
+    return whilePending(setPendingTracks, postingId, async () => {
       const response = await request()
       if (!response.ok) {
         setSession(await loadSession())
         return
       }
       await onDone(response)
-    } finally {
-      setPendingTracks((current) => {
-        const next = new Set(current)
-        next.delete(postingId)
-        return next
-      })
-    }
+    })
   }
 
   function track(postingId: number) {
@@ -80,10 +74,10 @@ export default function App() {
     )
   }
 
-  async function untrack(postingId: number) {
+  function untrack(postingId: number) {
     const id = session ? trackedRowId(session.tracked, postingId) : null
     if (id === null) return
-    await changeTrack(
+    return changeTrack(
       postingId,
       () => fetch(`/api/me/tracked/${id}`, { method: 'DELETE' }),
       async () => setSession((current) => current && { ...current, tracked: withoutPosting(current.tracked, postingId) }),
@@ -95,19 +89,11 @@ export default function App() {
     if (follows) setSession((current) => current && { ...current, follows })
   }
 
-  async function changeFollow(source: string, token: string, request: () => Promise<Response>) {
-    const key = boardKey({ source, token })
-    setPendingFollows((current) => new Set(current).add(key))
-    try {
+  function changeFollow(source: string, token: string, request: () => Promise<Response>) {
+    return whilePending(setPendingFollows, boardKey({ source, token }), async () => {
       await request()
       await refreshFollows()
-    } finally {
-      setPendingFollows((current) => {
-        const next = new Set(current)
-        next.delete(key)
-        return next
-      })
-    }
+    })
   }
 
   function follow(source: string, token: string) {
