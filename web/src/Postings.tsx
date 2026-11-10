@@ -4,6 +4,7 @@ import { boardKey, followsKey } from "./boards";
 import { type Filters, filtersToSearch, readFilters } from "./filters";
 import { capitalize, JAPANESE_CHOICES, japaneseRequirement, passesJapanese, readJapaneseChoice } from "./japanese";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
+import { checkedAgo, lastChecked } from "./checked";
 
 type Row = {
     posting: Posting
@@ -26,6 +27,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     const [searchParams, setSearchParams] = useSearchParams()
     const filters = readFilters(searchParams)
     const [failed, setFailed] = useState(false)
+    const [now] = useState(Date.now)
 
     // Refetch when follows change, so a newly followed board's postings join the list.
     const followsSignature = followingOnly && followed ? followsKey(followed) : ''
@@ -57,6 +59,7 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
     const passing = shown.filter(({ facts }) => passesJapanese(japaneseRequirement(facts), filters.japanese))
     const hidden = passing.filter((row) => row.sales_or_support).length
     const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
+    const checkedAt = followingOnly ? null : lastChecked(rows)
 
     function actions(posting: Posting) {
         if (!trackedIds && !followed) return null
@@ -87,7 +90,10 @@ export default function Postings({ followingOnly = false, trackedIds, onTrack, f
 
     return (
         <section>
-            <h2>Postings ({visible.length})</h2>
+            <div className="postings-heading">
+                <h2>Postings ({visible.length})</h2>
+                {checkedAt && <span className="muted">checked {checkedAgo(checkedAt, now)}</span>}
+            </div>
             <div className="filters">
                 <label>
                     My Japanese{' '}

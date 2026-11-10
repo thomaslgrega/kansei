@@ -26,6 +26,30 @@ header {
   text-decoration: none;
 }
 
+.pitch h1 {
+  margin: 1.5rem 0 0.25rem;
+  font-size: 1.75rem;
+  line-height: 1.25;
+}
+
+.pitch p {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 1.1rem;
+}
+
+.postings-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0 1rem;
+}
+
+.postings-heading span {
+  font-size: 0.9em;
+}
+
 form {
   display: grid;
   gap: 0.5rem;
