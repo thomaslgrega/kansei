@@ -16,7 +16,7 @@ export default function Header({ email, onLogOut }: Props) {
                 <Link to={loginHref(location)}>Log in</Link>
             ) : (
                 <span>
-                    <Link to="/tracked">Tracked</Link> · {email} · <button onClick={onLogOut}>Log out</button>
+                    <Link to="/following">Following</Link> · <Link to="/tracked">Tracked</Link> · {email} · <button onClick={onLogOut}>Log out</button>
                 </span>
             )}
         </header>
