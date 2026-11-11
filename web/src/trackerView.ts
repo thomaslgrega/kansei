@@ -61,6 +61,10 @@ export function archivedOptionLabel(row: Staged): string {
     return row.archived ? `Archived · ${LABELS[row.stage]}` : 'Archived'
 }
 
+export function asksBeforeUntrack(row: Staged & { note: string }): boolean {
+    return row.note.trim() !== '' || row.stage !== 'saved' || row.archived
+}
+
 export function emptyMessage(filter: Filter): string {
     if (filter === 'all') return 'Nothing in progress.'
     if (filter === 'archived') return 'Nothing archived.'
