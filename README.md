@@ -140,7 +140,7 @@ The `run` command makes paid API calls. Cloning the repo gives you the saved res
 - `GET /api/postings/{id}` returns one posting with its newest extraction for the configured model and prompt, or `null` if it hasn't been extracted.
 - `POST /api/signup` and `POST /api/login` take `{"email", "password"}`. Passwords need at least 15 characters and are stored as Argon2id hashes. Signup and login set an `HttpOnly`, `Secure`, `SameSite=Lax` session cookie that lasts 14 days.
 - `GET /api/me` returns the logged-in user, or 401. `POST /api/logout` deletes the session on the server, so a copied cookie stops working.
-- `GET /api/me/tracked` lists the postings you're tracking, newest first. `POST /api/me/tracked` takes `{"posting_id", "status", "note"}`, `PATCH /api/me/tracked/{id}` changes the status or note, and `DELETE /api/me/tracked/{id}` stops tracking a posting. Status is one of `saved`, `applied`, `interviewing`, `offer`, `rejected`, and Postgres enforces it too. Another user's tracked posting returns the same 404 as one that doesn't exist.
+- `GET /api/me/tracked` lists the postings you're tracking, newest first. `POST /api/me/tracked` takes `{"posting_id", "stage", "note"}`, `PATCH /api/me/tracked/{id}` changes the stage or note, and `DELETE /api/me/tracked/{id}` stops tracking a posting. Stage is one of `saved`, `applied`, `interviewing`, `offer`, `rejected`, and Postgres enforces it too. Another user's tracked posting returns the same 404 as one that doesn't exist.
 
 ## Web app
 

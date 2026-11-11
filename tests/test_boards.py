@@ -174,7 +174,7 @@ def test_removing_a_board_deletes_only_its_follows_and_keeps_its_postings_and_tr
         [make_posting(token="kansei-junk", url="https://example.com/junk")],
         datetime(2026, 11, 1, tzinfo=UTC),
     )
-    session.add(Tracked(user_id=ada.id, posting_id=ids["https://example.com/junk"], status="applied", note="Called back"))
+    session.add(Tracked(user_id=ada.id, posting_id=ids["https://example.com/junk"], stage="applied", note="Called back"))
     session.flush()
 
     remove_board(session, "greenhouse:kansei-junk")
@@ -191,7 +191,7 @@ def test_removing_a_board_deletes_only_its_follows_and_keeps_its_postings_and_tr
         ("https://example.com/junk", "kansei-junk"),
     ]
     assert session.execute(
-        select(Tracked.user_id, Tracked.posting_id, Tracked.status, Tracked.note).where(Tracked.user_id.in_(user_ids))
+        select(Tracked.user_id, Tracked.posting_id, Tracked.stage, Tracked.note).where(Tracked.user_id.in_(user_ids))
     ).all() == [
         (ada.id, ids["https://example.com/junk"], "applied", "Called back"),
     ]

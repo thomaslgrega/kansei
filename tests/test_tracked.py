@@ -4,7 +4,7 @@ from typing import get_args
 import pytest
 
 from kansei import save_postings
-from kansei.db import Tracked, TrackStatus, User
+from kansei.db import Stage, Tracked, User
 
 SEEN_AT = datetime(2026, 10, 18, tzinfo=UTC)
 
@@ -83,30 +83,30 @@ def test_another_users_tracked_posting_looks_like_one_that_doesnt_exist(client, 
     bobs = client.post("/api/me/tracked", json={"posting_id": posting_ids[0]}).json()["id"]
     log_in_as("ada@example.com")
 
-    response = client.patch(f"/api/me/tracked/{bobs}", json={"status": "rejected"})
-    missing = client.patch("/api/me/tracked/0", json={"status": "rejected"})
+    response = client.patch(f"/api/me/tracked/{bobs}", json={"stage": "rejected"})
+    missing = client.patch("/api/me/tracked/0", json={"stage": "rejected"})
 
     assert response.status_code == 404
     assert response.json() == missing.json()
-    assert session.get(Tracked, bobs).status == "saved"
+    assert session.get(Tracked, bobs).stage == "saved"
 
 
 def test_patch_changes_only_the_fields_it_sends(client, log_in_as, posting_ids):
     log_in_as("ada@example.com")
     tracked = client.post("/api/me/tracked", json={"posting_id": posting_ids[0], "note": "Recruiter reached out"}).json()
 
-    response = client.patch(f"/api/me/tracked/{tracked['id']}", json={"status": "applied"})
+    response = client.patch(f"/api/me/tracked/{tracked['id']}", json={"stage": "applied"})
 
-    assert response.json()["status"] == "applied"
+    assert response.json()["stage"] == "applied"
     assert response.json()["note"] == "Recruiter reached out"
 
 
-@pytest.mark.parametrize("status", get_args(TrackStatus))
-def test_the_database_accepts_every_status_the_api_does(session, posting_ids, status):
+@pytest.mark.parametrize("stage", get_args(Stage))
+def test_the_database_accepts_every_stage_the_api_does(session, posting_ids, stage):
     user = User(email="ada@example.com", password_hash="not a real hash")
     session.add(user)
     session.flush()
-    session.add(Tracked(user_id=user.id, posting_id=posting_ids[0], status=status, note=""))
+    session.add(Tracked(user_id=user.id, posting_id=posting_ids[0], stage=stage, note=""))
     session.flush()
 
 

@@ -26,7 +26,7 @@ touch the database take the `session` fixture, which rolls back.
 - A test pins the exact result (`==` on the whole list or value), so a plausible wrong
   implementation fails it.
 - A column with a fixed set of values is a `Literal` plus a `CheckConstraint`, like
-  `Tracked.status`. Alembic autogenerate misses a changed CHECK, so changing the `Literal` needs a
+  `Tracked.stage`. Alembic autogenerate misses a changed CHECK, so changing the `Literal` needs a
   hand-written migration step.
 - Migrations start from `uv run alembic revision --autogenerate -m "..."`, then get read and
   edited.
