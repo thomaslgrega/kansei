@@ -1,4 +1,4 @@
-import type { Tracked } from './TrackedPostings'
+import type { Tracked } from './Tracker'
 
 export type TrackControls = {
     ids: Set<number>

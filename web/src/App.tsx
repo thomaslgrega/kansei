@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Route, Routes } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router'
 import { type Board, boardKey, latestOnly } from './boards'
 import Following from './Following'
 import Header from './Header'
@@ -10,7 +10,7 @@ import Signup from './Signup'
 import Title from './Title'
 import { whilePending } from './pending'
 import { trackedRowId, withoutPosting } from './tracked'
-import TrackedPostings, { type Tracked } from './TrackedPostings'
+import Tracker, { type Tracked } from './Tracker'
 
 type User = { id: number; email: string }
 
@@ -141,13 +141,14 @@ export default function App() {
       <Routes>
         <Route path="/" element={home} />
         <Route
-          path="/tracked"
+          path="/tracker"
           element={
             <RequireLogin loggedIn={session !== null}>
-              {session && <TrackedPostings tracked={session.tracked} />}
+              {session && <Tracker tracked={session.tracked} />}
             </RequireLogin>
           }
         />
+        <Route path="/tracked" element={<Navigate to="/tracker" replace />} />
         <Route
           path="/following"
           element={
