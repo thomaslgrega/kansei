@@ -25,8 +25,8 @@ from kansei.db import (
     Follow,
     Posting,
     SessionDep,
+    Stage,
     Tracked,
-    TrackStatus,
 )
 from kansei.llm import PostingFacts, prompt_snapshot
 from kansei.ratelimit import PROBE_PER_USER, Now, rate_limit
@@ -155,12 +155,12 @@ def get_posting(posting_id: int, session: SessionDep) -> PostingDetail:
 
 class TrackIn(BaseModel):
     posting_id: int
-    status: TrackStatus = "saved"
+    stage: Stage = "saved"
     note: str = Field("", max_length=2000)
 
 
 class TrackUpdate(BaseModel):
-    status: TrackStatus | None = None
+    stage: Stage | None = None
     note: str | None = Field(None, max_length=2000)
 
 
@@ -168,7 +168,7 @@ class TrackedOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    status: TrackStatus
+    stage: Stage
     note: str
     created_at: datetime
     posting: PostingOut

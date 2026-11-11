@@ -5,7 +5,7 @@ import type { Tracked } from './TrackedPostings'
 function row(id: number, postingId: number): Tracked {
     return {
         id,
-        status: 'saved',
+        stage: 'saved',
         note: '',
         posting: { id: postingId, title: `Posting ${postingId}`, url: '', location: 'Tokyo', first_seen_at: '', listed: true },
     }
