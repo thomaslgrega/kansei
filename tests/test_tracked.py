@@ -104,6 +104,27 @@ def test_a_tracked_posting_with_no_extraction_has_null_facts(client, log_in_as, 
     assert [row["facts"] for row in response.json()] == [None]
 
 
+def test_facts_that_dont_fit_the_current_schema_are_null_without_breaking_the_list(
+    client, session, log_in_as, posting_ids
+):
+    old_schema = FACTS.model_dump(mode="json", exclude={"remote_policy"})
+    session.add_all([
+        make_extraction(posting_ids[0], 5, "Fits."),
+        make_extraction(posting_ids[1], 5, "Old schema.", prompt_sha="70b7a0b0", facts=old_schema),
+    ])
+    session.flush()
+    log_in_as("ada@example.com")
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[1]})
+
+    response = client.get("/api/me/tracked")
+
+    assert [(row["posting"]["id"], row["facts"]) for row in response.json()] == [
+        (posting_ids[1], None),
+        (posting_ids[0], FACTS.model_copy(update={"role_summary": "Fits."}).model_dump(mode="json")),
+    ]
+
+
 def test_tracking_a_posting_that_is_no_longer_listed_says_so(client, log_in_as, posting_ids):
     log_in_as("ada@example.com")
 

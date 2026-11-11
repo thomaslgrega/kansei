@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import Select, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
@@ -185,6 +185,14 @@ def select_tracked(user_id: int) -> Select[tuple[Tracked, dict | None]]:
     return select(Tracked, newest_facts).where(Tracked.user_id == user_id)
 
 
+def facts_or_none(facts: dict | None) -> PostingFacts | None:
+    # An extraction under an older prompt may not fit the current schema.
+    try:
+        return None if facts is None else PostingFacts.model_validate(facts)
+    except ValidationError:
+        return None
+
+
 def tracked_out(tracked: Tracked, facts: dict | None) -> TrackedOut:
     return TrackedOut(
         id=tracked.id,
@@ -192,7 +200,7 @@ def tracked_out(tracked: Tracked, facts: dict | None) -> TrackedOut:
         note=tracked.note,
         created_at=tracked.created_at,
         posting=PostingOut.model_validate(tracked.posting),
-        facts=facts,
+        facts=facts_or_none(facts),
     )
 
 
