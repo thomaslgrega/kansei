@@ -101,7 +101,7 @@ export default function Tracker({ tracked, onMove }: Props) {
                         </span>
                         <CompanyLogo company={row.posting.company} logoUrl={row.posting.logo_url} />
                         <div className="tracker-title">
-                            <a href={row.posting.url} target="_blank">
+                            <a href={row.posting.url} target="_blank" title={row.posting.title}>
                                 {row.posting.title}
                             </a>
                             {!row.posting.listed && <span className="unlisted">No longer listed</span>}
