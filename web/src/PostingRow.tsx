@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
-import { type ChipFacts, postingChips } from './chips'
+import type { ChipFacts } from './chips'
+import PostingChips from './PostingChips'
 import CompanyLogo from './CompanyLogo'
 import { firstSeenAgo } from './firstSeen'
 import NewBadge from './NewBadge'
@@ -48,13 +49,7 @@ export default function PostingRow({ posting, facts, actions, companyAction }: P
                     </time>
                 </p>
                 <p className="muted">{facts.role_summary}</p>
-                <ul className="chips">
-                    {postingChips(facts).map((chip, index) => (
-                        <li key={index} className={chip.kind === 'japanese' ? `chip japanese japanese-${chip.requirement}` : `chip ${chip.kind}`}>
-                            {chip.label}
-                        </li>
-                    ))}
-                </ul>
+                <PostingChips facts={facts} />
             </div>
             {actions && <div className="posting-actions">{actions}</div>}
         </li>
