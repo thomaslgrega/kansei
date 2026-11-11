@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { applyMove, trackedRowId, withoutPosting, withRow } from './tracked'
+import { applyMove, asksBeforeUntrackingPosting, trackedRowId, withoutPosting, withRow } from './tracked'
 import type { Tracked } from './Tracker'
 
 function row(id: number, postingId: number): Tracked {
@@ -59,5 +59,22 @@ test('a picked move shows at once: a stage unarchives, archiving keeps the stage
     expect([applyMove(archived, { stage: 'offer' }), applyMove(row(2, 20), { archived: true })]).toEqual([
         { ...archived, stage: 'offer', archived: false },
         { ...row(2, 20), archived: true },
+    ])
+})
+
+test('untracking by posting id asks by that posting row, and an untracked posting never asks', () => {
+    const tracked = [
+        row(1, 10),
+        { ...row(2, 20), stage: 'applied' as const },
+        { ...row(3, 30), note: 'Ask about visa' },
+        { ...row(4, 40), archived: true },
+    ]
+
+    expect([10, 20, 30, 40, 50].map((postingId) => asksBeforeUntrackingPosting(tracked, postingId))).toEqual([
+        false,
+        true,
+        true,
+        true,
+        false,
     ])
 })

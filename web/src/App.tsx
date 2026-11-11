@@ -9,7 +9,7 @@ import RequireLogin from './RequireLogin'
 import Signup from './Signup'
 import Title from './Title'
 import { whilePending } from './pending'
-import { applyMove, trackedRowId, withoutPosting, withRow } from './tracked'
+import { applyMove, asksBeforeUntrackingPosting, trackedRowId, withoutPosting, withRow } from './tracked'
 import Tracker, { type Move, type Tracked } from './Tracker'
 
 type User = { id: number; email: string }
@@ -152,6 +152,7 @@ export default function App() {
   const tracking = session && {
     ids: new Set(session.tracked.map((row) => row.posting.id)),
     pending: pendingTracks,
+    asksBeforeUntrackingPosting: (postingId: number) => asksBeforeUntrackingPosting(session.tracked, postingId),
     track,
     untrack,
   }

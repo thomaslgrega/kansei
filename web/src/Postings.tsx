@@ -6,6 +6,7 @@ import { capitalize, JAPANESE_CHOICES, japaneseRequirement, passesJapanese, read
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo, lastChecked } from "./checked";
 import type { TrackControls } from "./tracked";
+import UntrackConfirm from "./UntrackConfirm";
 
 type Row = {
     posting: Posting
@@ -58,22 +59,6 @@ export default function Postings({ followingOnly = false, tracking, following }:
     const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
     const checkedAt = followingOnly ? null : lastChecked(rows)
 
-    function postingAction(posting: Posting) {
-        if (!tracking) return null
-        const isTracked = tracking.ids.has(posting.id)
-        return (
-            <button
-                className={isTracked ? 'track tracked' : 'track'}
-                aria-pressed={isTracked}
-                aria-label={isTracked ? `Untrack ${posting.title}` : `Track ${posting.title}`}
-                disabled={tracking.pending.has(posting.id)}
-                onClick={() => isTracked ? tracking.untrack(posting.id) : tracking.track(posting.id)}
-            >
-                {isTracked ? '✓ Tracked' : 'Track'}
-            </button>
-        )
-    }
-
     function companyAction(posting: Posting) {
         if (!following || !posting.has_board) return null
         const key = boardKey(posting)
@@ -120,9 +105,52 @@ export default function Postings({ followingOnly = false, tracking, following }:
             </div>
             <ul className="postings">
                 {visible.map(({ posting, facts }) => (
-                    <PostingRow key={posting.id} posting={posting} facts={facts} actions={postingAction(posting)} companyAction={companyAction(posting)} />
+                    <PostingRow
+                        key={posting.id}
+                        posting={posting}
+                        facts={facts}
+                        actions={tracking && <TrackToggle posting={posting} tracking={tracking} />}
+                        companyAction={companyAction(posting)}
+                    />
                 ))}
             </ul>
         </section>
+    )
+}
+
+function TrackToggle({ posting, tracking }: { posting: Posting; tracking: TrackControls }) {
+    const [confirming, setConfirming] = useState(false)
+    const isTracked = tracking.ids.has(posting.id)
+
+    if (confirming && isTracked) {
+        return (
+            <UntrackConfirm
+                onUntrack={() => {
+                    setConfirming(false)
+                    tracking.untrack(posting.id)
+                }}
+                onKeep={() => setConfirming(false)}
+            />
+        )
+    }
+
+    function toggle() {
+        if (!isTracked) {
+            setConfirming(false)
+            tracking.track(posting.id)
+        } else if (tracking.asksBeforeUntrackingPosting(posting.id)) setConfirming(true)
+        else tracking.untrack(posting.id)
+    }
+
+    return (
+        <button
+            className={isTracked ? 'track tracked' : 'track'}
+            aria-pressed={isTracked}
+            aria-label={isTracked ? `Untrack ${posting.title}` : `Track ${posting.title}`}
+            disabled={tracking.pending.has(posting.id)}
+            onClick={toggle}
+        >
+            {isTracked ? '✓ Tracked' : 'Track'}
+        </button>
     )
 }

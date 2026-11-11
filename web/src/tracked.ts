@@ -1,14 +1,25 @@
 import type { Move, Tracked } from './Tracker'
+import { asksBeforeUntrack } from './trackerView'
 
 export type TrackControls = {
     ids: Set<number>
     pending: Set<number>
+    asksBeforeUntrackingPosting: (postingId: number) => boolean
     track: (postingId: number) => void
     untrack: (postingId: number) => void
 }
 
+function rowFor(tracked: Tracked[], postingId: number): Tracked | undefined {
+    return tracked.find((row) => row.posting.id === postingId)
+}
+
 export function trackedRowId(tracked: Tracked[], postingId: number): number | null {
-    return tracked.find((row) => row.posting.id === postingId)?.id ?? null
+    return rowFor(tracked, postingId)?.id ?? null
+}
+
+export function asksBeforeUntrackingPosting(tracked: Tracked[], postingId: number): boolean {
+    const row = rowFor(tracked, postingId)
+    return row !== undefined && asksBeforeUntrack(row)
 }
 
 export function withoutPosting(tracked: Tracked[], postingId: number): Tracked[] {
