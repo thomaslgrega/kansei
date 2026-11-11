@@ -78,15 +78,19 @@ def test_a_tracked_posting_carries_the_facts_of_its_newest_extraction_under_any_
         make_extraction(posting_ids[0], 5, "Current model and prompt."),
         make_extraction(posting_ids[0], 6, "Old prompt.", prompt_sha="70b7a0b0"),
         make_extraction(posting_ids[0], 7, "Other model.", model="gpt-5.6-luna"),
-        make_extraction(posting_ids[1], 5, "Another posting."),
+        make_extraction(posting_ids[1], 5, "Current model and prompt."),
+        make_extraction(posting_ids[1], 6, "Old prompt.", prompt_sha="70b7a0b0"),
+        make_extraction(posting_ids[2], 5, "Untracked posting."),
     ])
     session.flush()
     log_in_as("ada@example.com")
     client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[1]})
 
     response = client.get("/api/me/tracked")
 
     assert [row["facts"] for row in response.json()] == [
+        FACTS.model_copy(update={"role_summary": "Old prompt."}).model_dump(mode="json"),
         FACTS.model_copy(update={"role_summary": "Other model."}).model_dump(mode="json"),
     ]
 

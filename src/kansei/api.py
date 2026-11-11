@@ -175,14 +175,14 @@ class TrackedOut(BaseModel):
 
 def select_tracked(user_id: int) -> Select[tuple[Tracked, dict | None]]:
     # Any model or prompt: a tracked posting that stopped being listed is never extracted again.
-    facts = (
+    newest_facts = (
         select(Extraction.facts)
         .where(Extraction.posting_id == Tracked.posting_id)
         .order_by(Extraction.created_at.desc(), Extraction.id.desc())
         .limit(1)
         .scalar_subquery()
     )
-    return select(Tracked, facts).where(Tracked.user_id == user_id)
+    return select(Tracked, newest_facts).where(Tracked.user_id == user_id)
 
 
 def tracked_out(tracked: Tracked, facts: dict | None) -> TrackedOut:
