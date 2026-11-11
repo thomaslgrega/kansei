@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import CompanyLogo from './CompanyLogo'
+import Dropdown, { type DropdownOption } from './Dropdown'
 import type { Facts, Posting } from './PostingRow'
 import { allPostingChips } from './chips'
 import PostingChips from './PostingChips'
@@ -8,16 +9,23 @@ import Title from './Title'
 import {
     archivedOptionLabel,
     asksBeforeUntrack,
+    clickSort,
     disabledFilters,
     emptyMessage,
     FILTERS,
     filterCounts,
+    flipOrder,
     inOrder,
     LABELS,
     matchesFilter,
+    type Order,
+    orderLabel,
+    pickSort,
     readTrackerView,
+    type Sort,
     type Stage,
     STAGES,
+    type TrackerView,
     trackerViewToSearch,
     viewRows,
 } from './trackerView'
@@ -42,6 +50,36 @@ type Props = {
     onUntrack: (postingId: number) => void
 }
 
+const SORT_OPTIONS: DropdownOption<Sort>[] = [
+    { value: 'moved', label: 'Moved', hint: 'When the stage last changed' },
+    { value: 'company', label: 'Company', hint: 'By company name' },
+    { value: 'stage', label: 'Stage', hint: 'Saved through Offer' },
+]
+
+function arrow(order: Order): string {
+    return order === 'asc' ? '▲' : '▼'
+}
+
+type SortHeaderProps = { column: Sort; label: string; view: TrackerView; onSort: (column: Sort) => void }
+
+function SortHeader({ column, label, view, onSort }: SortHeaderProps) {
+    const active = column === view.sort
+    return (
+        <button
+            type="button"
+            className={`tracker-sort tracker-sort-${column}`}
+            aria-pressed={active}
+            title={active ? orderLabel(view.sort, view.order) : undefined}
+            onClick={() => onSort(column)}
+        >
+            {label}
+            <span className="tracker-sort-arrow" aria-hidden="true">
+                {active && arrow(view.order)}
+            </span>
+        </button>
+    )
+}
+
 function day(iso: string): string {
     return new Date(iso).toLocaleDateString('en-CA')
 }
@@ -58,6 +96,8 @@ export default function Tracker({ tracked, onMove, onNote, onUntrack }: Props) {
         ids = viewRows(tracked, view).map((row) => row.id)
         setHeldOrder({ viewKey, ids })
     }
+    const show = (next: TrackerView) => setSearchParams(trackerViewToSearch(next), { replace: true })
+    const onSort = (column: Sort) => show(clickSort(view, column))
     const rows = inOrder(ids, tracked)
     const counts = filterCounts(tracked)
     const disabled = disabledFilters(counts, view.stage)
@@ -82,18 +122,30 @@ export default function Tracker({ tracked, onMove, onNote, onUntrack }: Props) {
                         className={`stage-filter stage-${filter}`}
                         aria-pressed={filter === view.stage}
                         disabled={disabled.includes(filter)}
-                        onClick={() => setSearchParams(trackerViewToSearch({ ...view, stage: filter }), { replace: true })}
+                        onClick={() => show({ ...view, stage: filter })}
                     >
                         <span className="stage-filter-count">{counts[filter] || '– –'}</span>
                         <span className="stage-filter-label">{LABELS[filter]}</span>
                     </button>
                 ))}
             </div>
+            <div className="tracker-sortbar">
+                <Dropdown label="Sort by" options={SORT_OPTIONS} value={view.sort} onChange={(sort) => show(pickSort(view, sort))} />
+                <button
+                    type="button"
+                    className="tracker-sort-flip"
+                    aria-label={orderLabel(view.sort, view.order)}
+                    title={orderLabel(view.sort, view.order)}
+                    onClick={() => show(flipOrder(view))}
+                >
+                    {arrow(view.order)}
+                </button>
+            </div>
             <div className="tracker-header">
                 <span className="tracker-header-posting">Posting</span>
-                <span>Company</span>
-                <span>Stage</span>
-                <span>Moved</span>
+                <SortHeader column="company" label="Company" view={view} onSort={onSort} />
+                <SortHeader column="stage" label="Stage" view={view} onSort={onSort} />
+                <SortHeader column="moved" label="Moved" view={view} onSort={onSort} />
             </div>
             {tracked.length === 0 ? (
                 <p className="tracker-empty">

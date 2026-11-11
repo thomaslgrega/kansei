@@ -2,22 +2,38 @@ import { expect, test } from 'vitest'
 import {
     archivedOptionLabel,
     asksBeforeUntrack,
+    clickSort,
     disabledFilters,
     emptyMessage,
     type Filter,
     FILTERS,
     filterCounts,
+    flipOrder,
     inOrder,
+    type Order,
+    orderLabel,
+    pickSort,
     readTrackerView,
+    type Sort,
+    SORTS,
     type Stage,
+    type TrackerView,
     trackerViewToSearch,
     viewRows,
 } from './trackerView'
 
-type Row = { id: number; stage: Stage; archived: boolean; moved_at: string }
+type Row = { id: number; stage: Stage; archived: boolean; moved_at: string; posting: { company: string } }
 
-function row(id: number, stage: Stage, archived: boolean, moved_at: string): Row {
-    return { id, stage, archived, moved_at }
+function row(id: number, stage: Stage, archived: boolean, moved_at: string, company = 'Acme'): Row {
+    return { id, stage, archived, moved_at, posting: { company } }
+}
+
+function view(stage: Filter, sort: Sort = 'moved', order: Order = 'desc'): TrackerView {
+    return { stage, sort, order }
+}
+
+function read(search: string): TrackerView {
+    return readTrackerView(new URLSearchParams(search))
 }
 
 const rows = [
@@ -32,30 +48,25 @@ const rows = [
 test('reads the stage filter from the query string', () => {
     const searches = ['?stage=saved', '?stage=applied', '?stage=interviewing', '?stage=offer', '?stage=archived', '?stage=all', '']
 
-    expect(searches.map((search) => readTrackerView(new URLSearchParams(search)))).toEqual([
-        { stage: 'saved' },
-        { stage: 'applied' },
-        { stage: 'interviewing' },
-        { stage: 'offer' },
-        { stage: 'archived' },
-        { stage: 'all' },
-        { stage: 'all' },
+    expect(searches.map(read)).toEqual([
+        view('saved'),
+        view('applied'),
+        view('interviewing'),
+        view('offer'),
+        view('archived'),
+        view('all'),
+        view('all'),
     ])
 })
 
 test('an unknown stage reads as all', () => {
     const searches = ['?stage=rejected', '?stage=Saved', '?stage=toString', '?stage=']
 
-    expect(searches.map((search) => readTrackerView(new URLSearchParams(search)))).toEqual([
-        { stage: 'all' },
-        { stage: 'all' },
-        { stage: 'all' },
-        { stage: 'all' },
-    ])
+    expect(searches.map(read)).toEqual([view('all'), view('all'), view('all'), view('all')])
 })
 
 test('writes the stage filter to the query string and leaves all out', () => {
-    expect(FILTERS.map((stage) => trackerViewToSearch({ stage }))).toEqual([
+    expect(FILTERS.map((stage) => trackerViewToSearch(view(stage)))).toEqual([
         '',
         'stage=saved',
         'stage=applied',
@@ -66,7 +77,7 @@ test('writes the stage filter to the query string and leaves all out', () => {
 })
 
 test('each filter keeps its rows, moved newest first, and archived mixes stages', () => {
-    const ids = (stage: Filter) => viewRows(rows, { stage }).map((row) => row.id)
+    const ids = (stage: Filter) => viewRows(rows, view(stage)).map((row) => row.id)
 
     expect(FILTERS.map((stage) => [stage, ids(stage)])).toEqual([
         ['all', [6, 2, 4, 1]],
@@ -78,10 +89,187 @@ test('each filter keeps its rows, moved newest first, and archived mixes stages'
     ])
 })
 
-test('rows moved at the same moment keep the newest id first', () => {
+test('rows moved at the same moment keep the newest id first, and oldest first reverses that', () => {
     const tied = [row(1, 'saved', false, '2026-11-01T09:00:00Z'), row(3, 'saved', false, '2026-11-01T09:00:00Z'), row(2, 'saved', false, '2026-11-01T09:00:00Z')]
+    const ids = (order: Order) => viewRows(tied, view('all', 'moved', order)).map((row) => row.id)
 
-    expect(viewRows(tied, { stage: 'all' }).map((row) => row.id)).toEqual([3, 2, 1])
+    expect([ids('desc'), ids('asc')]).toEqual([
+        [3, 2, 1],
+        [1, 2, 3],
+    ])
+})
+
+test('reads the sort and its order from the query string', () => {
+    const searches = [
+        '?sort=company',
+        '?sort=company&order=desc',
+        '?sort=stage',
+        '?sort=stage&order=desc',
+        '?sort=moved',
+        '?order=asc',
+        '?stage=offer&sort=company&order=desc',
+    ]
+
+    expect(searches.map(read)).toEqual([
+        view('all', 'company', 'asc'),
+        view('all', 'company', 'desc'),
+        view('all', 'stage', 'asc'),
+        view('all', 'stage', 'desc'),
+        view('all', 'moved', 'desc'),
+        view('all', 'moved', 'asc'),
+        view('offer', 'company', 'desc'),
+    ])
+})
+
+test("an unknown sort reads as moved, and an unknown order as the sort's first-click direction", () => {
+    const searches = ['?sort=title', '?sort=Company', '?sort=', '?sort=company&order=up', '?sort=stage&order=', '?sort=title&order=asc']
+
+    expect(searches.map(read)).toEqual([
+        view('all', 'moved', 'desc'),
+        view('all', 'moved', 'desc'),
+        view('all', 'moved', 'desc'),
+        view('all', 'company', 'asc'),
+        view('all', 'stage', 'asc'),
+        view('all', 'moved', 'asc'),
+    ])
+})
+
+test("writes the sort and order, leaving out moved and each sort's first-click direction", () => {
+    const views = [
+        view('all', 'moved', 'desc'),
+        view('all', 'moved', 'asc'),
+        view('all', 'company', 'asc'),
+        view('all', 'company', 'desc'),
+        view('all', 'stage', 'asc'),
+        view('all', 'stage', 'desc'),
+        view('offer', 'stage', 'desc'),
+    ]
+
+    expect(views.map(trackerViewToSearch)).toEqual([
+        '',
+        'order=asc',
+        'sort=company',
+        'sort=company&order=desc',
+        'sort=stage',
+        'sort=stage&order=desc',
+        'stage=offer&sort=stage&order=desc',
+    ])
+})
+
+test('every view reads back as written', () => {
+    const views = FILTERS.flatMap((stage) => SORTS.flatMap((sort) => (['asc', 'desc'] as Order[]).map((order) => view(stage, sort, order))))
+
+    expect(views.map((written) => read(trackerViewToSearch(written)))).toEqual(views)
+})
+
+const sortable = [
+    row(1, 'saved', false, '2026-11-01T09:00:00Z', 'Mercari'),
+    row(2, 'applied', false, '2026-11-05T09:00:00Z', 'freee'),
+    row(3, 'offer', false, '2026-11-03T09:00:00Z', 'Mercari'),
+    row(4, 'saved', false, '2026-11-04T09:00:00Z', 'Sansan'),
+    row(5, 'applied', false, '2026-11-02T09:00:00Z', 'Mercari'),
+    row(6, 'interviewing', false, '2026-11-06T09:00:00Z', 'freee'),
+]
+
+test('each sort runs both ways, and ties stay moved newest first', () => {
+    const ids = (sort: Sort, order: Order) => viewRows(sortable, view('all', sort, order)).map((row) => row.id)
+
+    expect(SORTS.flatMap((sort) => [[sort, 'asc', ids(sort, 'asc')], [sort, 'desc', ids(sort, 'desc')]])).toEqual([
+        ['moved', 'asc', [1, 5, 3, 4, 2, 6]],
+        ['moved', 'desc', [6, 2, 4, 3, 5, 1]],
+        ['company', 'asc', [6, 2, 3, 5, 1, 4]],
+        ['company', 'desc', [4, 3, 5, 1, 6, 2]],
+        ['stage', 'asc', [4, 1, 2, 5, 6, 3]],
+        ['stage', 'desc', [3, 6, 2, 5, 4, 1]],
+    ])
+})
+
+test('company names sort Latin first, then kana by reading, then kanji', () => {
+    const companies = [
+        'ビジョナル株式会社',
+        'freee',
+        'Mercari',
+        '株式会社メルカリ',
+        'SmartHR',
+        'アンドパッド',
+        'LINEヤフー',
+        'Sansan',
+        'エムスリー',
+        'ab inc',
+        'Zeals',
+        'さくらインターネット',
+    ]
+    const named = companies.map((company, index) => row(index + 1, 'saved', false, '2026-11-01T09:00:00Z', company))
+
+    expect(viewRows(named, view('all', 'company', 'asc')).map((row) => row.posting.company)).toEqual([
+        'ab inc',
+        'freee',
+        'LINEヤフー',
+        'Mercari',
+        'Sansan',
+        'SmartHR',
+        'Zeals',
+        'アンドパッド',
+        'エムスリー',
+        'さくらインターネット',
+        'ビジョナル株式会社',
+        '株式会社メルカリ',
+    ])
+})
+
+test('a header click sorts a new column its first way and reverses the active one', () => {
+    expect([
+        clickSort(view('saved', 'moved', 'desc'), 'moved'),
+        clickSort(view('saved', 'moved', 'asc'), 'moved'),
+        clickSort(view('saved', 'moved', 'asc'), 'company'),
+        clickSort(view('saved', 'company', 'asc'), 'company'),
+        clickSort(view('saved', 'company', 'desc'), 'company'),
+        clickSort(view('saved', 'company', 'desc'), 'stage'),
+        clickSort(view('saved', 'stage', 'desc'), 'moved'),
+    ]).toEqual([
+        view('saved', 'moved', 'asc'),
+        view('saved', 'moved', 'desc'),
+        view('saved', 'company', 'asc'),
+        view('saved', 'company', 'desc'),
+        view('saved', 'company', 'asc'),
+        view('saved', 'stage', 'asc'),
+        view('saved', 'moved', 'desc'),
+    ])
+})
+
+test('picking a sort from the menu uses its first way, and picking the active one changes nothing', () => {
+    expect([
+        pickSort(view('offer', 'moved', 'asc'), 'company'),
+        pickSort(view('offer', 'company', 'desc'), 'stage'),
+        pickSort(view('offer', 'stage', 'desc'), 'moved'),
+        pickSort(view('offer', 'company', 'desc'), 'company'),
+        pickSort(view('offer', 'moved', 'asc'), 'moved'),
+    ]).toEqual([
+        view('offer', 'company', 'asc'),
+        view('offer', 'stage', 'asc'),
+        view('offer', 'moved', 'desc'),
+        view('offer', 'company', 'desc'),
+        view('offer', 'moved', 'asc'),
+    ])
+})
+
+test('the direction button reverses the order and keeps the sort', () => {
+    expect([
+        flipOrder(view('archived', 'moved', 'desc')),
+        flipOrder(view('archived', 'company', 'asc')),
+        flipOrder(view('archived', 'stage', 'desc')),
+    ]).toEqual([view('archived', 'moved', 'asc'), view('archived', 'company', 'desc'), view('archived', 'stage', 'asc')])
+})
+
+test('each direction has a name', () => {
+    expect(SORTS.flatMap((sort) => [orderLabel(sort, 'asc'), orderLabel(sort, 'desc')])).toEqual([
+        'Oldest first',
+        'Newest first',
+        'A to Z',
+        'Z to A',
+        'Saved first',
+        'Offer first',
+    ])
 })
 
 test('all and the stages count unarchived rows, and archived counts the rest', () => {

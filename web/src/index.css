@@ -474,6 +474,59 @@ li {
   grid-column: 1 / 4;
 }
 
+.tracker-sort {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.tracker-sort:hover,
+.tracker-sort[aria-pressed="true"] {
+  color: CanvasText;
+}
+
+.tracker-sort-arrow {
+  font-size: 0.6rem;
+}
+
+.tracker-sortbar {
+  display: none;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.tracker-sortbar .dropdown {
+  flex: 1;
+}
+
+.tracker-sortbar .dropdown-trigger {
+  width: 100%;
+}
+
+.tracker-sortbar .dropdown-chevron {
+  margin-left: auto;
+}
+
+.tracker-sort-flip {
+  flex: none;
+  width: 2.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: none;
+  color: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
 .tracker-empty {
   margin: 1.25rem 0;
   color: var(--muted);
@@ -716,6 +769,10 @@ li {
   .tracker-header,
   .tracker-moved {
     display: none;
+  }
+
+  .tracker-sortbar {
+    display: flex;
   }
 
   .tracker-row {
