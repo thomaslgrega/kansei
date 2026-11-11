@@ -68,13 +68,24 @@ test('the link between login and signup carries next over unchanged', () => {
 })
 
 test('after signup, goes to a safe next, or else to Following', () => {
-    const next = [null, '', '/', '/tracker?status=applied#12', '//evil.example', '/login']
+    const next = [
+        null,
+        '',
+        '/',
+        '/tracker?status=applied#12',
+        '//evil.example',
+        '/\\evil.example',
+        'https://evil.example/',
+        '/login',
+    ]
 
     expect(next.map(afterSignup)).toEqual([
         '/following',
         '/following',
         '/',
         '/tracker?status=applied#12',
+        '/following',
+        '/following',
         '/following',
         '/following',
     ])
