@@ -24,6 +24,22 @@ _Avoid_: Closed, expired
 A user's choice to see one board's candidates on their own page.
 _Avoid_: Subscription, watch, favorite
 
+**Tracked posting**:
+A posting a user keeps in their tracker, with its stage and a note. Untracking deletes it.
+_Avoid_: Application, saved job, job, bookmark
+
+**Stage**:
+How far a user has got with a tracked posting: saved, applied, interviewing or offer. Archiving doesn't change it.
+_Avoid_: Status, step, phase
+
+**Archived**:
+Said of a tracked posting the user is no longer pursuing, for any reason: the company turned them down, they withdrew, the company never replied, or they lost interest. It keeps its stage.
+_Avoid_: Rejected, closed, inactive
+
+**Moved**:
+The last time a user changed a tracked posting's stage, or archived or unarchived it. Editing the note doesn't move it.
+_Avoid_: Updated, last activity, stage changed
+
 **Extraction**:
 The facts the model read out of one posting's text, stored with that exact text, the model and the prompt.
 _Avoid_: Summary, parse
