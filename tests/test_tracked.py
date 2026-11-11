@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import get_args
 
 import pytest
+from conftest import Clock
 from sqlalchemy.exc import IntegrityError
 from test_api import FACTS, make_extraction
 
@@ -41,7 +42,7 @@ def test_tracking_the_same_posting_twice_is_409(client, log_in_as, posting_ids):
     assert response.status_code == 409
 
 
-def test_a_user_sees_only_their_own_tracked_postings_moved_newest_first(client, log_in_as, posting_ids):
+def test_a_user_sees_only_their_own_tracked_postings_newest_first(client, log_in_as, posting_ids):
     log_in_as("bob@example.com")
     client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
     log_in_as("ada@example.com")
@@ -126,7 +127,7 @@ def test_facts_that_dont_fit_the_current_schema_are_null_without_breaking_the_li
     ]
 
 
-def dates(row: dict) -> dict:
+def tracked_fields(row: dict) -> dict:
     return {
         "id": row["id"],
         "stage": row["stage"],
@@ -143,7 +144,7 @@ def test_tracking_starts_at_saved_with_both_dates_now(client, clock, log_in_as, 
     response = client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
 
     assert response.status_code == 201
-    assert dates(response.json()) == {
+    assert tracked_fields(response.json()) == {
         "id": response.json()["id"],
         "stage": "saved",
         "archived": False,
@@ -167,7 +168,7 @@ def test_the_list_shows_stage_archived_and_both_dates_moved_newest_first(client,
 
     response = client.get("/api/me/tracked")
 
-    assert [dates(row) for row in response.json()] == [
+    assert [tracked_fields(row) for row in response.json()] == [
         {
             "id": ids[1],
             "stage": "saved",
@@ -204,7 +205,7 @@ def test_tracked_postings_that_moved_at_the_same_time_list_newest_id_first(clien
     assert [row["id"] for row in response.json()] == ids[::-1]
 
 
-TRACKED, EARLIER, NOW = (datetime(2026, 11, 10, 9, 0, 5, tzinfo=UTC) + timedelta(days=n) for n in range(3))
+TRACKED, EARLIER, NOW = (Clock().now + timedelta(days=n) for n in range(3))
 
 
 @pytest.mark.parametrize(("earlier", "patch", "expected"), [
@@ -247,7 +248,7 @@ def test_a_tracked_posting_moves_only_when_its_stage_or_archive_changes(
 
     response = client.patch(f"/api/me/tracked/{tracked}", json=patch)
 
-    row = dates(response.json())
+    row = tracked_fields(response.json())
     assert (row["stage"], row["archived"], row["note"], row["moved_at"]) == expected
     assert row["tracked_at"] == TRACKED
 
@@ -264,6 +265,23 @@ def test_rejected_is_no_longer_a_stage(client, log_in_as, posting_ids, method):
 
     assert response.status_code == 422
     assert [row["stage"] for row in client.get("/api/me/tracked").json()] == ["saved"]
+
+
+def test_a_note_holds_2000_characters_and_no_more(client, log_in_as, posting_ids):
+    log_in_as("ada@example.com")
+
+    posted = [
+        client.post("/api/me/tracked", json={"posting_id": posting_ids[0], "note": "x" * 2001}).status_code,
+        client.post("/api/me/tracked", json={"posting_id": posting_ids[0], "note": "x" * 2000}).status_code,
+    ]
+    tracked = client.get("/api/me/tracked").json()[0]["id"]
+    patched = [
+        client.patch(f"/api/me/tracked/{tracked}", json={"note": "y" * 2001}).status_code,
+        client.patch(f"/api/me/tracked/{tracked}", json={"note": "y" * 2000}).status_code,
+    ]
+
+    assert (posted, patched) == ([422, 201], [422, 200])
+    assert [row["note"] for row in client.get("/api/me/tracked").json()] == ["y" * 2000]
 
 
 def test_tracking_a_posting_that_is_no_longer_listed_says_so(client, log_in_as, posting_ids):
