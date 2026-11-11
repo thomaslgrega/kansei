@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { trackedRowId, withoutPosting } from './tracked'
-import type { Tracked } from './TrackedPostings'
+import type { Tracked } from './Tracker'
 
 function row(id: number, postingId: number): Tracked {
     return {

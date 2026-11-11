@@ -4,17 +4,17 @@ import { loginHref, returnTo } from './loginRedirect'
 test('the login link remembers the page it was followed from', () => {
     const pages = [
         { pathname: '/', search: '', hash: '' },
-        { pathname: '/tracked', search: '', hash: '' },
-        { pathname: '/tracked', search: '?status=applied', hash: '#12' },
-        { pathname: '/login', search: '?next=%2Ftracked', hash: '' },
+        { pathname: '/tracker', search: '', hash: '' },
+        { pathname: '/tracker', search: '?status=applied', hash: '#12' },
+        { pathname: '/login', search: '?next=%2Ftracker', hash: '' },
         { pathname: '/login', search: '', hash: '' },
     ]
 
     expect(pages.map(loginHref)).toEqual([
         '/login',
-        '/login?next=%2Ftracked',
-        '/login?next=%2Ftracked%3Fstatus%3Dapplied%2312',
-        '/login?next=%2Ftracked',
+        '/login?next=%2Ftracker',
+        '/login?next=%2Ftracker%3Fstatus%3Dapplied%2312',
+        '/login?next=%2Ftracker',
         '/login',
     ])
 })
@@ -24,20 +24,22 @@ test('after login, returns only to a page on this site, and never to login itsel
         null,
         '',
         '/',
-        '/tracked?status=applied#12',
+        '/tracker?status=applied#12',
+        '/tracked',
         '//evil.example',
         '/\\evil.example',
         'https://evil.example/',
-        'tracked',
+        'tracker',
         '/login',
-        '/login?next=%2Ftracked',
+        '/login?next=%2Ftracker',
     ]
 
     expect(next.map(returnTo)).toEqual([
         '/',
         '/',
         '/',
-        '/tracked?status=applied#12',
+        '/tracker?status=applied#12',
+        '/tracked',
         '/',
         '/',
         '/',

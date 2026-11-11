@@ -13,11 +13,11 @@ type Props = {
     tracked: Tracked[]
 }
 
-export default function TrackedPostings({ tracked }: Props) {
+export default function Tracker({ tracked }: Props) {
     return (
         <main>
-            <Title>Tracked · kansei</Title>
-            <h1>Tracked postings</h1>
+            <Title>Tracker · kansei</Title>
+            <h1>Tracker</h1>
             {tracked.length === 0 && (
                 <p>
                     Nothing tracked yet. Track postings from the <Link to="/">postings list</Link>.
