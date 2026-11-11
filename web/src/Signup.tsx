@@ -1,5 +1,6 @@
 import { type SubmitEvent, useState } from 'react'
-import { Navigate } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
+import { afterSignup, authSwitchHref } from './loginRedirect'
 import { signupError } from './signupError'
 import Title from './Title'
 
@@ -10,8 +11,9 @@ type Props = {
 
 export default function Signup({ loggedIn, onSignedUp }: Props) {
     const [error, setError] = useState('')
+    const [params] = useSearchParams()
 
-    if (loggedIn) return <Navigate to="/following" replace />
+    if (loggedIn) return <Navigate to={afterSignup(params.get('next'))} replace />
 
     async function signUp(event: SubmitEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -46,6 +48,9 @@ export default function Signup({ loggedIn, onSignedUp }: Props) {
                 <button>Sign up</button>
                 {error && <p role="alert">{error}</p>}
             </form>
+            <p>
+                Have an account? <Link to={authSwitchHref('/login', params.get('next'))}>Log in</Link>
+            </p>
         </main>
     )
 }

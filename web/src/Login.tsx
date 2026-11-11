@@ -1,7 +1,7 @@
 import { type SubmitEvent, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
 import { loginError } from './loginError'
-import { returnTo } from './loginRedirect'
+import { authSwitchHref, returnTo } from './loginRedirect'
 import Title from './Title'
 
 type Props = {
@@ -40,6 +40,9 @@ export default function Login({ loggedIn, onLoggedIn }: Props) {
                 <button>Log in</button>
                 {error && <p role="alert">{error}</p>}
             </form>
+            <p>
+                New here? <Link to={authSwitchHref('/signup', params.get('next'))}>Create an account</Link>
+            </p>
         </main>
     )
 }
