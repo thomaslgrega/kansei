@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import CompanyLogo from './CompanyLogo'
 import type { Facts, Posting } from './PostingRow'
+import { allPostingChips } from './chips'
 import PostingChips from './PostingChips'
 import Title from './Title'
 import {
@@ -135,7 +136,15 @@ function TrackerRow({ row, faded, expanded, onToggle, onExpand, onMove, onNote, 
     const detailsId = `tracker-details-${row.id}`
 
     return (
-        <li className={`tracker-row${faded ? ' faded' : ''}${expanded ? ' expanded' : ''}`}>
+        <li
+            className={`tracker-row${faded ? ' faded' : ''}${expanded ? ' expanded' : ''}`}
+            onClick={(event) => {
+                // Controls, the company name and the open details keep their clicks; the chevron is the keyboard path.
+                if ((event.target as Element).closest('a, button, select, textarea, .tracker-company, .tracker-details')) return
+                if (window.getSelection()?.toString()) return
+                onToggle()
+            }}
+        >
             <button
                 type="button"
                 className="tracker-chevron"
@@ -205,7 +214,7 @@ function TrackerRow({ row, faded, expanded, onToggle, onExpand, onMove, onNote, 
                         Tracked <time dateTime={row.tracked_at}>{day(row.tracked_at)}</time> · Moved{' '}
                         <time dateTime={row.moved_at}>{day(row.moved_at)}</time>
                     </p>
-                    {row.facts && <PostingChips facts={row.facts} />}
+                    {row.facts && <PostingChips chips={allPostingChips(row.facts)} />}
                     <div className="tracker-actions">
                         <a href={row.posting.url} target="_blank">
                             Open posting

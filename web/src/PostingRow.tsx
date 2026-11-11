@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react'
-import type { ChipFacts } from './chips'
+import { type ChipFacts, postingChips } from './chips'
 import PostingChips from './PostingChips'
 import CompanyLogo from './CompanyLogo'
 import { firstSeenAgo } from './firstSeen'
@@ -49,7 +49,7 @@ export default function PostingRow({ posting, facts, actions, companyAction }: P
                     </time>
                 </p>
                 <p className="muted">{facts.role_summary}</p>
-                <PostingChips facts={facts} />
+                <PostingChips chips={postingChips(facts)} />
             </div>
             {actions && <div className="posting-actions">{actions}</div>}
         </li>

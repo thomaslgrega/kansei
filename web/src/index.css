@@ -490,6 +490,12 @@ li {
   padding: 0.7rem 0;
   border-bottom: 1px solid var(--line);
   overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.tracker-company,
+.tracker-details {
+  cursor: auto;
 }
 
 .tracker-row.faded {
@@ -568,6 +574,10 @@ li {
 
 .tracker-title a:hover {
   text-decoration: underline;
+}
+
+.tracker-row.expanded .tracker-title a {
+  white-space: normal;
 }
 
 .unlisted {
