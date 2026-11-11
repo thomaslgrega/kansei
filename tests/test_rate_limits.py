@@ -1,28 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from sqlalchemy import select
 
-from kansei.api import app
 from kansei.db import RateLimit
-from kansei.ratelimit import utcnow
 
 PASSWORD = "correct password"
-
-
-class Clock:
-    def __init__(self) -> None:
-        self.now = datetime(2026, 11, 10, 9, 0, 5, tzinfo=UTC)
-
-    def advance(self, by: timedelta) -> None:
-        self.now += by
-
-
-@pytest.fixture
-def clock(client):
-    clock = Clock()
-    app.dependency_overrides[utcnow] = lambda: clock.now
-    return clock
 
 
 def log_in(client, email: str = "ada@example.com", ip: str | None = None) -> int:

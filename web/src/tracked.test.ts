@@ -1,11 +1,12 @@
 import { expect, test } from 'vitest'
-import { trackedRowId, withoutPosting } from './tracked'
+import { stageLabel, trackedRowId, withoutPosting } from './tracked'
 import type { Tracked } from './Tracker'
 
 function row(id: number, postingId: number): Tracked {
     return {
         id,
         stage: 'saved',
+        archived: false,
         note: '',
         posting: { id: postingId, title: `Posting ${postingId}`, url: '', location: 'Tokyo', first_seen_at: '', listed: true },
     }
@@ -27,4 +28,12 @@ test('removing a posting that is not tracked changes nothing', () => {
     const tracked = [row(1, 10), row(2, 20)]
 
     expect(withoutPosting(tracked, 1)).toEqual([row(1, 10), row(2, 20)])
+})
+
+test('an archived row says so before the stage it reached', () => {
+    expect([
+        stageLabel({ stage: 'applied', archived: false }),
+        stageLabel({ stage: 'applied', archived: true }),
+        stageLabel({ stage: 'interviewing', archived: true }),
+    ]).toEqual(['applied', 'Archived · applied', 'Archived · interviewing'])
 })

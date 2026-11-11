@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -6,6 +8,7 @@ from sqlalchemy.orm import Session
 from kansei import JobPosting
 from kansei.api import app, get_http
 from kansei.db import engine, get_session
+from kansei.ratelimit import utcnow
 
 
 @pytest.fixture
@@ -81,3 +84,18 @@ def log_in_as(client):
         assert response.status_code == 204, response.text
 
     return log_in
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = datetime(2026, 11, 10, 9, 0, 5, tzinfo=UTC)
+
+    def advance(self, by: timedelta) -> None:
+        self.now += by
+
+
+@pytest.fixture
+def clock(client):
+    clock = Clock()
+    app.dependency_overrides[utcnow] = lambda: clock.now
+    return clock
