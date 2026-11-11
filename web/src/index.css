@@ -5,6 +5,10 @@
   --muted: light-dark(#5f6672, #9aa3b2);
   --line: light-dark(#e3e6eb, #2a303a);
   --chip: light-dark(#eef0f3, #232933);
+  --accent: light-dark(#c2410c, #fb923c);
+  --accent-hover: light-dark(#9a3412, #fdba74);
+  --on-accent: light-dark(white, #14181f);
+  --error: light-dark(#b42318, #f97066);
 }
 
 body {
@@ -58,6 +62,147 @@ form {
 
 li {
   margin-bottom: 0.75rem;
+}
+
+.auth {
+  max-width: 26rem;
+  margin: 3rem auto 0;
+}
+
+.auth h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.auth-subtitle {
+  margin: 0.4rem 0 1.75rem;
+}
+
+.auth form {
+  gap: 1rem;
+  max-width: none;
+}
+
+.auth-field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.auth-field input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 2.9rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: light-dark(#f6f7f9, #1b2028);
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+}
+
+.auth-field input:focus-visible,
+.auth button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.auth-field input:focus-visible {
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+
+.auth-password {
+  position: relative;
+}
+
+.auth-password input {
+  padding-right: 3rem;
+}
+
+.auth-eye {
+  position: absolute;
+  top: 50%;
+  right: 0.4rem;
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.4rem;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.auth-eye:hover {
+  color: inherit;
+}
+
+.auth-eye svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.auth form small {
+  margin-top: -0.6rem;
+}
+
+.auth-error {
+  margin: 0;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
+  font-size: 0.9em;
+}
+
+.auth-submit {
+  height: 2.9rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.auth-submit:hover {
+  background: var(--accent-hover);
+}
+
+.auth-submit:disabled {
+  background: var(--accent);
+  cursor: default;
+  opacity: 0.65;
+}
+
+.auth-switch {
+  margin: 1.5rem 0 0;
+  text-align: center;
+}
+
+.auth-switch a {
+  color: inherit;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.auth-switch a:hover {
+  color: var(--accent);
 }
 
 .status {
