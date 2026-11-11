@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { stageLabel, trackedRowId, withoutPosting } from './tracked'
+import { trackedRowId, withoutPosting, withRow } from './tracked'
 import type { Tracked } from './Tracker'
 
 function row(id: number, postingId: number): Tracked {
@@ -8,7 +8,23 @@ function row(id: number, postingId: number): Tracked {
         stage: 'saved',
         archived: false,
         note: '',
-        posting: { id: postingId, title: `Posting ${postingId}`, url: '', location: 'Tokyo', first_seen_at: '', listed: true },
+        tracked_at: '',
+        moved_at: '',
+        posting: {
+            id: postingId,
+            url: '',
+            source: 'greenhouse',
+            token: 'acme',
+            company: 'Acme',
+            logo_url: null,
+            has_board: true,
+            title: `Posting ${postingId}`,
+            location: 'Tokyo',
+            first_seen_at: '',
+            last_seen_at: '',
+            listed: true,
+        },
+        facts: null,
     }
 }
 
@@ -30,10 +46,9 @@ test('removing a posting that is not tracked changes nothing', () => {
     expect(withoutPosting(tracked, 1)).toEqual([row(1, 10), row(2, 20)])
 })
 
-test('an archived row says so before the stage it reached', () => {
-    expect([
-        stageLabel({ stage: 'applied', archived: false }),
-        stageLabel({ stage: 'applied', archived: true }),
-        stageLabel({ stage: 'interviewing', archived: true }),
-    ]).toEqual(['applied', 'Archived · applied', 'Archived · interviewing'])
+test('a saved row replaces the one with its id and keeps its place', () => {
+    const tracked = [row(1, 10), row(2, 20), row(3, 30)]
+    const moved = { ...row(2, 20), stage: 'offer' as const, archived: true }
+
+    expect(withRow(tracked, moved)).toEqual([row(1, 10), moved, row(3, 30)])
 })

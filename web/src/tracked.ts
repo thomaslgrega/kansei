@@ -1,4 +1,4 @@
-import type { Stage, Tracked } from './Tracker'
+import type { Tracked } from './Tracker'
 
 export type TrackControls = {
     ids: Set<number>
@@ -15,6 +15,6 @@ export function withoutPosting(tracked: Tracked[], postingId: number): Tracked[]
     return tracked.filter((row) => row.posting.id !== postingId)
 }
 
-export function stageLabel({ stage, archived }: { stage: Stage; archived: boolean }): string {
-    return archived ? `Archived · ${stage}` : stage
+export function withRow(tracked: Tracked[], saved: Tracked): Tracked[] {
+    return tracked.map((row) => (row.id === saved.id ? saved : row))
 }
