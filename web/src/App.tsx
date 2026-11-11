@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import { type Board, boardKey, latestOnly } from './boards'
 import Following from './Following'
@@ -9,8 +9,8 @@ import RequireLogin from './RequireLogin'
 import Signup from './Signup'
 import Title from './Title'
 import { whilePending } from './pending'
-import { trackedRowId, withoutPosting } from './tracked'
-import Tracker, { type Tracked } from './Tracker'
+import { applyMove, trackedRowId, withoutPosting, withRow } from './tracked'
+import Tracker, { type Move, type Tracked } from './Tracker'
 
 type User = { id: number; email: string }
 
@@ -33,6 +33,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [pendingFollows, setPendingFollows] = useState<Set<string>>(new Set())
   const [pendingTracks, setPendingTracks] = useState<Set<number>>(new Set())
+  const latestMoves = useRef(new Map<number, number>())
 
   useEffect(() => {
     loadSession().then(setSession)
@@ -82,6 +83,28 @@ export default function App() {
       () => fetch(`/api/me/tracked/${id}`, { method: 'DELETE' }),
       async () => setSession((current) => current && { ...current, tracked: withoutPosting(current.tracked, postingId) }),
     )
+  }
+
+  async function move(id: number, change: Move) {
+    const call = (latestMoves.current.get(id) ?? 0) + 1
+    latestMoves.current.set(id, call)
+    setSession(
+      (current) =>
+        current && { ...current, tracked: current.tracked.map((row) => (row.id === id ? applyMove(row, change) : row)) },
+    )
+    const response = await fetch(`/api/me/tracked/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(change),
+    })
+    // A quicker second move on the same row wins over this one.
+    if (latestMoves.current.get(id) !== call) return
+    if (!response.ok) {
+      setSession(await loadSession())
+      return
+    }
+    const updated: Tracked = await response.json()
+    setSession((current) => current && { ...current, tracked: withRow(current.tracked, updated) })
   }
 
   async function refreshFollows() {
@@ -144,7 +167,7 @@ export default function App() {
           path="/tracker"
           element={
             <RequireLogin loggedIn={session !== null}>
-              {session && <Tracker tracked={session.tracked} />}
+              {session && <Tracker tracked={session.tracked} onMove={move} />}
             </RequireLogin>
           }
         />
