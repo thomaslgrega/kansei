@@ -490,6 +490,12 @@ li {
   padding: 0.7rem 0;
   border-bottom: 1px solid var(--line);
   overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.tracker-company,
+.tracker-details {
+  cursor: auto;
 }
 
 .tracker-row.faded {
@@ -507,7 +513,16 @@ li {
 .tracker-chevron {
   grid-area: chevron;
   display: grid;
+  margin: -0.4rem;
+  padding: 0.4rem;
+  border: 0;
+  background: none;
   color: var(--muted);
+  cursor: pointer;
+}
+
+.tracker-row.expanded .tracker-chevron svg {
+  transform: rotate(90deg);
 }
 
 .tracker-chevron svg {
@@ -522,11 +537,31 @@ li {
 
 .tracker-title {
   grid-area: title;
+  min-width: 0;
+}
+
+.tracker-title-line {
   display: flex;
   align-items: center;
-  min-width: 0;
   font-weight: 650;
   line-height: 1.35;
+}
+
+.tracker-note-preview {
+  display: block;
+  max-width: 100%;
+  margin: 0.1rem 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85em;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .tracker-title a {
@@ -539,6 +574,10 @@ li {
 
 .tracker-title a:hover {
   text-decoration: underline;
+}
+
+.tracker-row.expanded .tracker-title a {
+  white-space: normal;
 }
 
 .unlisted {
@@ -594,6 +633,62 @@ li {
   font-size: 0.85em;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
+}
+
+.tracker-details {
+  grid-column: 3 / -1;
+  min-width: 0;
+  padding: 0.3rem 0 0.2rem;
+  font-size: 0.9em;
+}
+
+.tracker-details p {
+  margin: 0.4rem 0 0;
+}
+
+.tracker-note {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.tracker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.untrack-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.untrack,
+.keep {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.untrack-confirm .untrack {
+  border-color: transparent;
+  background: light-dark(#b42318, #f97066);
+  color: light-dark(white, #14181f);
 }
 
 @media (max-width: 36rem) {

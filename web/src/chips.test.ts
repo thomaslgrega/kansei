@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { type ChipFacts, postingChips } from './chips'
+import { allPostingChips, type ChipFacts, postingChips } from './chips'
 
 const SKILLS = ['Go', 'Kubernetes', 'PostgreSQL', 'gRPC', 'Terraform', 'AWS', 'Kafka']
 
@@ -74,5 +74,21 @@ test('each remote policy and seniority has its own label', () => {
             { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
             { kind: 'fact', label: 'Staff+' },
         ],
+    ])
+})
+
+test('the full chips list every skill with no count', () => {
+    const chips = allPostingChips(facts({ remote_policy: 'remote', must_have_skills: SKILLS }))
+
+    expect(chips).toEqual([
+        { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
+        { kind: 'fact', label: 'Remote' },
+        { kind: 'skill', label: 'Go' },
+        { kind: 'skill', label: 'Kubernetes' },
+        { kind: 'skill', label: 'PostgreSQL' },
+        { kind: 'skill', label: 'gRPC' },
+        { kind: 'skill', label: 'Terraform' },
+        { kind: 'skill', label: 'AWS' },
+        { kind: 'skill', label: 'Kafka' },
     ])
 })

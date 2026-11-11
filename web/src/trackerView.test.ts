@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import {
     archivedOptionLabel,
+    asksBeforeUntrack,
     disabledFilters,
     emptyMessage,
     type Filter,
@@ -134,4 +135,18 @@ test('an empty filter says what is missing', () => {
         'Nothing in Offer.',
         'Nothing archived.',
     ])
+})
+
+test('untracking asks first unless the posting is saved, unarchived and has no note', () => {
+    const cases = [
+        { note: '', stage: 'saved' as const, archived: false },
+        { note: 'Call on Friday', stage: 'saved' as const, archived: false },
+        { note: ' \n ', stage: 'saved' as const, archived: false },
+        { note: '', stage: 'applied' as const, archived: false },
+        { note: '', stage: 'offer' as const, archived: false },
+        { note: '', stage: 'saved' as const, archived: true },
+        { note: 'Sent CV', stage: 'interviewing' as const, archived: true },
+    ]
+
+    expect(cases.map(asksBeforeUntrack)).toEqual([false, true, false, true, true, true, true])
 })

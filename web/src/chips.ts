@@ -27,12 +27,20 @@ const SENIORITIES = new Map([
 const MAX_SKILLS = 5
 
 export function postingChips(facts: ChipFacts): Chip[] {
+    return chipsUpTo(facts, MAX_SKILLS)
+}
+
+export function allPostingChips(facts: ChipFacts): Chip[] {
+    return chipsUpTo(facts, Infinity)
+}
+
+function chipsUpTo(facts: ChipFacts, maxSkills: number): Chip[] {
     const chips: Chip[] = [{ kind: 'japanese', label: japaneseBadge(facts), requirement: japaneseRequirement(facts) }]
     for (const label of [REMOTE_POLICIES.get(facts.remote_policy), SENIORITIES.get(facts.seniority)]) {
         if (label) chips.push({ kind: 'fact', label })
     }
-    for (const skill of facts.must_have_skills.slice(0, MAX_SKILLS)) chips.push({ kind: 'skill', label: skill })
-    const rest = facts.must_have_skills.length - MAX_SKILLS
+    for (const skill of facts.must_have_skills.slice(0, maxSkills)) chips.push({ kind: 'skill', label: skill })
+    const rest = facts.must_have_skills.length - maxSkills
     if (rest > 0) chips.push({ kind: 'more', label: `+${rest}` })
     return chips
 }

@@ -33,7 +33,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [pendingFollows, setPendingFollows] = useState<Set<string>>(new Set())
   const [pendingTracks, setPendingTracks] = useState<Set<number>>(new Set())
-  const latestMoves = useRef(new Map<number, number>())
+  const latestPatches = useRef(new Map<number, number>())
+  const patchQueues = useRef(new Map<number, Promise<unknown>>())
 
   useEffect(() => {
     loadSession().then(setSession)
@@ -85,20 +86,31 @@ export default function App() {
     )
   }
 
-  async function move(id: number, change: Move) {
-    const call = (latestMoves.current.get(id) ?? 0) + 1
-    latestMoves.current.set(id, call)
+  function move(id: number, change: Move) {
+    return patchTracked(id, change, (row) => applyMove(row, change))
+  }
+
+  function saveNote(id: number, note: string) {
+    return patchTracked(id, { note }, (row) => ({ ...row, note }))
+  }
+
+  async function patchTracked(id: number, change: Move | { note: string }, shown: (row: Tracked) => Tracked) {
+    const call = (latestPatches.current.get(id) ?? 0) + 1
+    latestPatches.current.set(id, call)
     setSession(
-      (current) =>
-        current && { ...current, tracked: current.tracked.map((row) => (row.id === id ? applyMove(row, change) : row)) },
+      (current) => current && { ...current, tracked: current.tracked.map((row) => (row.id === id ? shown(row) : row)) },
     )
-    const response = await fetch(`/api/me/tracked/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(change),
-    })
-    // A quicker second move on the same row wins over this one.
-    if (latestMoves.current.get(id) !== call) return
+    // One PATCH at a time per row, so the last answer holds every change before it.
+    const request = (patchQueues.current.get(id) ?? Promise.resolve()).then(() =>
+      fetch(`/api/me/tracked/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(change),
+      }),
+    )
+    patchQueues.current.set(id, request.catch(() => undefined))
+    const response = await request
+    if (latestPatches.current.get(id) !== call) return
     if (!response.ok) {
       setSession(await loadSession())
       return
@@ -167,7 +179,7 @@ export default function App() {
           path="/tracker"
           element={
             <RequireLogin loggedIn={session !== null}>
-              {session && <Tracker tracked={session.tracked} onMove={move} />}
+              {session && <Tracker tracked={session.tracked} onMove={move} onNote={saveNote} onUntrack={untrack} />}
             </RequireLogin>
           }
         />
