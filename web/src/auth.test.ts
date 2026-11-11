@@ -32,7 +32,14 @@ test('signing up posts the credentials to the signup endpoint', async () => {
     const { sent, fetchFn } = fakeFetch(new Response('{}', { status: 201 }))
 
     expect(await submitAuth('signup', credentials, fetchFn)).toBe(null)
-    expect(sent.map((s) => s.url)).toEqual(['/api/signup'])
+    expect(sent).toEqual([
+        {
+            url: '/api/signup',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{"email":"a@example.com","password":"correct horse battery staple"}',
+        },
+    ])
 })
 
 test('a rejected login reads as a wrong email or password', async () => {

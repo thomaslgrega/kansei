@@ -5,6 +5,16 @@ export type AuthMode = 'login' | 'signup'
 
 type Credentials = { email: string; password: string }
 
+type Copy = {
+    title: string
+    heading: string
+    subtitle: string
+    button: string
+    pending: string
+    switchPrompt: string
+    switchLink: string
+}
+
 export const AUTH_COPY = {
     login: {
         title: 'Log in · kansei',
@@ -24,7 +34,7 @@ export const AUTH_COPY = {
         switchPrompt: 'Have an account?',
         switchLink: 'Log in',
     },
-}
+} satisfies Record<AuthMode, Copy>
 
 async function errorFor(mode: AuthMode, response: Response): Promise<string> {
     if (mode === 'login') return loginError(response.status)

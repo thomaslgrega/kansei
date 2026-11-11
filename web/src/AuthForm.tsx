@@ -7,7 +7,7 @@ import Title from './Title'
 type Props = {
     mode: AuthMode
     loggedIn: boolean
-    onDone: () => Promise<void>
+    onAuthenticated: () => Promise<void>
 }
 
 function EyeIcon({ crossed }: { crossed: boolean }) {
@@ -20,10 +20,10 @@ function EyeIcon({ crossed }: { crossed: boolean }) {
     )
 }
 
-export default function AuthForm({ mode, loggedIn, onDone }: Props) {
+export default function AuthForm({ mode, loggedIn, onAuthenticated }: Props) {
     const [error, setError] = useState('')
     const [pending, setPending] = useState(false)
-    const [shown, setShown] = useState(false)
+    const [passwordShown, setPasswordShown] = useState(false)
     const [params] = useSearchParams()
     const next = params.get('next')
     const copy = AUTH_COPY[mode]
@@ -38,7 +38,7 @@ export default function AuthForm({ mode, loggedIn, onDone }: Props) {
         setPending(true)
         try {
             const message = await submitAuth(mode, credentials)
-            if (message === null) await onDone()
+            if (message === null) await onAuthenticated()
             else setError(message)
         } finally {
             setPending(false)
@@ -55,12 +55,13 @@ export default function AuthForm({ mode, loggedIn, onDone }: Props) {
                     Email
                     <input name="email" type="email" placeholder="you@example.com" autoComplete="email" required />
                 </label>
-                <label className="auth-field">
-                    Password
+                <div className="auth-field">
+                    <label htmlFor="password">Password</label>
                     <span className="auth-password">
                         <input
+                            id="password"
                             name="password"
-                            type={shown ? 'text' : 'password'}
+                            type={passwordShown ? 'text' : 'password'}
                             autoComplete={signup ? 'new-password' : 'current-password'}
                             aria-describedby={signup ? 'password-hint' : undefined}
                             required
@@ -69,13 +70,13 @@ export default function AuthForm({ mode, loggedIn, onDone }: Props) {
                             type="button"
                             className="auth-eye"
                             aria-label="Show password"
-                            aria-pressed={shown}
-                            onClick={() => setShown(!shown)}
+                            aria-pressed={passwordShown}
+                            onClick={() => setPasswordShown(!passwordShown)}
                         >
-                            <EyeIcon crossed={shown} />
+                            <EyeIcon crossed={passwordShown} />
                         </button>
                     </span>
-                </label>
+                </div>
                 {signup && (
                     <small id="password-hint" className="muted">
                         At least 15 characters. A few words work.

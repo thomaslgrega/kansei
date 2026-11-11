@@ -194,8 +194,8 @@ export default function App() {
             </RequireLogin>
           }
         />
-        <Route path="/login" element={<AuthForm key="login" mode="login" loggedIn={session !== null} onDone={reloadSession} />} />
-        <Route path="/signup" element={<AuthForm key="signup" mode="signup" loggedIn={session !== null} onDone={reloadSession} />} />
+        <Route path="/login" element={<AuthForm key="login" mode="login" loggedIn={session !== null} onAuthenticated={reloadSession} />} />
+        <Route path="/signup" element={<AuthForm key="signup" mode="signup" loggedIn={session !== null} onAuthenticated={reloadSession} />} />
         <Route path="*" element={<main><Title>Not found · kansei</Title><p>Page not found.</p></main>} />
       </Routes>
     </>
