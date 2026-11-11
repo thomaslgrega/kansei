@@ -6,6 +6,7 @@ import type { Facts, Posting } from './PostingRow'
 import { allPostingChips } from './chips'
 import PostingChips from './PostingChips'
 import Title from './Title'
+import UntrackConfirm from './UntrackConfirm'
 import {
     archivedOptionLabel,
     asksBeforeUntrack,
@@ -263,15 +264,7 @@ function TrackerRow({ row, faded, expanded, onToggle, onExpand, onMove, onNote, 
                             Open posting
                         </a>
                         {confirming ? (
-                            <span className="untrack-confirm">
-                                Untracking deletes its stage and note.
-                                <button type="button" className="untrack" onClick={() => onUntrack(row.posting.id)}>
-                                    Untrack
-                                </button>
-                                <button type="button" className="keep" onClick={() => setConfirming(false)}>
-                                    Keep
-                                </button>
-                            </span>
+                            <UntrackConfirm onUntrack={() => onUntrack(row.posting.id)} onKeep={() => setConfirming(false)} />
                         ) : (
                             <button
                                 type="button"
