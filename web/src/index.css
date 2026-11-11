@@ -691,6 +691,12 @@ li {
   color: light-dark(white, #14181f);
 }
 
+.posting-actions .untrack-confirm {
+  max-width: 10rem;
+  justify-content: flex-end;
+  text-align: right;
+}
+
 @media (max-width: 36rem) {
   .posting {
     grid-template-columns: 2.5rem minmax(0, 1fr);
@@ -707,6 +713,12 @@ li {
     grid-row: auto;
     grid-column: 2;
     flex-direction: row;
+  }
+
+  .posting-actions .untrack-confirm {
+    max-width: none;
+    justify-content: flex-start;
+    text-align: left;
   }
 
   .stage-filter {
