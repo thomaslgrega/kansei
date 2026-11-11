@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import CompanyLogo from './CompanyLogo'
+import Dropdown from './Dropdown'
 import type { Facts, Posting } from './PostingRow'
 import { allPostingChips } from './chips'
 import PostingChips from './PostingChips'
@@ -8,16 +9,25 @@ import Title from './Title'
 import {
     archivedOptionLabel,
     asksBeforeUntrack,
+    clickSort,
     disabledFilters,
     emptyMessage,
     FILTERS,
     filterCounts,
+    flipOrder,
     inOrder,
     LABELS,
     matchesFilter,
+    type Order,
+    orderLabel,
+    pickSort,
     readTrackerView,
+    type Sort,
+    SORT_COLUMNS,
+    SORT_OPTIONS,
     type Stage,
     STAGES,
+    type TrackerView,
     trackerViewToSearch,
     viewRows,
 } from './trackerView'
@@ -42,6 +52,9 @@ type Props = {
     onUntrack: (postingId: number) => void
 }
 
+const HEADER_SORTS: Sort[] = ['company', 'stage', 'moved']
+const ARROWS: Record<Order, string> = { asc: '▲', desc: '▼' }
+
 function day(iso: string): string {
     return new Date(iso).toLocaleDateString('en-CA')
 }
@@ -58,6 +71,8 @@ export default function Tracker({ tracked, onMove, onNote, onUntrack }: Props) {
         ids = viewRows(tracked, view).map((row) => row.id)
         setHeldOrder({ viewKey, ids })
     }
+    const setView = (next: TrackerView) => setSearchParams(trackerViewToSearch(next), { replace: true })
+    const direction = orderLabel(view.sort, view.order)
     const rows = inOrder(ids, tracked)
     const counts = filterCounts(tracked)
     const disabled = disabledFilters(counts, view.stage)
@@ -82,18 +97,46 @@ export default function Tracker({ tracked, onMove, onNote, onUntrack }: Props) {
                         className={`stage-filter stage-${filter}`}
                         aria-pressed={filter === view.stage}
                         disabled={disabled.includes(filter)}
-                        onClick={() => setSearchParams(trackerViewToSearch({ ...view, stage: filter }), { replace: true })}
+                        onClick={() => setView({ ...view, stage: filter })}
                     >
                         <span className="stage-filter-count">{counts[filter] || '– –'}</span>
                         <span className="stage-filter-label">{LABELS[filter]}</span>
                     </button>
                 ))}
             </div>
+            <div className="tracker-sortbar">
+                <Dropdown label="Sort by" options={SORT_OPTIONS} value={view.sort} onChange={(sort) => setView(pickSort(view, sort))} />
+                <button
+                    type="button"
+                    className="tracker-sort-flip"
+                    aria-label={direction}
+                    title={direction}
+                    onClick={() => setView(flipOrder(view))}
+                >
+                    {ARROWS[view.order]}
+                </button>
+            </div>
             <div className="tracker-header">
                 <span className="tracker-header-posting">Posting</span>
-                <span>Company</span>
-                <span>Stage</span>
-                <span>Moved</span>
+                {HEADER_SORTS.map((sort) => {
+                    const { label } = SORT_COLUMNS[sort]
+                    const active = sort === view.sort
+                    return (
+                        <button
+                            key={sort}
+                            type="button"
+                            className="tracker-sort"
+                            aria-pressed={active}
+                            aria-label={active ? `${label}, ${direction}` : label}
+                            onClick={() => setView(clickSort(view, sort))}
+                        >
+                            {label}
+                            <span className="tracker-sort-arrow" aria-hidden="true">
+                                {active && ARROWS[view.order]}
+                            </span>
+                        </button>
+                    )
+                })}
             </div>
             {tracked.length === 0 ? (
                 <p className="tracker-empty">
