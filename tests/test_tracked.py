@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import get_args
 
 import pytest
+from test_api import FACTS, make_extraction
 
 from kansei import save_postings
 from kansei.db import Stage, Tracked, User
@@ -68,6 +69,35 @@ def test_a_tracked_posting_kansei_hasnt_seen_for_two_days_is_no_longer_listed(cl
         (ids[1], True),
         (ids[0], True),
     ]
+
+
+def test_a_tracked_posting_carries_the_facts_of_its_newest_extraction_under_any_model_or_prompt(
+    client, session, log_in_as, posting_ids
+):
+    session.add_all([
+        make_extraction(posting_ids[0], 5, "Current model and prompt."),
+        make_extraction(posting_ids[0], 6, "Old prompt.", prompt_sha="70b7a0b0"),
+        make_extraction(posting_ids[0], 7, "Other model.", model="gpt-5.6-luna"),
+        make_extraction(posting_ids[1], 5, "Another posting."),
+    ])
+    session.flush()
+    log_in_as("ada@example.com")
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+
+    response = client.get("/api/me/tracked")
+
+    assert [row["facts"] for row in response.json()] == [
+        FACTS.model_copy(update={"role_summary": "Other model."}).model_dump(mode="json"),
+    ]
+
+
+def test_a_tracked_posting_with_no_extraction_has_null_facts(client, log_in_as, posting_ids):
+    log_in_as("ada@example.com")
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+
+    response = client.get("/api/me/tracked")
+
+    assert [row["facts"] for row in response.json()] == [None]
 
 
 def test_tracking_a_posting_that_is_no_longer_listed_says_so(client, log_in_as, posting_ids):
