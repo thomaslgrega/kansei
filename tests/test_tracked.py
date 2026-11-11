@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import get_args
 
 import pytest
+from test_api import FACTS, make_extraction
 
 from kansei import save_postings
 from kansei.db import Stage, Tracked, User
@@ -67,6 +68,60 @@ def test_a_tracked_posting_kansei_hasnt_seen_for_two_days_is_no_longer_listed(cl
         (ids[2], False),
         (ids[1], True),
         (ids[0], True),
+    ]
+
+
+def test_a_tracked_posting_carries_the_facts_of_its_newest_extraction_under_any_model_or_prompt(
+    client, session, log_in_as, posting_ids
+):
+    session.add_all([
+        make_extraction(posting_ids[0], 5, "Current model and prompt."),
+        make_extraction(posting_ids[0], 6, "Old prompt.", prompt_sha="70b7a0b0"),
+        make_extraction(posting_ids[0], 7, "Other model.", model="gpt-5.6-luna"),
+        make_extraction(posting_ids[1], 5, "Current model and prompt."),
+        make_extraction(posting_ids[1], 6, "Old prompt.", prompt_sha="70b7a0b0"),
+        make_extraction(posting_ids[2], 5, "Untracked posting."),
+    ])
+    session.flush()
+    log_in_as("ada@example.com")
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[1]})
+
+    response = client.get("/api/me/tracked")
+
+    assert [row["facts"] for row in response.json()] == [
+        FACTS.model_copy(update={"role_summary": "Old prompt."}).model_dump(mode="json"),
+        FACTS.model_copy(update={"role_summary": "Other model."}).model_dump(mode="json"),
+    ]
+
+
+def test_a_tracked_posting_with_no_extraction_has_null_facts(client, log_in_as, posting_ids):
+    log_in_as("ada@example.com")
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+
+    response = client.get("/api/me/tracked")
+
+    assert [row["facts"] for row in response.json()] == [None]
+
+
+def test_facts_that_dont_fit_the_current_schema_are_null_without_breaking_the_list(
+    client, session, log_in_as, posting_ids
+):
+    old_schema = FACTS.model_dump(mode="json", exclude={"remote_policy"})
+    session.add_all([
+        make_extraction(posting_ids[0], 5, "Fits."),
+        make_extraction(posting_ids[1], 5, "Old schema.", prompt_sha="70b7a0b0", facts=old_schema),
+    ])
+    session.flush()
+    log_in_as("ada@example.com")
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[0]})
+    client.post("/api/me/tracked", json={"posting_id": posting_ids[1]})
+
+    response = client.get("/api/me/tracked")
+
+    assert [(row["posting"]["id"], row["facts"]) for row in response.json()] == [
+        (posting_ids[1], None),
+        (posting_ids[0], FACTS.model_copy(update={"role_summary": "Fits."}).model_dump(mode="json")),
     ]
 
 

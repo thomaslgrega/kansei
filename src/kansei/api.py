@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import Select, delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
@@ -165,23 +165,54 @@ class TrackUpdate(BaseModel):
 
 
 class TrackedOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     stage: Stage
     note: str
     created_at: datetime
     posting: PostingOut
+    facts: PostingFacts | None
+
+
+def select_tracked(user_id: int) -> Select[tuple[Tracked, dict | None]]:
+    # Any model or prompt: a tracked posting that stopped being listed is never extracted again.
+    newest_facts = (
+        select(Extraction.facts)
+        .where(Extraction.posting_id == Tracked.posting_id)
+        .order_by(Extraction.created_at.desc(), Extraction.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    return select(Tracked, newest_facts).where(Tracked.user_id == user_id)
+
+
+def facts_or_none(facts: dict | None) -> PostingFacts | None:
+    # An extraction under an older prompt may not fit the current schema.
+    try:
+        return None if facts is None else PostingFacts.model_validate(facts)
+    except ValidationError:
+        return None
+
+
+def tracked_out(tracked: Tracked, facts: dict | None) -> TrackedOut:
+    return TrackedOut(
+        id=tracked.id,
+        stage=tracked.stage,
+        note=tracked.note,
+        created_at=tracked.created_at,
+        posting=PostingOut.model_validate(tracked.posting),
+        facts=facts_or_none(facts),
+    )
+
+
+def get_tracked(session: Session, user_id: int, tracked_id: int) -> TrackedOut:
+    tracked, facts = session.execute(select_tracked(user_id).where(Tracked.id == tracked_id)).one()
+    return tracked_out(tracked, facts)
 
 
 @api.get("/me/tracked")
 def list_tracked(user: CurrentUser, session: SessionDep) -> list[TrackedOut]:
-    tracked = session.scalars(
-        select(Tracked)
-        .where(Tracked.user_id == user.id)
-        .order_by(Tracked.created_at.desc(), Tracked.id.desc())
-    )
-    return [TrackedOut.model_validate(row) for row in tracked]
+    rows = session.execute(select_tracked(user.id).order_by(Tracked.created_at.desc(), Tracked.id.desc()))
+    return [tracked_out(tracked, facts) for tracked, facts in rows]
 
 
 @api.post("/me/tracked", status_code=201)
@@ -195,7 +226,7 @@ def track(body: TrackIn, user: CurrentUser, session: SessionDep) -> TrackedOut:
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=409, detail="Posting already tracked")
-    return TrackedOut.model_validate(tracked)
+    return get_tracked(session, user.id, tracked.id)
 
 
 @api.patch("/me/tracked/{tracked_id}")
@@ -212,7 +243,7 @@ def update_tracked(tracked_id: int, body: TrackUpdate, user: CurrentUser, sessio
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(tracked, field, value)
     session.commit()
-    return TrackedOut.model_validate(tracked)
+    return get_tracked(session, user.id, tracked.id)
 
 
 @api.delete("/me/tracked/{tracked_id}", status_code=204)
