@@ -17,6 +17,15 @@ body {
   padding: 0 1rem;
 }
 
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 header {
   display: flex;
   justify-content: space-between;
@@ -103,12 +112,6 @@ li {
   color: inherit;
   font: inherit;
   font-weight: 400;
-}
-
-.auth-field input:focus-visible,
-.auth button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .auth-field input:focus-visible {
@@ -329,10 +332,10 @@ li {
 .follow {
   margin-left: 0.4rem;
   padding: 0 0.4rem;
-  border: 1px solid light-dark(#b9c3d3, #3c4656);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 999px;
   background: none;
-  color: light-dark(#2a5bd7, #8fb0ff);
+  color: var(--accent);
   font: inherit;
   font-size: 0.8em;
   font-weight: 600;
@@ -577,6 +580,12 @@ li {
 .stage-filter.stage-archived[aria-pressed="true"] {
   border-style: dashed;
   background: var(--chip);
+}
+
+/* Inset on a page-colored band, because the clip-path cuts off an outside ring. */
+.stage-filter:focus-visible {
+  outline-offset: -4px;
+  box-shadow: inset 0 0 0 6px Canvas;
 }
 
 .stage-filter:disabled {
