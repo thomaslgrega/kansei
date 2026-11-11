@@ -174,7 +174,13 @@ def test_removing_a_board_deletes_only_its_follows_and_keeps_its_postings_and_tr
         [make_posting(token="kansei-junk", url="https://example.com/junk")],
         datetime(2026, 11, 1, tzinfo=UTC),
     )
-    session.add(Tracked(user_id=ada.id, posting_id=ids["https://example.com/junk"], stage="applied", note="Called back"))
+    session.add(Tracked(
+        user_id=ada.id,
+        posting_id=ids["https://example.com/junk"],
+        stage="applied",
+        note="Called back",
+        moved_at=datetime(2026, 11, 2, tzinfo=UTC),
+    ))
     session.flush()
 
     remove_board(session, "greenhouse:kansei-junk")

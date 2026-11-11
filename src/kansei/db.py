@@ -139,7 +139,7 @@ class UserSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
-Stage = Literal["saved", "applied", "interviewing", "offer", "rejected"]
+Stage = Literal["saved", "applied", "interviewing", "offer"]
 
 
 class Tracked(Base):
@@ -154,6 +154,8 @@ class Tracked(Base):
     posting_id: Mapped[int] = mapped_column(ForeignKey("postings.id"))
     stage: Mapped[Stage] = mapped_column(String)
     note: Mapped[str]
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    moved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     posting: Mapped[Posting] = relationship(lazy="joined")

@@ -1,10 +1,14 @@
 import { Link } from 'react-router'
 import NewBadge from './NewBadge'
 import Title from './Title'
+import { stageLabel } from './tracked'
+
+export type Stage = 'saved' | 'applied' | 'interviewing' | 'offer'
 
 export type Tracked = {
     id: number
-    stage: string
+    stage: Stage
+    archived: boolean
     note: string
     posting: { id: number; title: string; url: string; location: string; first_seen_at: string; listed: boolean }
 }
@@ -30,7 +34,7 @@ export default function Tracker({ tracked }: Props) {
                         <a href={row.posting.url}>{row.posting.title}</a>
                         <br />
                         <span className="status">
-                            {row.stage} · {row.posting.location}
+                            {stageLabel(row)} · {row.posting.location}
                             {!row.posting.listed && ' · No longer listed'}
                         </span>
                     </li>

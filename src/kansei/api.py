@@ -161,14 +161,17 @@ class TrackIn(BaseModel):
 
 class TrackUpdate(BaseModel):
     stage: Stage | None = None
+    archived: bool | None = None
     note: str | None = Field(None, max_length=2000)
 
 
 class TrackedOut(BaseModel):
     id: int
     stage: Stage
+    archived: bool
     note: str
-    created_at: datetime
+    tracked_at: datetime
+    moved_at: datetime
     posting: PostingOut
     facts: PostingFacts | None
 
@@ -197,8 +200,10 @@ def tracked_out(tracked: Tracked, facts: dict | None) -> TrackedOut:
     return TrackedOut(
         id=tracked.id,
         stage=tracked.stage,
+        archived=tracked.archived_at is not None,
         note=tracked.note,
-        created_at=tracked.created_at,
+        tracked_at=tracked.created_at,
+        moved_at=tracked.moved_at,
         posting=PostingOut.model_validate(tracked.posting),
         facts=facts_or_none(facts),
     )
@@ -211,15 +216,15 @@ def get_tracked(session: Session, user_id: int, tracked_id: int) -> TrackedOut:
 
 @api.get("/me/tracked")
 def list_tracked(user: CurrentUser, session: SessionDep) -> list[TrackedOut]:
-    rows = session.execute(select_tracked(user.id).order_by(Tracked.created_at.desc(), Tracked.id.desc()))
+    rows = session.execute(select_tracked(user.id).order_by(Tracked.moved_at.desc(), Tracked.id.desc()))
     return [tracked_out(tracked, facts) for tracked, facts in rows]
 
 
 @api.post("/me/tracked", status_code=201)
-def track(body: TrackIn, user: CurrentUser, session: SessionDep) -> TrackedOut:
+def track(body: TrackIn, user: CurrentUser, session: SessionDep, now: Now) -> TrackedOut:
     if session.get(Posting, body.posting_id) is None:
         raise HTTPException(status_code=404, detail="Posting not found")
-    tracked = Tracked(user_id=user.id, **body.model_dump())
+    tracked = Tracked(user_id=user.id, **body.model_dump(), created_at=now, moved_at=now)
     session.add(tracked)
     try:
         session.commit()
@@ -230,7 +235,9 @@ def track(body: TrackIn, user: CurrentUser, session: SessionDep) -> TrackedOut:
 
 
 @api.patch("/me/tracked/{tracked_id}")
-def update_tracked(tracked_id: int, body: TrackUpdate, user: CurrentUser, session: SessionDep) -> TrackedOut:
+def update_tracked(
+    tracked_id: int, body: TrackUpdate, user: CurrentUser, session: SessionDep, now: Now
+) -> TrackedOut:
     tracked = session.scalar(
         select(Tracked)
         .where(
@@ -240,8 +247,21 @@ def update_tracked(tracked_id: int, body: TrackUpdate, user: CurrentUser, sessio
     )
     if tracked is None:
         raise HTTPException(status_code=404, detail="Tracked posting not found")
-    for field, value in body.model_dump(exclude_none=True).items():
-        setattr(tracked, field, value)
+    archived = body.archived
+    if archived is None and body.stage is not None:
+        # Picking a stage unarchives unless the same request says otherwise.
+        archived = False
+    moved = False
+    if body.stage is not None and body.stage != tracked.stage:
+        tracked.stage = body.stage
+        moved = True
+    if archived is not None and archived != (tracked.archived_at is not None):
+        tracked.archived_at = now if archived else None
+        moved = True
+    if moved:
+        tracked.moved_at = now
+    if body.note is not None:
+        tracked.note = body.note
     session.commit()
     return get_tracked(session, user.id, tracked.id)
 
