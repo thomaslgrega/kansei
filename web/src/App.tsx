@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
+import AuthForm from './AuthForm'
 import { type Board, boardKey, latestOnly } from './boards'
 import Following from './Following'
 import Header from './Header'
-import Login from './Login'
 import Postings from './Postings'
 import RequireLogin from './RequireLogin'
-import Signup from './Signup'
 import Title from './Title'
 import { whilePending } from './pending'
 import { applyMove, asksBeforeUntrackingPosting, trackedRowId, withoutPosting, withRow } from './tracked'
@@ -195,8 +194,8 @@ export default function App() {
             </RequireLogin>
           }
         />
-        <Route path="/login" element={<Login loggedIn={session !== null} onLoggedIn={reloadSession} />} />
-        <Route path="/signup" element={<Signup loggedIn={session !== null} onSignedUp={reloadSession} />} />
+        <Route path="/login" element={<AuthForm key="login" mode="login" loggedIn={session !== null} onDone={reloadSession} />} />
+        <Route path="/signup" element={<AuthForm key="signup" mode="signup" loggedIn={session !== null} onDone={reloadSession} />} />
         <Route path="*" element={<main><Title>Not found · kansei</Title><p>Page not found.</p></main>} />
       </Routes>
     </>
