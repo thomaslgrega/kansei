@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import CompanyLogo from './CompanyLogo'
-import Dropdown, { type DropdownOption } from './Dropdown'
+import Dropdown from './Dropdown'
 import type { Facts, Posting } from './PostingRow'
 import { allPostingChips } from './chips'
 import PostingChips from './PostingChips'
@@ -23,6 +23,8 @@ import {
     pickSort,
     readTrackerView,
     type Sort,
+    SORT_COLUMNS,
+    SORT_OPTIONS,
     type Stage,
     STAGES,
     type TrackerView,
@@ -50,35 +52,8 @@ type Props = {
     onUntrack: (postingId: number) => void
 }
 
-const SORT_OPTIONS: DropdownOption<Sort>[] = [
-    { value: 'moved', label: 'Moved', hint: 'When the stage last changed' },
-    { value: 'company', label: 'Company', hint: 'By company name' },
-    { value: 'stage', label: 'Stage', hint: 'Saved through Offer' },
-]
-
-function arrow(order: Order): string {
-    return order === 'asc' ? '▲' : '▼'
-}
-
-type SortHeaderProps = { column: Sort; label: string; view: TrackerView; onSort: (column: Sort) => void }
-
-function SortHeader({ column, label, view, onSort }: SortHeaderProps) {
-    const active = column === view.sort
-    return (
-        <button
-            type="button"
-            className={`tracker-sort tracker-sort-${column}`}
-            aria-pressed={active}
-            title={active ? orderLabel(view.sort, view.order) : undefined}
-            onClick={() => onSort(column)}
-        >
-            {label}
-            <span className="tracker-sort-arrow" aria-hidden="true">
-                {active && arrow(view.order)}
-            </span>
-        </button>
-    )
-}
+const HEADER_SORTS: Sort[] = ['company', 'stage', 'moved']
+const ARROWS: Record<Order, string> = { asc: '▲', desc: '▼' }
 
 function day(iso: string): string {
     return new Date(iso).toLocaleDateString('en-CA')
@@ -96,8 +71,8 @@ export default function Tracker({ tracked, onMove, onNote, onUntrack }: Props) {
         ids = viewRows(tracked, view).map((row) => row.id)
         setHeldOrder({ viewKey, ids })
     }
-    const show = (next: TrackerView) => setSearchParams(trackerViewToSearch(next), { replace: true })
-    const onSort = (column: Sort) => show(clickSort(view, column))
+    const setView = (next: TrackerView) => setSearchParams(trackerViewToSearch(next), { replace: true })
+    const direction = orderLabel(view.sort, view.order)
     const rows = inOrder(ids, tracked)
     const counts = filterCounts(tracked)
     const disabled = disabledFilters(counts, view.stage)
@@ -122,7 +97,7 @@ export default function Tracker({ tracked, onMove, onNote, onUntrack }: Props) {
                         className={`stage-filter stage-${filter}`}
                         aria-pressed={filter === view.stage}
                         disabled={disabled.includes(filter)}
-                        onClick={() => show({ ...view, stage: filter })}
+                        onClick={() => setView({ ...view, stage: filter })}
                     >
                         <span className="stage-filter-count">{counts[filter] || '– –'}</span>
                         <span className="stage-filter-label">{LABELS[filter]}</span>
@@ -130,22 +105,38 @@ export default function Tracker({ tracked, onMove, onNote, onUntrack }: Props) {
                 ))}
             </div>
             <div className="tracker-sortbar">
-                <Dropdown label="Sort by" options={SORT_OPTIONS} value={view.sort} onChange={(sort) => show(pickSort(view, sort))} />
+                <Dropdown label="Sort by" options={SORT_OPTIONS} value={view.sort} onChange={(sort) => setView(pickSort(view, sort))} />
                 <button
                     type="button"
                     className="tracker-sort-flip"
-                    aria-label={orderLabel(view.sort, view.order)}
-                    title={orderLabel(view.sort, view.order)}
-                    onClick={() => show(flipOrder(view))}
+                    aria-label={direction}
+                    title={direction}
+                    onClick={() => setView(flipOrder(view))}
                 >
-                    {arrow(view.order)}
+                    {ARROWS[view.order]}
                 </button>
             </div>
             <div className="tracker-header">
                 <span className="tracker-header-posting">Posting</span>
-                <SortHeader column="company" label="Company" view={view} onSort={onSort} />
-                <SortHeader column="stage" label="Stage" view={view} onSort={onSort} />
-                <SortHeader column="moved" label="Moved" view={view} onSort={onSort} />
+                {HEADER_SORTS.map((sort) => {
+                    const { label } = SORT_COLUMNS[sort]
+                    const active = sort === view.sort
+                    return (
+                        <button
+                            key={sort}
+                            type="button"
+                            className="tracker-sort"
+                            aria-pressed={active}
+                            aria-label={active ? `${label}, ${direction}` : label}
+                            onClick={() => setView(clickSort(view, sort))}
+                        >
+                            {label}
+                            <span className="tracker-sort-arrow" aria-hidden="true">
+                                {active && ARROWS[view.order]}
+                            </span>
+                        </button>
+                    )
+                })}
             </div>
             {tracked.length === 0 ? (
                 <p className="tracker-empty">

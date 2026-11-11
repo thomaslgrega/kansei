@@ -12,9 +12,11 @@ import {
     inOrder,
     type Order,
     orderLabel,
+    ORDERS,
     pickSort,
     readTrackerView,
     type Sort,
+    SORT_OPTIONS,
     SORTS,
     type Stage,
     type TrackerView,
@@ -157,7 +159,7 @@ test("writes the sort and order, leaving out moved and each sort's first-click d
 })
 
 test('every view reads back as written', () => {
-    const views = FILTERS.flatMap((stage) => SORTS.flatMap((sort) => (['asc', 'desc'] as Order[]).map((order) => view(stage, sort, order))))
+    const views = FILTERS.flatMap((stage) => SORTS.flatMap((sort) => ORDERS.map((order) => view(stage, sort, order))))
 
     expect(views.map((written) => read(trackerViewToSearch(written)))).toEqual(views)
 })
@@ -262,13 +264,21 @@ test('the direction button reverses the order and keeps the sort', () => {
 })
 
 test('each direction has a name', () => {
-    expect(SORTS.flatMap((sort) => [orderLabel(sort, 'asc'), orderLabel(sort, 'desc')])).toEqual([
+    expect(SORTS.flatMap((sort) => ORDERS.map((order) => orderLabel(sort, order)))).toEqual([
         'Oldest first',
         'Newest first',
         'A to Z',
         'Z to A',
         'Saved first',
         'Offer first',
+    ])
+})
+
+test('the sort menu lists moved, company and stage, each with a second line', () => {
+    expect(SORT_OPTIONS).toEqual([
+        { value: 'moved', label: 'Moved', hint: 'Last stage change or archiving' },
+        { value: 'company', label: 'Company', hint: 'By company name' },
+        { value: 'stage', label: 'Stage', hint: 'Saved through Offer' },
     ])
 })
 
