@@ -9,7 +9,7 @@ import RequireLogin from './RequireLogin'
 import Signup from './Signup'
 import Title from './Title'
 import { whilePending } from './pending'
-import { trackedRowId, withoutPosting, withRow } from './tracked'
+import { applyMove, trackedRowId, withoutPosting, withRow } from './tracked'
 import Tracker, { type Move, type Tracked } from './Tracker'
 
 type User = { id: number; email: string }
@@ -88,6 +88,10 @@ export default function App() {
   async function move(id: number, change: Move) {
     const call = (latestMoves.current.get(id) ?? 0) + 1
     latestMoves.current.set(id, call)
+    setSession(
+      (current) =>
+        current && { ...current, tracked: current.tracked.map((row) => (row.id === id ? applyMove(row, change) : row)) },
+    )
     const response = await fetch(`/api/me/tracked/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -99,8 +103,8 @@ export default function App() {
       setSession(await loadSession())
       return
     }
-    const saved: Tracked = await response.json()
-    setSession((current) => current && { ...current, tracked: withRow(current.tracked, saved) })
+    const updated: Tracked = await response.json()
+    setSession((current) => current && { ...current, tracked: withRow(current.tracked, updated) })
   }
 
   async function refreshFollows() {

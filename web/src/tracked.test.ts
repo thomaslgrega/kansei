@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { trackedRowId, withoutPosting, withRow } from './tracked'
+import { applyMove, trackedRowId, withoutPosting, withRow } from './tracked'
 import type { Tracked } from './Tracker'
 
 function row(id: number, postingId: number): Tracked {
@@ -46,9 +46,18 @@ test('removing a posting that is not tracked changes nothing', () => {
     expect(withoutPosting(tracked, 1)).toEqual([row(1, 10), row(2, 20)])
 })
 
-test('a saved row replaces the one with its id and keeps its place', () => {
+test('a returned row replaces the one with its id and keeps its place', () => {
     const tracked = [row(1, 10), row(2, 20), row(3, 30)]
     const moved = { ...row(2, 20), stage: 'offer' as const, archived: true }
 
     expect(withRow(tracked, moved)).toEqual([row(1, 10), moved, row(3, 30)])
+})
+
+test('a picked move shows at once: a stage unarchives, archiving keeps the stage', () => {
+    const archived = { ...row(1, 10), stage: 'interviewing' as const, archived: true }
+
+    expect([applyMove(archived, { stage: 'offer' }), applyMove(row(2, 20), { archived: true })]).toEqual([
+        { ...archived, stage: 'offer', archived: false },
+        { ...row(2, 20), archived: true },
+    ])
 })

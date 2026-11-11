@@ -45,12 +45,12 @@ export default function Tracker({ tracked, onMove }: Props) {
     const [searchParams, setSearchParams] = useSearchParams()
     const view = readTrackerView(searchParams)
     const viewKey = trackerViewToSearch(view)
-    const [held, setHeld] = useState(() => ({ viewKey, ids: viewRows(tracked, view).map((row) => row.id) }))
+    const [heldOrder, setHeldOrder] = useState(() => ({ viewKey, ids: viewRows(tracked, view).map((row) => row.id) }))
 
-    let ids = held.ids
-    if (held.viewKey !== viewKey) {
+    let ids = heldOrder.ids
+    if (heldOrder.viewKey !== viewKey) {
         ids = viewRows(tracked, view).map((row) => row.id)
-        setHeld({ viewKey, ids })
+        setHeldOrder({ viewKey, ids })
     }
     const rows = inOrder(ids, tracked)
     const counts = filterCounts(tracked)
