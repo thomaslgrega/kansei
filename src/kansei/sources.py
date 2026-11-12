@@ -184,11 +184,11 @@ def from_hrmos(page: str, token: str, job_id: str, headline: str) -> dict:
     }
 
 
-def says_more_than(text: str, *names: str | None) -> bool:
+def says_more_than(text: str, names: list[str]) -> bool:
     rest = text.casefold()
-    for name in names:
-        if name:
-            rest = rest.replace(name.casefold(), "")
+    # Longest first, so "SRE" doesn't leave "@ Acme" behind from "SRE @ Acme".
+    for name in sorted(names, key=len, reverse=True):
+        rest = rest.replace(name.casefold(), "")
     return bool(re.search(r"\w", rest))
 
 
@@ -198,9 +198,14 @@ def from_url(page: str, url: str) -> dict:
     heading = soup.h1 or soup.title
     title = posting.get("title") or (heading.get_text(strip=True) if heading else "")
     company_name = hiring_organization_name(posting)
-    structured = posting.get("description")
+    shown = [tag.get_text(strip=True) for tag in (soup.title, soup.h1) if tag]
+    names = [name for name in (title, company_name, *shown) if name]
+    ld_description = posting.get("description")
     # Script-rendered pages show only their title, while some sites' JSON-LD holds only a teaser.
-    texts = [page_text(soup), html_to_text(structured) if isinstance(structured, str) else ""]
+    candidates = [page_text(soup), html_to_text(ld_description) if isinstance(ld_description, str) else ""]
+    description = max(candidates, key=lambda text: (says_more_than(text, names), len(text)))
+    if not says_more_than(description, names):
+        raise ValueError(f"{url} has no posting text beyond its title")
     return {
         "source": "url",
         "token": urlsplit(url).netloc,
@@ -210,7 +215,7 @@ def from_url(page: str, url: str) -> dict:
         "posted_at": posting.get("datePosted"),
         "location": job_location(posting),
         "company_name": company_name,
-        "description": max(texts, key=lambda text: (says_more_than(text, title, company_name), len(text))),
+        "description": description,
         "headline": None,
     }
 
@@ -303,10 +308,7 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
         raise ValueError(f"{url} redirected to {response.url}")
     if "text/html" not in content_type:
         raise ValueError(f"{url} returned {content_type or 'no content type'}, not HTML")
-    posting = from_url(response.text, url)
-    if not says_more_than(posting["description"], posting["title"], posting["company_name"]):
-        raise ValueError(f"{url} has no posting text beyond its title")
-    return posting
+    return from_url(response.text, url)
 
 
 async def greenhouse_name(client: httpx.AsyncClient, token: str) -> str:

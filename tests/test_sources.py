@@ -326,6 +326,10 @@ def test_from_url_falls_back_to_the_page_text_without_a_usable_json_ld_descripti
             '<html><head><title>SRE</title></head><body><div id="root"></div></body></html>',
             id="only a title tag",
         ),
+        pytest.param(
+            "<html><head><title>SRE @ Acme</title></head><body><h1>SRE</h1></body></html>",
+            id="a title tag naming the company, without json-ld",
+        ),
     ],
 )
 async def test_fetch_url_refuses_a_page_with_nothing_but_its_title(page):
@@ -346,7 +350,7 @@ def page_with_job_location(job_location) -> str:
     ld = json.dumps({"@type": "JobPosting", "title": "SRE", "jobLocation": job_location})
     return (
         f'<html><head><script type="application/ld+json">{ld}</script></head>'
-        "<body><h1>SRE</h1></body></html>"
+        "<body><h1>SRE</h1><p>On call.</p></body></html>"
     )
 
 
@@ -389,7 +393,7 @@ def test_from_url_takes_the_location_from_the_first_place_with_an_address(job_lo
         "posted_at": None,
         "location": location,
         "company_name": None,
-        "description": "SRE",
+        "description": "SRE\nOn call.",
         "headline": None,
     }
 
