@@ -54,6 +54,13 @@ MARK = re.compile(
     r"|qualifications|nice to have|what you.ll need|必須条件|歓迎条件",
     re.IGNORECASE,
 )
+# Whole heading lines only: 業務 also appears inside requirement sentences.
+DUTIES = re.compile(
+    r"^\W*([^。、\s]{0,20}業務内容|業務について|仕事内容|職務内容|職種概要"
+    r"|(key |primary )?responsibilities|what you.ll do|what you will do|the impact you will have"
+    r"|about the role|job description)\W*$",
+    re.IGNORECASE,
+)
 TEST_BOARDS = ["lever:mujininc", "greenhouse:databricks", "greenhouse:datadog", "greenhouse:paypaycard"]
 
 Split = Literal["dev", "test"]
@@ -291,10 +298,10 @@ async def run(split: Split) -> None:
     print(f"{len(results)} postings, ${sum(cost for _, cost in results):.4f}, saved {path.name}")
 
 
-def print_posting(posting: FrozenPosting) -> None:
+def print_posting(posting: FrozenPosting, mark: re.Pattern[str] = MARK) -> None:
     print("\n" + "=" * 72)
     for line in posting.text.splitlines():
-        print(("» " if MARK.search(line) else "  ") + line)
+        print(("» " if mark.search(line) else "  ") + line)
     print(f"\n{posting.url}")
 
 
@@ -422,7 +429,7 @@ def label_specialties(urls: list[str]) -> None:
     ]
 
     for posting in todo:
-        print_posting(posting)
+        print_posting(posting, DUTIES)
         labels[posting.url].specialties = ask_specialties()
         save(LABELS, list(labels.values()))
         done = sum(label.specialties is not None for label in labels.values())

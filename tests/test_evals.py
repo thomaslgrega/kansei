@@ -5,6 +5,7 @@ import pytest
 
 from kansei import evals
 from kansei.evals import (
+    DUTIES,
     LABELS,
     MANIFEST,
     POSTINGS,
@@ -20,6 +21,7 @@ from kansei.evals import (
     per_board,
     per_specialty,
     precision_recall_f1,
+    print_posting,
     score,
     skill_misses,
     specialty_misses,
@@ -221,6 +223,41 @@ def test_no_dev_run_has_seen_a_test_posting():
     }
 
     assert seen & test_set == set()
+
+
+def test_specialty_labeling_marks_only_the_duties_headings(capsys):
+    posting = FrozenPosting(
+        url="https://a",
+        title="Software Engineer",
+        text=(
+            "Software Engineer\n"
+            "【具体的な業務内容】\n"
+            "決済システムのバックエンド開発\n"
+            "What You'll Do:\n"
+            "Build our iOS app.\n"
+            "必須条件\n"
+            "業務内容に関わる3年以上の経験\n"
+            "Nice to have: React"
+        ),
+        frozen_at=THEN,
+    )
+
+    print_posting(posting, DUTIES)
+
+    assert capsys.readouterr().out.splitlines() == [
+        "",
+        "=" * 72,
+        "  Software Engineer",
+        "» 【具体的な業務内容】",
+        "  決済システムのバックエンド開発",
+        "» What You'll Do:",
+        "  Build our iOS app.",
+        "  必須条件",
+        "  業務内容に関わる3年以上の経験",
+        "  Nice to have: React",
+        "",
+        "https://a",
+    ]
 
 
 def test_specialties_command_labels_the_urls_it_names(monkeypatch):
