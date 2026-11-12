@@ -1,4 +1,4 @@
-from sqlalchemy import literal, select
+from sqlalchemy import cast, literal, null, select
 from sqlalchemy.dialects.postgresql import JSONB
 
 from kansei.japanese import japanese_requirement
@@ -55,3 +55,9 @@ def test_not_stated_is_not_stated_whatever_level_or_jlpt_it_names(session):
     ]
 
     assert requirements(session, cases) == ["not_stated", "not_stated", "not_stated"]
+
+
+def test_no_facts_or_facts_without_japanese_required_have_no_requirement(session):
+    facts = [cast(null(), JSONB), literal({}, JSONB), literal({"japanese_level": "business", "jlpt": "N1"}, JSONB)]
+
+    assert [session.scalar(select(japanese_requirement(value))) for value in facts] == [None, None, None]

@@ -1,14 +1,16 @@
 from typing import Literal, get_args
 
-from sqlalchemy import ColumnElement, case, true, type_coerce
+from sqlalchemy import ColumnElement, case, null, true, type_coerce
 from sqlalchemy.dialects.postgresql import JSONB
+
+from kansei.llm import Jlpt
 
 Level = Literal["basic", "conversational", "business", "native"]
 JapaneseRequirement = Literal[Level, "none", "not_stated"]
 
 LEVELS: tuple[Level, ...] = get_args(Level)
 
-JLPT_LEVELS: dict[str, Level] = {
+JLPT_LEVELS: dict[Jlpt, Level] = {
     "N1": "business",
     "N2": "business",
     "N3": "conversational",
@@ -17,12 +19,13 @@ JLPT_LEVELS: dict[str, Level] = {
 }
 
 
-def japanese_requirement(facts: ColumnElement[dict]) -> ColumnElement[str]:
+def japanese_requirement(facts: ColumnElement[dict | None]) -> ColumnElement[str | None]:
     facts = type_coerce(facts, JSONB)
     required = facts["japanese_required"].astext
     level = facts["japanese_level"].astext
     jlpt = facts["jlpt"].astext
     return case(
+        (required.is_(None), null()),
         (required == "not_stated", "not_stated"),
         (required != "required", "none"),
         (level.in_(LEVELS), level),
