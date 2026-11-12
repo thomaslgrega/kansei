@@ -56,6 +56,10 @@ _Avoid_: Fresh, recent, unseen
 How much Japanese a candidate asks for: basic, conversational, business or native; none, when Japanese is only preferred or not required; or not stated, when the posting says nothing about it. A JLPT level stands in when no level is named: N1 and N2 are business, N3 conversational, N4 and N5 basic. Japanese that is required with no level is business.
 _Avoid_: Japanese level, language requirement
 
+**Specialty**:
+A kind of engineering a candidate is for: backend, frontend, fullstack, mobile, infrastructure, data, ML, security, QA, embedded, management or customer-facing; other, for engineering that fits none of these; or not engineering. A candidate can have several. They come from the title first. When the title names no area of work, only management or customer-facing or nothing at all, the duties add the areas. A fullstack candidate is also frontend and backend. Other and not engineering each stand alone.
+_Avoid_: Category, job function, role type, discipline
+
 **Checked**:
 The last time kansei saw a posting on any board. A pasted posting doesn't move it, so it says when the boards were last read, whether or not anything on them changed.
 _Avoid_: Updated, last run, refreshed, synced
