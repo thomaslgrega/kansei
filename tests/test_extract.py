@@ -1,4 +1,5 @@
 import asyncio
+import json
 from types import SimpleNamespace
 
 import httpx
@@ -6,10 +7,11 @@ import pytest
 from openai.lib._pydantic import to_strict_json_schema
 
 from kansei import extract_one, model_input
-from kansei.llm import INSTRUCTIONS, PostingFacts
+from kansei.llm import INSTRUCTIONS, PostingFacts, normalize_specialties
 
 FACTS = PostingFacts(
     role_summary="Builds payment services.",
+    specialties=["backend"],
     seniority="mid",
     must_have_skills=["Python"],
     japanese_as_written=None,
@@ -28,6 +30,17 @@ class StubResponses:
     async def parse(self, **kwargs) -> SimpleNamespace:
         self.calls.append(kwargs)
         return SimpleNamespace(output_parsed=self.reply, usage=None)
+
+
+class ParsingResponses(StubResponses):
+    def __init__(self, answer: dict):
+        super().__init__()
+        self.answer = answer
+
+    async def parse(self, **kwargs) -> SimpleNamespace:
+        self.calls.append(kwargs)
+        parsed = kwargs["text_format"].model_validate_json(json.dumps(self.answer))
+        return SimpleNamespace(output_parsed=parsed, usage=None)
 
 
 class StubLLM:
@@ -107,3 +120,52 @@ def test_every_enum_carries_its_decision_rule():
 
     missing = [name for name, f in schema["properties"].items() if "enum" in f and not f.get("description")]
     assert missing == []
+
+
+def test_the_schema_offers_exactly_the_specialties_context_md_defines():
+    schema = to_strict_json_schema(PostingFacts)
+
+    assert schema["properties"]["specialties"]["items"]["enum"] == [
+        "backend", "frontend", "fullstack", "mobile", "infrastructure", "data", "ml", "security",
+        "qa", "embedded", "management", "customer_facing", "other", "not_engineering",
+    ]
+
+
+async def test_extract_one_stores_the_specialties_the_model_answers():
+    answer = FACTS.model_dump(mode="json") | {"specialties": ["management", "fullstack"]}
+    llm = StubLLM(ParsingResponses(answer))
+
+    response, _ = await extract_one(llm, asyncio.Semaphore(1), "Engineering Manager\n\nLead the web team.")
+
+    call = llm.responses.calls[0]
+    assert (call["input"], call["instructions"], call["text_format"]) == (
+        "Engineering Manager\n\nLead the web team.", INSTRUCTIONS, PostingFacts
+    )
+    assert response.output_parsed.model_dump(mode="json")["specialties"] == [
+        "backend", "frontend", "fullstack", "management"
+    ]
+
+
+@pytest.mark.parametrize(("answer", "stored"), [
+    (["fullstack"], ["backend", "frontend", "fullstack"]),
+    (["frontend", "fullstack", "backend", "fullstack"], ["backend", "frontend", "fullstack"]),
+    (["mobile", "fullstack"], ["backend", "frontend", "fullstack", "mobile"]),
+    (["frontend", "backend"], ["backend", "frontend"]),
+], ids=["fullstack alone", "repeated", "with another", "frontend and backend stay apart"])
+def test_fullstack_is_also_frontend_and_backend_each_once_in_schema_order(answer, stored):
+    assert normalize_specialties(answer) == stored
+
+
+@pytest.mark.parametrize(("answer", "stored"), [
+    (["other"], ["other"]),
+    (["not_engineering"], ["not_engineering"]),
+    (["backend", "other"], ["backend"]),
+    (["not_engineering", "customer_facing"], ["customer_facing"]),
+    (["other", "not_engineering"], ["other"]),
+    (["fullstack", "other", "not_engineering"], ["backend", "frontend", "fullstack"]),
+], ids=[
+    "other alone", "not engineering alone", "a specialty drops other",
+    "a specialty drops not engineering", "other drops not engineering", "fullstack drops both",
+])
+def test_other_and_not_engineering_stand_alone(answer, stored):
+    assert normalize_specialties(answer) == stored

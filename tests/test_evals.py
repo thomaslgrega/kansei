@@ -18,9 +18,11 @@ from kansei.evals import (
     load,
     manifest_entry,
     per_board,
+    per_specialty,
     precision_recall_f1,
     score,
     skill_misses,
+    specialty_misses,
 )
 
 THEN = datetime(2026, 9, 26, tzinfo=UTC)
@@ -130,6 +132,39 @@ def test_skills_score_as_sets_of_exact_names_and_skip_unlabeled_postings():
     assert precision_recall_f1(list(diffs.values())) == pytest.approx((1/2, 2/3, 4/7))
 
 
+def test_specialties_score_by_exact_set_and_by_specialty_skipping_unlabeled_postings():
+    labels = [
+        answers("https://a", specialties=["backend"]),
+        answers("https://b", specialties=["backend", "frontend"]),
+        answers("https://c", specialties=["management", "mobile"]),
+        answers("https://d", specialties=["mobile"]),
+        answers("https://e"),
+    ]
+    predictions = [
+        answers("https://a", specialties=["backend"]),
+        answers("https://b", specialties=["backend"]),
+        answers("https://c", specialties=["mobile", "management"]),
+        answers("https://d", specialties=["backend", "mobile"]),
+        answers("https://e", specialties=["qa"]),
+    ]
+
+    by_specialty = per_specialty(labels, predictions)
+
+    assert specialty_misses(labels, predictions) == ["https://b", "https://d"]
+    assert by_specialty == {
+        "backend": SkillDiff(found={"https://a", "https://b"}, extra={"https://d"}, missed=set()),
+        "frontend": SkillDiff(found=set(), extra=set(), missed={"https://b"}),
+        "mobile": SkillDiff(found={"https://c", "https://d"}, extra=set(), missed=set()),
+        "management": SkillDiff(found={"https://c"}, extra=set(), missed=set()),
+    }
+    assert {s: precision_recall_f1([diff])[:2] for s, diff in by_specialty.items()} == pytest.approx({
+        "backend": (2/3, 1.0),
+        "frontend": (0.0, 0.0),
+        "mobile": (1.0, 1.0),
+        "management": (1.0, 1.0),
+    })
+
+
 def test_skill_misses_counts_runs_per_posting_not_names():
     labels = [
         answers("https://a", must_have_skills=["C", "C++"]),
@@ -172,6 +207,14 @@ def test_no_dev_run_has_seen_a_test_posting():
     }
 
     assert seen & test_set == set()
+
+
+def test_specialties_command_labels_the_urls_it_names(monkeypatch):
+    calls = []
+    monkeypatch.setattr(sys, "argv", ["kansei-eval", "specialties", "https://a"])
+    monkeypatch.setattr(evals, "label_specialties", calls.append)
+    evals.main()
+    assert calls == [["https://a"]]
 
 
 @pytest.mark.parametrize(("args", "expected"), [

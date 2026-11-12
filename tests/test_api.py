@@ -7,6 +7,7 @@ from kansei.llm import PostingFacts, prompt_snapshot
 
 FACTS = PostingFacts(
     role_summary="Builds payment services.",
+    specialties=["backend"],
     seniority="mid",
     must_have_skills=["Python"],
     japanese_as_written=None,

@@ -1,10 +1,10 @@
 import hashlib
 import json
-from typing import Literal
+from typing import Annotated, Literal, get_args
 
 from openai import AsyncOpenAI
 from openai.types.responses import ParsedResponse, ResponseUsage
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 from kansei.config import settings
 
@@ -13,10 +13,42 @@ JapaneseRequired = Literal["required", "preferred", "not_required", "not_stated"
 JapaneseLevel = Literal["native", "business", "conversational", "basic", "not_stated"]
 Jlpt = Literal["N1", "N2", "N3", "N4", "N5", "not_stated"]
 RemotePolicy = Literal["remote", "hybrid", "onsite", "not_stated"]
+Specialty = Literal[
+    "backend", "frontend", "fullstack", "mobile", "infrastructure", "data", "ml", "security",
+    "qa", "embedded", "management", "customer_facing", "other", "not_engineering",
+]
+SPECIALTIES: tuple[Specialty, ...] = get_args(Specialty)
+
+
+def normalize_specialties(specialties: list[Specialty]) -> list[Specialty]:
+    chosen = set(specialties)
+    if "fullstack" in chosen:
+        chosen |= {"frontend", "backend"}
+    if chosen - {"other", "not_engineering"}:
+        chosen -= {"other", "not_engineering"}
+    elif "other" in chosen:
+        chosen = {"other"}
+    return [specialty for specialty in SPECIALTIES if specialty in chosen]
 
 
 class PostingFacts(BaseModel):
     role_summary: str = Field(description="One sentence in English, whatever language the posting is in: what this person actually builds.")
+    specialties: Annotated[list[Specialty], AfterValidator(normalize_specialties)] = Field(
+        description=(
+            "The kinds of engineering the role is for, at least one. Take every specialty the title "
+            "names, and then stop: 'iOS Engineer' is mobile, whatever the duties say. Only when the "
+            "title names no area of work, just management, customer-facing or nothing at all, add "
+            "the areas the duties describe: 'Software Engineer' may be backend, or backend and "
+            "frontend; 'Engineering Manager' is management plus its duties' areas; 'Engineering "
+            "Manager, Payments Backend' is management and backend. "
+            "infrastructure: SRE, platform, DevOps, cloud, network. data: data engineering and "
+            "analytics. ml: machine learning and AI. qa: testing and quality. embedded: firmware "
+            "and software on devices. management: managing engineers. customer_facing: solutions, "
+            "sales, support and field engineers. other: engineering that fits none of these. "
+            "not_engineering: the role is not engineering, such as 事業開発. "
+            "other and not_engineering each stand alone."
+        )
+    )
     seniority: Seniority = Field(
         description=(
             "The level the title or text names in words: 'Junior'/ジュニア, 'Senior'/シニア, "

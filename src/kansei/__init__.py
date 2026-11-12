@@ -230,6 +230,7 @@ def show(facts: PostingFacts) -> None:
     print(f"  japanese: {facts.japanese_required}, level {facts.japanese_level}, jlpt {facts.jlpt}")
     print(f"            {facts.japanese_as_written or '(says nothing)'}")
     print(f"  remote:   {facts.remote_policy}")
+    print(f"  specialties: {', '.join(facts.specialties) or '(none)'}")
     print(f"  skills:   {', '.join(facts.must_have_skills) or '(none)'}")
     print(f"  summary:  {facts.role_summary}")
 
@@ -387,6 +388,7 @@ async def amain() -> None:
     facts = [response.output_parsed for response, _ in done.values()]
     print(f"japanese: {dict(Counter(f.japanese_required for f in facts))}")
     print(f"remote:   {dict(Counter(f.remote_policy for f in facts))}")
+    print(f"specialties: {dict(Counter(s for f in facts for s in f.specialties))}")
 
 
 async def ingest_url(url: str) -> None:
