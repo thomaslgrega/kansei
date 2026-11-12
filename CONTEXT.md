@@ -57,7 +57,7 @@ How much Japanese a candidate asks for: basic, conversational, business or nativ
 _Avoid_: Japanese level, language requirement
 
 **Specialty**:
-A kind of engineering a candidate is for: backend, frontend, fullstack, mobile, infrastructure, data, ML, security, QA, embedded, management or customer-facing; other, for engineering that fits none of these; or not engineering. A candidate can have several. They come from the title first. When the title names no area of work, only management or customer-facing or nothing at all, the duties add the areas. A fullstack candidate is also frontend and backend. Other and not engineering each stand alone.
+A kind of engineering a candidate is for: backend, frontend, fullstack, mobile, infrastructure, data, ML, security, QA, embedded, management or customer-facing. A candidate can have several. One whose work isn't on this list, including one that isn't engineering, has no listed specialty and counts as other. They come from the title first. When the title names no area of work, only management or customer-facing or nothing at all, the duties add the areas. A fullstack candidate is also frontend and backend.
 _Avoid_: Category, job function, role type, discipline
 
 **Checked**:

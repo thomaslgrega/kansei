@@ -15,7 +15,7 @@ Jlpt = Literal["N1", "N2", "N3", "N4", "N5", "not_stated"]
 RemotePolicy = Literal["remote", "hybrid", "onsite", "not_stated"]
 Specialty = Literal[
     "backend", "frontend", "fullstack", "mobile", "infrastructure", "data", "ml", "security",
-    "qa", "embedded", "management", "customer_facing", "other", "not_engineering",
+    "qa", "embedded", "management", "customer_facing",
 ]
 SPECIALTIES: tuple[Specialty, ...] = get_args(Specialty)
 
@@ -24,18 +24,17 @@ def normalize_specialties(specialties: list[Specialty]) -> list[Specialty]:
     chosen = set(specialties)
     if "fullstack" in chosen:
         chosen |= {"frontend", "backend"}
-    if chosen - {"other", "not_engineering"}:
-        chosen -= {"other", "not_engineering"}
-    elif "other" in chosen:
-        chosen = {"other"}
     return [specialty for specialty in SPECIALTIES if specialty in chosen]
+
+
+Specialties = Annotated[list[Specialty], AfterValidator(normalize_specialties)]
 
 
 class PostingFacts(BaseModel):
     role_summary: str = Field(description="One sentence in English, whatever language the posting is in: what this person actually builds.")
-    specialties: Annotated[list[Specialty], AfterValidator(normalize_specialties)] = Field(
+    specialties: Specialties = Field(
         description=(
-            "The kinds of engineering the role is for, at least one. Take every specialty the title "
+            "The kinds of engineering the role is for. Take every specialty the title "
             "names, and then stop: 'iOS Engineer' is mobile, whatever the duties say. Only when the "
             "title names no area of work, just management, customer-facing or nothing at all, add "
             "the areas the duties describe: 'Software Engineer' may be backend, or backend and "
@@ -44,9 +43,8 @@ class PostingFacts(BaseModel):
             "infrastructure: SRE, platform, DevOps, cloud, network. data: data engineering and "
             "analytics. ml: machine learning and AI. qa: testing and quality. embedded: firmware "
             "and software on devices. management: managing engineers. customer_facing: solutions, "
-            "sales, support and field engineers. other: engineering that fits none of these. "
-            "not_engineering: the role is not engineering, such as 事業開発. "
-            "other and not_engineering each stand alone."
+            "sales, support and field engineers. Empty list if none of these fits, including a "
+            "role that is not engineering, such as 事業開発."
         )
     )
     seniority: Seniority = Field(

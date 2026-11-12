@@ -122,13 +122,33 @@ def test_every_enum_carries_its_decision_rule():
     assert missing == []
 
 
-def test_the_schema_offers_exactly_the_specialties_context_md_defines():
+def test_the_model_gets_the_specialties_context_md_defines_and_the_title_first_rule():
     schema = to_strict_json_schema(PostingFacts)
 
-    assert schema["properties"]["specialties"]["items"]["enum"] == [
-        "backend", "frontend", "fullstack", "mobile", "infrastructure", "data", "ml", "security",
-        "qa", "embedded", "management", "customer_facing", "other", "not_engineering",
-    ]
+    assert schema["properties"]["specialties"] == {
+        "title": "Specialties",
+        "type": "array",
+        "items": {
+            "type": "string",
+            "enum": [
+                "backend", "frontend", "fullstack", "mobile", "infrastructure", "data", "ml",
+                "security", "qa", "embedded", "management", "customer_facing",
+            ],
+        },
+        "description": (
+            "The kinds of engineering the role is for. Take every specialty the title names, and "
+            "then stop: 'iOS Engineer' is mobile, whatever the duties say. Only when the title names "
+            "no area of work, just management, customer-facing or nothing at all, add the areas the "
+            "duties describe: 'Software Engineer' may be backend, or backend and frontend; "
+            "'Engineering Manager' is management plus its duties' areas; 'Engineering Manager, "
+            "Payments Backend' is management and backend. infrastructure: SRE, platform, DevOps, "
+            "cloud, network. data: data engineering and analytics. ml: machine learning and AI. "
+            "qa: testing and quality. embedded: firmware and software on devices. management: "
+            "managing engineers. customer_facing: solutions, sales, support and field engineers. "
+            "Empty list if none of these fits, including a role that is not engineering, such as "
+            "事業開発."
+        ),
+    }
 
 
 async def test_extract_one_stores_the_specialties_the_model_answers():
@@ -151,21 +171,7 @@ async def test_extract_one_stores_the_specialties_the_model_answers():
     (["frontend", "fullstack", "backend", "fullstack"], ["backend", "frontend", "fullstack"]),
     (["mobile", "fullstack"], ["backend", "frontend", "fullstack", "mobile"]),
     (["frontend", "backend"], ["backend", "frontend"]),
-], ids=["fullstack alone", "repeated", "with another", "frontend and backend stay apart"])
+    ([], []),
+], ids=["fullstack alone", "repeated", "with another", "frontend and backend stay apart", "other"])
 def test_fullstack_is_also_frontend_and_backend_each_once_in_schema_order(answer, stored):
-    assert normalize_specialties(answer) == stored
-
-
-@pytest.mark.parametrize(("answer", "stored"), [
-    (["other"], ["other"]),
-    (["not_engineering"], ["not_engineering"]),
-    (["backend", "other"], ["backend"]),
-    (["not_engineering", "customer_facing"], ["customer_facing"]),
-    (["other", "not_engineering"], ["other"]),
-    (["fullstack", "other", "not_engineering"], ["backend", "frontend", "fullstack"]),
-], ids=[
-    "other alone", "not engineering alone", "a specialty drops other",
-    "a specialty drops not engineering", "other drops not engineering", "fullstack drops both",
-])
-def test_other_and_not_engineering_stand_alone(answer, stored):
     assert normalize_specialties(answer) == stored

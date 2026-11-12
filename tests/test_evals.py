@@ -139,6 +139,8 @@ def test_specialties_score_by_exact_set_and_by_specialty_skipping_unlabeled_post
         answers("https://c", specialties=["management", "mobile"]),
         answers("https://d", specialties=["mobile"]),
         answers("https://e"),
+        answers("https://f", specialties=[]),
+        answers("https://g", specialties=[]),
     ]
     predictions = [
         answers("https://a", specialties=["backend"]),
@@ -146,23 +148,35 @@ def test_specialties_score_by_exact_set_and_by_specialty_skipping_unlabeled_post
         answers("https://c", specialties=["mobile", "management"]),
         answers("https://d", specialties=["backend", "mobile"]),
         answers("https://e", specialties=["qa"]),
+        answers("https://f", specialties=[]),
+        answers("https://g", specialties=["qa"]),
     ]
 
     by_specialty = per_specialty(labels, predictions)
 
-    assert specialty_misses(labels, predictions) == ["https://b", "https://d"]
+    assert specialty_misses(labels, predictions) == ["https://b", "https://d", "https://g"]
     assert by_specialty == {
         "backend": SkillDiff(found={"https://a", "https://b"}, extra={"https://d"}, missed=set()),
         "frontend": SkillDiff(found=set(), extra=set(), missed={"https://b"}),
         "mobile": SkillDiff(found={"https://c", "https://d"}, extra=set(), missed=set()),
         "management": SkillDiff(found={"https://c"}, extra=set(), missed=set()),
+        "qa": SkillDiff(found=set(), extra={"https://g"}, missed=set()),
     }
     assert {s: precision_recall_f1([diff])[:2] for s, diff in by_specialty.items()} == pytest.approx({
         "backend": (2/3, 1.0),
         "frontend": (0.0, 0.0),
         "mobile": (1.0, 1.0),
         "management": (1.0, 1.0),
+        "qa": (0.0, 0.0),
     })
+
+
+def test_a_hand_written_fullstack_label_is_also_frontend_and_backend():
+    assert Label.model_validate_json(
+        '{"url": "https://a", "seniority": "not_stated", "japanese_required": "not_stated", '
+        '"japanese_level": "not_stated", "jlpt": "not_stated", "remote_policy": "not_stated", '
+        '"specialties": ["fullstack"]}'
+    ).specialties == ["backend", "frontend", "fullstack"]
 
 
 def test_skill_misses_counts_runs_per_posting_not_names():

@@ -30,6 +30,7 @@ from kansei.llm import (
     Jlpt,
     RemotePolicy,
     Seniority,
+    Specialties,
     Specialty,
     cost_usd,
     extract,
@@ -83,7 +84,7 @@ class Label(BaseModel):
     jlpt: Jlpt
     remote_policy: RemotePolicy
     must_have_skills: list[str] | None = None
-    specialties: list[Specialty] | None = None
+    specialties: Specialties | None = None
 
 FIELDS = [name for name in Label.model_fields if name not in {"url", "must_have_skills", "specialties"}]
 
@@ -261,15 +262,10 @@ def ask_skills(text: str) -> list[str]:
 def ask_specialties() -> list[Specialty]:
     options = "  ".join(f"{i}={value}" for i, value in enumerate(SPECIALTIES, 1))
     while True:
-        answer = input(f"specialties    space-separated   {options}\n> ")
+        answer = input(f"specialties    space-separated, empty for other   {options}\n> ")
         numbers = answer.replace(",", " ").split()
-        if not numbers or not all(n.isdigit() and 1 <= int(n) <= len(SPECIALTIES) for n in numbers):
-            continue
-        chosen = {SPECIALTIES[int(n) - 1] for n in numbers}
-        if len(chosen) > 1 and chosen & {"other", "not_engineering"}:
-            print("other and not_engineering each stand alone")
-            continue
-        return normalize_specialties(list(chosen))
+        if all(n.isdigit() and 1 <= int(n) <= len(SPECIALTIES) for n in numbers):
+            return normalize_specialties([SPECIALTIES[int(n) - 1] for n in numbers])
 
 
 async def predict(llm: AsyncOpenAI, limit: asyncio.Semaphore, posting: FrozenPosting) -> tuple[Label, float]:
@@ -361,7 +357,9 @@ def print_specialties(labels: list[Label], predictions: list[Label], titles: dic
     by_url = {label.url: label for label in labels}
     predicted = {p.url: p for p in predictions}
     for url in misses:
-        print(f"\nspecialties: you {', '.join(by_url[url].specialties)}, model {', '.join(predicted[url].specialties)}")
+        you = ", ".join(by_url[url].specialties) or "other"
+        model = ", ".join(predicted[url].specialties) or "other"
+        print(f"\nspecialties: you {you}, model {model}")
         print(f"  {titles[url]}\n  {url}")
 
 
