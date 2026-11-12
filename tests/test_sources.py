@@ -4,7 +4,7 @@ import httpx
 import pytest
 from bs4 import BeautifulSoup
 
-from kansei import JobPosting, is_candidate
+from kansei import JobPosting, is_candidate, model_input
 from kansei.sources import (
     ASHBY_ORGANIZATION_QUERY,
     fetch_ashby,
@@ -243,10 +243,103 @@ def test_from_url_finds_the_job_posting_inside_a_graph():
     assert posting["location"] == "JP"
 
 
-def test_from_url_takes_the_body_from_the_page_not_the_json_ld_description():
+def test_from_url_keeps_the_page_text_when_the_json_ld_description_is_a_shorter_teaser():
     posting = from_url(PAGE_WITH_GRAPH, "https://www.wantedly.com/projects/2576097")
 
-    assert "出店戦略と新業態を主導するポジションです。" in posting["description"]
+    assert posting["description"] == "Wantedly\n事業開発\n出店戦略と新業態を主導するポジションです。"
+
+
+SCRIPT_RENDERED_LD = {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    "title": "Engineering Manager - Realtime",
+    "hiringOrganization": {"@type": "Organization", "name": "Acme"},
+    "description": "<p>About the role</p><ul><li>Lead the Realtime team</li><li>Run Elixir in production</li></ul>",
+}
+
+
+def script_rendered_page(ld: dict, title: str = "Engineering Manager - Realtime @ Acme") -> str:
+    return (
+        f"<html><head><title>{title}</title>"
+        f'<script type="application/ld+json">{json.dumps(ld)}</script></head>'
+        '<body><div id="root"></div></body></html>'
+    )
+
+
+def html_response(page: str):
+    return lambda request: httpx.Response(200, headers={"content-type": "text/html"}, text=page)
+
+
+async def test_a_pasted_url_whose_page_is_rendered_by_script_sends_the_json_ld_description():
+    transport = httpx.MockTransport(html_response(script_rendered_page(SCRIPT_RENDERED_LD)))
+    async with httpx.AsyncClient(transport=transport) as client:
+        job = JobPosting.model_validate(await fetch_url(client, "https://jobs.ashbyhq.com/acme/1"))
+        text = await model_input(client, job)
+
+    assert text == (
+        "Engineering Manager - Realtime\n\n"
+        "About the role\nLead the Realtime team\nRun Elixir in production"
+    )
+
+
+VISIBLE_POSTING = """
+<html><head><title>SRE @ Acme</title>{ld}</head>
+<body><h1>SRE</h1><p>Keep the Tokyo cluster up.</p></body></html>
+"""
+
+
+@pytest.mark.parametrize(
+    "ld",
+    [
+        pytest.param({"@type": "JobPosting", "title": "SRE"}, id="absent"),
+        pytest.param({"@type": "JobPosting", "title": "SRE", "description": ""}, id="empty"),
+        pytest.param({"@type": "JobPosting", "title": "SRE", "description": " <p> </p> "}, id="blank"),
+        pytest.param({"@type": "JobPosting", "title": "SRE", "description": 42}, id="a number"),
+        pytest.param({"@type": "JobPosting", "title": "SRE", "description": ["Run Kubernetes"]}, id="a list"),
+        pytest.param(
+            {"@type": "JobPosting", "title": "SRE", "description": {"text": "Run Kubernetes"}},
+            id="an object",
+        ),
+    ],
+)
+def test_from_url_falls_back_to_the_page_text_without_a_usable_json_ld_description(ld):
+    page = VISIBLE_POSTING.format(ld=f'<script type="application/ld+json">{json.dumps(ld)}</script>')
+
+    assert from_url(page, "https://example.com/1")["description"] == "SRE @ Acme\nSRE\nKeep the Tokyo cluster up."
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        pytest.param(
+            script_rendered_page({key: value for key, value in SCRIPT_RENDERED_LD.items() if key != "description"}),
+            id="title and company from json-ld",
+        ),
+        pytest.param(
+            script_rendered_page(
+                {**SCRIPT_RENDERED_LD, "description": "<p>ENGINEERING MANAGER - REALTIME</p>"},
+                title="Engineering Manager - Realtime | acme",
+            ),
+            id="the json-ld description repeats the title",
+        ),
+        pytest.param(
+            '<html><head><title>SRE</title></head><body><div id="root"></div></body></html>',
+            id="only a title tag",
+        ),
+    ],
+)
+async def test_fetch_url_refuses_a_page_with_nothing_but_its_title(page):
+    async with httpx.AsyncClient(transport=httpx.MockTransport(html_response(page))) as client:
+        with pytest.raises(ValueError, match="https://example.com/1 has no posting text beyond its title"):
+            await fetch_url(client, "https://example.com/1")
+
+
+async def test_fetch_url_accepts_a_short_posting_that_says_more_than_its_title():
+    page = script_rendered_page({**SCRIPT_RENDERED_LD, "description": "<p>On call.</p>"})
+    async with httpx.AsyncClient(transport=httpx.MockTransport(html_response(page))) as client:
+        posting = await fetch_url(client, "https://example.com/1")
+
+    assert posting["description"] == "On call."
 
 
 def page_with_job_location(job_location) -> str:

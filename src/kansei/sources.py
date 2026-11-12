@@ -184,20 +184,33 @@ def from_hrmos(page: str, token: str, job_id: str, headline: str) -> dict:
     }
 
 
+def says_more_than(text: str, *names: str | None) -> bool:
+    rest = text.casefold()
+    for name in names:
+        if name:
+            rest = rest.replace(name.casefold(), "")
+    return bool(re.search(r"\w", rest))
+
+
 def from_url(page: str, url: str) -> dict:
     soup = BeautifulSoup(page, "html.parser")
     posting = job_posting_ld(soup)
     heading = soup.h1 or soup.title
+    title = posting.get("title") or (heading.get_text(strip=True) if heading else "")
+    company_name = hiring_organization_name(posting)
+    structured = posting.get("description")
+    # Script-rendered pages show only their title, while some sites' JSON-LD holds only a teaser.
+    texts = [page_text(soup), html_to_text(structured) if isinstance(structured, str) else ""]
     return {
         "source": "url",
         "token": urlsplit(url).netloc,
         "id": url,
-        "title": posting.get("title") or (heading.get_text(strip=True) if heading else ""),
+        "title": title,
         "url": url,
         "posted_at": posting.get("datePosted"),
         "location": job_location(posting),
-        "company_name": hiring_organization_name(posting),
-        "description": page_text(soup),
+        "company_name": company_name,
+        "description": max(texts, key=lambda text: (says_more_than(text, title, company_name), len(text))),
         "headline": None,
     }
 
@@ -290,7 +303,10 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> dict:
         raise ValueError(f"{url} redirected to {response.url}")
     if "text/html" not in content_type:
         raise ValueError(f"{url} returned {content_type or 'no content type'}, not HTML")
-    return from_url(response.text, url)
+    posting = from_url(response.text, url)
+    if not says_more_than(posting["description"], posting["title"], posting["company_name"]):
+        raise ValueError(f"{url} has no posting text beyond its title")
+    return posting
 
 
 async def greenhouse_name(client: httpx.AsyncClient, token: str) -> str:
