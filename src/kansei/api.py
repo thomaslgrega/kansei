@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import Select, delete, func, select, tuple_
+from sqlalchemy import Select, delete, func, select, true, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -28,6 +28,7 @@ from kansei.db import (
     Stage,
     Tracked,
 )
+from kansei.japanese import JapaneseRequirement, japanese_requirement, passes_japanese
 from kansei.llm import PostingFacts, prompt_snapshot
 from kansei.ratelimit import PROBE_PER_USER, Now, rate_limit
 from kansei.sources import (
@@ -87,12 +88,17 @@ class PostingDetail(BaseModel):
 class PostingWithFacts(BaseModel):
     posting: PostingOut
     facts: PostingFacts
+    japanese_requirement: JapaneseRequirement
     sales_or_support: bool
 
 
 @api.get("/postings")
 def list_postings(
-    session: SessionDep, token: str | None = None, following: bool = False, cookie: SessionCookie = None
+    session: SessionDep,
+    token: str | None = None,
+    following: bool = False,
+    japanese: str = "any",
+    cookie: SessionCookie = None,
 ) -> list[PostingWithFacts]:
     prompt_sha, _ = prompt_snapshot()
     newest = (
@@ -102,10 +108,11 @@ def list_postings(
         .order_by(Extraction.posting_id, Extraction.created_at.desc(), Extraction.id.desc())
         .subquery()
     )
+    requirement = japanese_requirement(newest.c.facts)
     statement = (
-        select(Posting, newest.c.facts)
+        select(Posting, newest.c.facts, requirement)
         .join(newest, newest.c.posting_id == Posting.id)
-        .where(Posting.listed)
+        .where(Posting.listed, passes_japanese(requirement, japanese))
         .order_by(Posting.first_seen_at.desc(), Posting.id.desc())
     )
     if token is not None:
@@ -122,9 +129,10 @@ def list_postings(
         PostingWithFacts(
             posting=PostingOut.model_validate(posting),
             facts=facts,
+            japanese_requirement=requirement,
             sales_or_support=is_sales_or_support(posting.title),
         )
-        for posting, facts in session.execute(statement)
+        for posting, facts, requirement in session.execute(statement)
         if is_candidate(posting)
     ]
 
@@ -174,18 +182,23 @@ class TrackedOut(BaseModel):
     moved_at: datetime
     posting: PostingOut
     facts: PostingFacts | None
+    japanese_requirement: JapaneseRequirement | None
 
 
-def select_tracked(user_id: int) -> Select[tuple[Tracked, dict | None]]:
+def select_tracked(user_id: int) -> Select[tuple[Tracked, dict | None, str | None]]:
     # Any model or prompt: a tracked posting that stopped being listed is never extracted again.
-    newest_facts = (
+    newest = (
         select(Extraction.facts)
         .where(Extraction.posting_id == Tracked.posting_id)
         .order_by(Extraction.created_at.desc(), Extraction.id.desc())
         .limit(1)
-        .scalar_subquery()
+        .lateral()
     )
-    return select(Tracked, newest_facts).where(Tracked.user_id == user_id)
+    return (
+        select(Tracked, newest.c.facts, japanese_requirement(newest.c.facts))
+        .outerjoin(newest, true())
+        .where(Tracked.user_id == user_id)
+    )
 
 
 def facts_or_none(facts: dict | None) -> PostingFacts | None:
@@ -196,7 +209,8 @@ def facts_or_none(facts: dict | None) -> PostingFacts | None:
         return None
 
 
-def tracked_out(tracked: Tracked, facts: dict | None) -> TrackedOut:
+def tracked_out(tracked: Tracked, facts: dict | None, requirement: str | None) -> TrackedOut:
+    posting_facts = facts_or_none(facts)
     return TrackedOut(
         id=tracked.id,
         stage=tracked.stage,
@@ -205,19 +219,19 @@ def tracked_out(tracked: Tracked, facts: dict | None) -> TrackedOut:
         tracked_at=tracked.created_at,
         moved_at=tracked.moved_at,
         posting=PostingOut.model_validate(tracked.posting),
-        facts=facts_or_none(facts),
+        facts=posting_facts,
+        japanese_requirement=requirement if posting_facts else None,
     )
 
 
 def get_tracked(session: Session, user_id: int, tracked_id: int) -> TrackedOut:
-    tracked, facts = session.execute(select_tracked(user_id).where(Tracked.id == tracked_id)).one()
-    return tracked_out(tracked, facts)
+    return tracked_out(*session.execute(select_tracked(user_id).where(Tracked.id == tracked_id)).one())
 
 
 @api.get("/me/tracked")
 def list_tracked(user: CurrentUser, session: SessionDep) -> list[TrackedOut]:
     rows = session.execute(select_tracked(user.id).order_by(Tracked.moved_at.desc(), Tracked.id.desc()))
-    return [tracked_out(tracked, facts) for tracked, facts in rows]
+    return [tracked_out(*row) for row in rows]
 
 
 @api.post("/me/tracked", status_code=201)

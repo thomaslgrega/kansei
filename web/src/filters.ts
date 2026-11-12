@@ -12,3 +12,11 @@ export function filtersToSearch(filters: Filters): string {
     if (filters.showSales) params.set('sales', '1')
     return params.toString()
 }
+
+export function postingsUrl(followingOnly: boolean, japanese: JapaneseChoice): string {
+    const params = new URLSearchParams()
+    if (followingOnly) params.set('following', 'true')
+    if (japanese !== 'any') params.set('japanese', japanese)
+    const search = params.toString()
+    return search ? `/api/postings?${search}` : '/api/postings'
+}
