@@ -184,20 +184,38 @@ def from_hrmos(page: str, token: str, job_id: str, headline: str) -> dict:
     }
 
 
+def says_more_than(text: str, names: list[str]) -> bool:
+    rest = text.casefold()
+    # Longest first, so "SRE" doesn't leave "@ Acme" behind from "SRE @ Acme".
+    for name in sorted(names, key=len, reverse=True):
+        rest = rest.replace(name.casefold(), "")
+    return bool(re.search(r"\w", rest))
+
+
 def from_url(page: str, url: str) -> dict:
     soup = BeautifulSoup(page, "html.parser")
     posting = job_posting_ld(soup)
     heading = soup.h1 or soup.title
+    title = posting.get("title") or (heading.get_text(strip=True) if heading else "")
+    company_name = hiring_organization_name(posting)
+    shown = [tag.get_text(strip=True) for tag in (soup.title, soup.h1) if tag]
+    names = [name for name in (title, company_name, *shown) if name]
+    ld_description = posting.get("description")
+    # Script-rendered pages show only their title, while some sites' JSON-LD holds only a teaser.
+    candidates = [page_text(soup), html_to_text(ld_description) if isinstance(ld_description, str) else ""]
+    description = max(candidates, key=lambda text: (says_more_than(text, names), len(text)))
+    if not says_more_than(description, names):
+        raise ValueError(f"{url} has no posting text beyond its title")
     return {
         "source": "url",
         "token": urlsplit(url).netloc,
         "id": url,
-        "title": posting.get("title") or (heading.get_text(strip=True) if heading else ""),
+        "title": title,
         "url": url,
         "posted_at": posting.get("datePosted"),
         "location": job_location(posting),
-        "company_name": hiring_organization_name(posting),
-        "description": page_text(soup),
+        "company_name": company_name,
+        "description": description,
         "headline": None,
     }
 
