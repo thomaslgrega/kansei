@@ -8,7 +8,7 @@ Live: https://kansei.cloud.run/
 
 - Reads postings from Greenhouse, Lever, Ashby, HRMOS, or a job page URL.
 - Removes HTML and converts each source into the same posting format, checked with Pydantic.
-- Uses OpenAI structured outputs to extract a role summary, seniority, required skills, Japanese requirements, and remote work policy.
+- Uses OpenAI structured outputs to extract a role summary, specialties, seniority, required skills, Japanese requirements, and remote work policy.
 - Processes several postings at a time, limits concurrent requests, and reports failures for individual postings.
 - Reports API cost and median and p95 request times.
 - Shows the open postings on a public web page with the extracted facts, newest first. Sales and support roles are hidden until you ask for them, and logged-in users can track postings.
@@ -55,7 +55,7 @@ Extractions are stored too, with the exact text the model read. A posting is sen
 
 ## Evaluation
 
-I label postings by hand and compare the model's answers with those labels. Seniority, Japanese requirements, and remote policy are scored by field. Required skills are scored with precision, recall, and F1, using exact skill names.
+I label postings by hand and compare the model's answers with those labels. Seniority, Japanese requirements, and remote policy are scored by field. Required skills are scored with precision, recall, and F1, using exact skill names. Specialties are scored two ways: whether the model's set matches mine exactly, and precision and recall for each specialty.
 
 Each posting is saved as the exact text sent to the model. Freezing more postings adds new ones without changing existing text. The labeling rules live in [llm.py](src/kansei/llm.py), so the model and I use the same definitions. Each run saves its answers and a hash of the instructions and schema, with a copy of that prompt saved separately.
 

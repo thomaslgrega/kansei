@@ -5,6 +5,7 @@ import pytest
 
 from kansei import evals
 from kansei.evals import (
+    DUTIES,
     LABELS,
     MANIFEST,
     POSTINGS,
@@ -18,9 +19,12 @@ from kansei.evals import (
     load,
     manifest_entry,
     per_board,
+    per_specialty,
     precision_recall_f1,
+    print_posting,
     score,
     skill_misses,
+    specialty_misses,
 )
 
 THEN = datetime(2026, 9, 26, tzinfo=UTC)
@@ -130,6 +134,53 @@ def test_skills_score_as_sets_of_exact_names_and_skip_unlabeled_postings():
     assert precision_recall_f1(list(diffs.values())) == pytest.approx((1/2, 2/3, 4/7))
 
 
+def test_specialties_score_by_exact_set_and_by_specialty_skipping_unlabeled_postings():
+    labels = [
+        answers("https://a", specialties=["backend"]),
+        answers("https://b", specialties=["backend", "frontend"]),
+        answers("https://c", specialties=["management", "mobile"]),
+        answers("https://d", specialties=["mobile"]),
+        answers("https://e"),
+        answers("https://f", specialties=[]),
+        answers("https://g", specialties=[]),
+    ]
+    predictions = [
+        answers("https://a", specialties=["backend"]),
+        answers("https://b", specialties=["backend"]),
+        answers("https://c", specialties=["mobile", "management"]),
+        answers("https://d", specialties=["backend", "mobile"]),
+        answers("https://e", specialties=["qa"]),
+        answers("https://f", specialties=[]),
+        answers("https://g", specialties=["qa"]),
+    ]
+
+    by_specialty = per_specialty(labels, predictions)
+
+    assert specialty_misses(labels, predictions) == ["https://b", "https://d", "https://g"]
+    assert by_specialty == {
+        "backend": SkillDiff(found={"https://a", "https://b"}, extra={"https://d"}, missed=set()),
+        "frontend": SkillDiff(found=set(), extra=set(), missed={"https://b"}),
+        "mobile": SkillDiff(found={"https://c", "https://d"}, extra=set(), missed=set()),
+        "management": SkillDiff(found={"https://c"}, extra=set(), missed=set()),
+        "qa": SkillDiff(found=set(), extra={"https://g"}, missed=set()),
+    }
+    assert {s: precision_recall_f1([diff])[:2] for s, diff in by_specialty.items()} == pytest.approx({
+        "backend": (2/3, 1.0),
+        "frontend": (0.0, 0.0),
+        "mobile": (1.0, 1.0),
+        "management": (1.0, 1.0),
+        "qa": (0.0, 0.0),
+    })
+
+
+def test_a_hand_written_fullstack_label_is_also_frontend_and_backend():
+    assert Label.model_validate_json(
+        '{"url": "https://a", "seniority": "not_stated", "japanese_required": "not_stated", '
+        '"japanese_level": "not_stated", "jlpt": "not_stated", "remote_policy": "not_stated", '
+        '"specialties": ["fullstack"]}'
+    ).specialties == ["backend", "frontend", "fullstack"]
+
+
 def test_skill_misses_counts_runs_per_posting_not_names():
     labels = [
         answers("https://a", must_have_skills=["C", "C++"]),
@@ -172,6 +223,49 @@ def test_no_dev_run_has_seen_a_test_posting():
     }
 
     assert seen & test_set == set()
+
+
+def test_specialty_labeling_marks_only_the_duties_headings(capsys):
+    posting = FrozenPosting(
+        url="https://a",
+        title="Software Engineer",
+        text=(
+            "Software Engineer\n"
+            "【具体的な業務内容】\n"
+            "決済システムのバックエンド開発\n"
+            "What You'll Do:\n"
+            "Build our iOS app.\n"
+            "必須条件\n"
+            "業務内容に関わる3年以上の経験\n"
+            "Nice to have: React"
+        ),
+        frozen_at=THEN,
+    )
+
+    print_posting(posting, DUTIES)
+
+    assert capsys.readouterr().out.splitlines() == [
+        "",
+        "=" * 72,
+        "  Software Engineer",
+        "» 【具体的な業務内容】",
+        "  決済システムのバックエンド開発",
+        "» What You'll Do:",
+        "  Build our iOS app.",
+        "  必須条件",
+        "  業務内容に関わる3年以上の経験",
+        "  Nice to have: React",
+        "",
+        "https://a",
+    ]
+
+
+def test_specialties_command_labels_the_urls_it_names(monkeypatch):
+    calls = []
+    monkeypatch.setattr(sys, "argv", ["kansei-eval", "specialties", "https://a"])
+    monkeypatch.setattr(evals, "label_specialties", calls.append)
+    evals.main()
+    assert calls == [["https://a"]]
 
 
 @pytest.mark.parametrize(("args", "expected"), [

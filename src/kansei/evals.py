@@ -24,13 +24,17 @@ from kansei import (
 from kansei.config import settings
 from kansei.db import engine
 from kansei.llm import (
+    SPECIALTIES,
     JapaneseLevel,
     JapaneseRequired,
     Jlpt,
     RemotePolicy,
     Seniority,
+    Specialties,
+    Specialty,
     cost_usd,
     extract,
+    normalize_specialties,
     openai_client,
     prompt_snapshot,
 )
@@ -48,6 +52,13 @@ MARK = re.compile(
     r"japanese|日本語|jlpt|remote|hybrid|on-?site|office|リモート|在宅|出社|ハイブリッド|オフィス|勤務"
     r"|senior|junior|staff|principal|シニア|ジュニア"
     r"|qualifications|nice to have|what you.ll need|必須条件|歓迎条件",
+    re.IGNORECASE,
+)
+# Whole heading lines only: 業務 also appears inside requirement sentences.
+DUTIES = re.compile(
+    r"^\W*([^。、\s]{0,20}業務内容|業務について|仕事内容|職務内容|職種概要"
+    r"|(key |primary )?responsibilities|what you.ll do|what you will do|the impact you will have"
+    r"|about the role|job description)\W*$",
     re.IGNORECASE,
 )
 TEST_BOARDS = ["lever:mujininc", "greenhouse:databricks", "greenhouse:datadog", "greenhouse:paypaycard"]
@@ -80,8 +91,9 @@ class Label(BaseModel):
     jlpt: Jlpt
     remote_policy: RemotePolicy
     must_have_skills: list[str] | None = None
+    specialties: Specialties | None = None
 
-FIELDS = [name for name in Label.model_fields if name not in {"url", "must_have_skills"}]
+FIELDS = [name for name in Label.model_fields if name not in {"url", "must_have_skills", "specialties"}]
 
 
 class SkillDiff(NamedTuple):
@@ -133,6 +145,34 @@ def skill_misses(labels: list[Label], runs: list[list[Label]]) -> Counter[str]:
             if diff.extra or diff.missed:
                 misses[url] += 1
     return misses
+
+
+def specialty_pairs(labels: list[Label], predictions: list[Label]) -> list[tuple[str, set[str], set[str]]]:
+    predicted = {p.url: p.specialties for p in predictions}
+    return [
+        (label.url, set(label.specialties), set(predicted[label.url]))
+        for label in labels
+        if label.specialties is not None and predicted[label.url] is not None
+    ]
+
+
+def specialty_misses(labels: list[Label], predictions: list[Label]) -> list[str]:
+    return [url for url, want, got in specialty_pairs(labels, predictions) if want != got]
+
+
+def per_specialty(labels: list[Label], predictions: list[Label]) -> dict[Specialty, SkillDiff]:
+    """Per specialty, the postings it was rightly given, wrongly given, and missed on."""
+    pairs = specialty_pairs(labels, predictions)
+    diffs = {}
+    for specialty in SPECIALTIES:
+        diff = SkillDiff(
+            found={url for url, want, got in pairs if specialty in want and specialty in got},
+            extra={url for url, want, got in pairs if specialty not in want and specialty in got},
+            missed={url for url, want, got in pairs if specialty in want and specialty not in got},
+        )
+        if any(diff):
+            diffs[specialty] = diff
+    return diffs
 
 
 def per_board(jobs: list[JobPosting], k: int) -> list[JobPosting]:
@@ -226,6 +266,15 @@ def ask_skills(text: str) -> list[str]:
         print(f"not in the posting as written: {', '.join(missing)}")
 
 
+def ask_specialties() -> list[Specialty]:
+    options = "  ".join(f"{i}={value}" for i, value in enumerate(SPECIALTIES, 1))
+    while True:
+        answer = input(f"specialties    space-separated, empty for other   {options}\n> ")
+        numbers = answer.replace(",", " ").split()
+        if all(n.isdigit() and 1 <= int(n) <= len(SPECIALTIES) for n in numbers):
+            return normalize_specialties([SPECIALTIES[int(n) - 1] for n in numbers])
+
+
 async def predict(llm: AsyncOpenAI, limit: asyncio.Semaphore, posting: FrozenPosting) -> tuple[Label, float]:
     async with limit:
         response = await extract(llm, posting.text)
@@ -249,10 +298,10 @@ async def run(split: Split) -> None:
     print(f"{len(results)} postings, ${sum(cost for _, cost in results):.4f}, saved {path.name}")
 
 
-def print_posting(posting: FrozenPosting) -> None:
+def print_posting(posting: FrozenPosting, mark: re.Pattern[str] = MARK) -> None:
     print("\n" + "=" * 72)
     for line in posting.text.splitlines():
-        print(("» " if MARK.search(line) else "  ") + line)
+        print(("» " if mark.search(line) else "  ") + line)
     print(f"\n{posting.url}")
 
 
@@ -296,6 +345,30 @@ def report(run: Path) -> None:
             print(f"\nmust_have_skills: model extra {extra} | missed {missed}")
             print(f"  {titles[url]}\n  {url}")
 
+    print_specialties(labels, list(predicted.values()), titles)
+
+
+def print_specialties(labels: list[Label], predictions: list[Label], titles: dict[str, str]) -> None:
+    n = len(specialty_pairs(labels, predictions))
+    if not n:
+        print(f"\n{'specialties':18} not in this run")
+        return
+    misses = specialty_misses(labels, predictions)
+    print(f"\n{'specialties':18} {n - len(misses):2}/{n}    {(n - len(misses)) / n:4.0%}    exact set")
+    for specialty, diff in per_specialty(labels, predictions).items():
+        precision, recall, _ = precision_recall_f1([diff])
+        print(
+            f"  {specialty:16} P {precision:4.0%}  R {recall:4.0%}    "
+            f"{len(diff.found)} found, {len(diff.extra)} extra, {len(diff.missed)} missed"
+        )
+    by_url = {label.url: label for label in labels}
+    predicted = {p.url: p for p in predictions}
+    for url in misses:
+        you = ", ".join(by_url[url].specialties) or "other"
+        model = ", ".join(predicted[url].specialties) or "other"
+        print(f"\nspecialties: you {you}, model {model}")
+        print(f"  {titles[url]}\n  {url}")
+
 
 def compare(old: str, new: str) -> None:
     runs = {sha: [load(path, Label) for path in sorted(RUNS.glob(f"*-{settings.openai_model}-{sha}.jsonl"))] for sha in (old, new)}
@@ -326,6 +399,7 @@ def label(urls: list[str], split: Split = "dev") -> None:
         print_posting(posting)
         answers = {name: ask(name, values) for name, values in fields.items()}
         answers["must_have_skills"] = ask_skills(posting.text)
+        answers["specialties"] = ask_specialties()
         with LABELS.open("a", encoding="utf-8") as f:
             f.write(Label(url=posting.url, **answers).model_dump_json() + "\n")
         done.add(posting.url)
@@ -345,6 +419,21 @@ def label_skills(urls: list[str]) -> None:
         save(LABELS, list(labels.values()))
         done = sum(label.must_have_skills is not None for label in labels.values())
         print(f"saved: {done} of {len(labels)} have skills")
+
+
+def label_specialties(urls: list[str]) -> None:
+    labels = {label.url: label for label in load(LABELS, Label)}
+    todo = [
+        p for p in load(POSTINGS, FrozenPosting)
+        if p.url in labels and labels[p.url].specialties is None and (not urls or p.url in urls)
+    ]
+
+    for posting in todo:
+        print_posting(posting, DUTIES)
+        labels[posting.url].specialties = ask_specialties()
+        save(LABELS, list(labels.values()))
+        done = sum(label.specialties is not None for label in labels.values())
+        print(f"saved: {done} of {len(labels)} have specialties")
 
 
 def main() -> None:
@@ -384,5 +473,10 @@ def main() -> None:
                 label_skills(urls)
             except (KeyboardInterrupt, EOFError):
                 print("\nstopped. Every posting you finished is saved.")
+        case ["specialties", *urls]:
+            try:
+                label_specialties(urls)
+            except (KeyboardInterrupt, EOFError):
+                print("\nstopped. Every posting you finished is saved.")
         case _:
-            sys.exit("usage: kansei-eval freeze [URL ...] | freeze-test | label [test | URL ...] | skills [URL ...] | manifest | run [test] | score [RUN] | compare OLD NEW | show URL ...")
+            sys.exit("usage: kansei-eval freeze [URL ...] | freeze-test | label [test | URL ...] | skills [URL ...] | specialties [URL ...] | manifest | run [test] | score [RUN] | compare OLD NEW | show URL ...")
