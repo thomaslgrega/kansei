@@ -1,4 +1,4 @@
-type Place = { pathname: string; search: string; hash: string }
+export type Place = { pathname: string; search: string; hash: string }
 
 const SAME_ORIGIN = 'https://kansei.invalid'
 

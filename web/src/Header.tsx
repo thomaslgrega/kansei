@@ -17,7 +17,7 @@ export default function Header({ email, onLogOut }: Props) {
                     <Link
                         key={link.label}
                         to={link.to}
-                        className={link.look === 'button' ? 'nav-link nav-signup' : 'nav-link'}
+                        className={link.look === 'button' ? 'nav-signup' : 'nav-link'}
                         aria-current={link.current ? 'page' : undefined}
                     >
                         {link.label}

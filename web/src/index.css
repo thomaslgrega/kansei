@@ -65,16 +65,9 @@ a {
 
 .nav-signup {
   padding: 0.35rem 0.85rem;
-  border: none;
   border-radius: 0.4rem;
-  background: var(--accent);
-  color: var(--on-accent);
   font-weight: 600;
-}
-
-.nav-signup:hover {
-  background: var(--accent-hover);
-  color: var(--on-accent);
+  text-decoration: none;
 }
 
 .nav-signup[aria-current="page"] {
@@ -227,19 +220,24 @@ li {
   font-size: 0.9em;
 }
 
+.auth-submit,
+.nav-signup {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.auth-submit:hover,
+.nav-signup:hover {
+  background: var(--accent-hover);
+}
+
 .auth-submit {
   height: 2.9rem;
   border: 0;
   border-radius: 0.6rem;
-  background: var(--accent);
-  color: var(--on-accent);
   font: inherit;
   font-weight: 650;
   cursor: pointer;
-}
-
-.auth-submit:hover {
-  background: var(--accent-hover);
 }
 
 .auth-submit:disabled {

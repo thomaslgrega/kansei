@@ -1,6 +1,4 @@
-import { loginHref } from './loginRedirect'
-
-type Place = { pathname: string; search: string; hash: string }
+import { loginHref, type Place } from './loginRedirect'
 
 export type NavLink = {
     label: string
@@ -10,7 +8,7 @@ export type NavLink = {
 }
 
 export function navLinks(loggedIn: boolean, place: Place): NavLink[] {
-    const link = (label: string, to: string, path: string, look: NavLink['look'] = 'link'): NavLink => ({
+    const link = (label: string, to: string, look: NavLink['look'] = 'link', path = to): NavLink => ({
         label,
         to,
         look,
@@ -18,7 +16,7 @@ export function navLinks(loggedIn: boolean, place: Place): NavLink[] {
     })
 
     if (!loggedIn) {
-        return [link('Log in', loginHref(place), '/login'), link('Sign up', '/signup', '/signup', 'button')]
+        return [link('Log in', loginHref(place), 'link', '/login'), link('Sign up', '/signup', 'button')]
     }
-    return [link('Postings', '/', '/'), link('Following', '/following', '/following'), link('Tracker', '/tracker', '/tracker')]
+    return [link('Postings', '/'), link('Following', '/following'), link('Tracker', '/tracker')]
 }
