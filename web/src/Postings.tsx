@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
 import { type Filters, filtersToSearch, postingsUrl, readFilters } from "./filters";
-import { capitalize, JAPANESE_CHOICES, type JapaneseRequirement, readJapaneseChoice } from "./japanese";
+import Dropdown from "./Dropdown";
+import { JAPANESE_OPTIONS, type JapaneseRequirement } from "./japanese";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo, lastChecked } from "./checked";
 import type { TrackControls } from "./tracked";
@@ -87,17 +88,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 {checkedAt && <span className="muted">checked {checkedAgo(checkedAt, now)}</span>}
             </div>
             <div className="filters">
-                <label>
-                    My Japanese{' '}
-                    <select
-                        value={filters.japanese}
-                        onChange={(event) => setFilters({ japanese: readJapaneseChoice(event.target.value) })}
-                    >
-                        {JAPANESE_CHOICES.map((choice) => (
-                            <option key={choice} value={choice}>{capitalize(choice)}</option>
-                        ))}
-                    </select>
-                </label>
+                <Dropdown label="My Japanese" options={JAPANESE_OPTIONS} value={filters.japanese} onChange={(japanese) => setFilters({ japanese })} />
                 <label>
                     <input type="checkbox" checked={filters.showSales} onChange={(event) => setFilters({ showSales: event.target.checked })} />
                     Show sales and support roles ({hidden})
