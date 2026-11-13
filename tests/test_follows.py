@@ -107,7 +107,7 @@ def test_following_lists_only_open_candidates_with_an_extraction_from_followed_b
     response = client.get("/api/postings", params={"following": "true"})
 
     assert response.status_code == 200
-    assert [row["posting"]["url"] for row in response.json()] == ["https://example.com/followed"]
+    assert [row["posting"]["url"] for row in response.json()["postings"]] == ["https://example.com/followed"]
 
 
 def test_following_applies_my_japanese_and_specialty_too(client, session, log_in_as, make_posting, boards):
@@ -125,9 +125,9 @@ def test_following_applies_my_japanese_and_specialty_too(client, session, log_in
     log_in_as("ada@example.com")
     client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
 
-    response = client.get("/api/postings", params={"following": "true", "japanese": "none", "specialty": "backend"})
+    body = client.get("/api/postings", params={"following": "true", "japanese": "none", "specialty": "backend"}).json()
 
-    assert [row["posting"]["url"] for row in response.json()] == ["https://example.com/followed"]
+    assert ([row["posting"]["url"] for row in body["postings"]], body["total"]) == (["https://example.com/followed"], 1)
 
 
 def test_following_postings_while_logged_out_is_401(client):

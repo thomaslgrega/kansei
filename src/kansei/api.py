@@ -92,6 +92,16 @@ class PostingWithFacts(BaseModel):
     japanese_requirement: JapaneseRequirement
 
 
+class PostingsPage(BaseModel):
+    postings: list[PostingWithFacts]
+    total: int
+    page: int
+    checked_at: datetime | None
+
+
+PAGE_SIZE = 50
+
+
 @api.get("/postings")
 def list_postings(
     session: SessionDep,
@@ -99,8 +109,9 @@ def list_postings(
     following: bool = False,
     japanese: str = "any",
     specialty: str | None = None,
+    page: str = "1",
     cookie: SessionCookie = None,
-) -> list[PostingWithFacts]:
+) -> PostingsPage:
     prompt_sha, _ = prompt_snapshot()
     newest = (
         select(Extraction.posting_id, Extraction.facts)
@@ -130,15 +141,37 @@ def list_postings(
             .where(Follow.user_id == user.id)
         )
         statement = statement.where(tuple_(Posting.source, Posting.token).in_(followed))
-    return [
-        PostingWithFacts(
-            posting=PostingOut.model_validate(posting),
-            facts=facts,
-            japanese_requirement=requirement,
-        )
-        for posting, facts, requirement in session.execute(statement)
-        if is_candidate(posting)
+    # is_candidate runs in Python, so the few columns it needs come first for every posting, and facts for the page after.
+    candidates = [
+        row
+        for row in session.execute(statement.with_only_columns(
+            Posting.id, Posting.source, Posting.title, Posting.headline, Posting.location, Posting.last_seen_at
+        ))
+        if is_candidate(row)
     ]
+    served = page_to_serve(page, len(candidates))
+    shown = [row.id for row in candidates[(served - 1) * PAGE_SIZE:served * PAGE_SIZE]]
+    return PostingsPage(
+        postings=[
+            PostingWithFacts(
+                posting=PostingOut.model_validate(posting),
+                facts=facts,
+                japanese_requirement=requirement,
+            )
+            for posting, facts, requirement in session.execute(statement.where(Posting.id.in_(shown)))
+        ],
+        total=len(candidates),
+        page=served,
+        checked_at=max((row.last_seen_at for row in candidates if row.source != "url"), default=None),
+    )
+
+
+def page_to_serve(page: str, total: int) -> int:
+    last = max(1, -(-total // PAGE_SIZE))
+    try:
+        return min(max(1, int(page)), last)
+    except ValueError:
+        return 1
 
 
 @api.get("/postings/{posting_id}")

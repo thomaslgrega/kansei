@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { filtersToSearch, postingsUrl, readFilters } from './filters'
+import { type Filters, filtersToSearch, postingsUrl, readFilters } from './filters'
 
 test('reads both filters from the query string and ignores sales', () => {
     const searches = ['?japanese=basic&specialty=backend,ml', '?japanese=native', '?specialty=', '?sales=1', '']
@@ -53,5 +53,25 @@ test('the postings URL asks for followed boards, My Japanese and Specialty, and 
         '/api/postings?following=true',
         '/api/postings?japanese=none&specialty=',
         '/api/postings?following=true&japanese=business&specialty=backend,other',
+    ])
+})
+
+test('the page goes after the filters in both URLs, and page 1 is left out', () => {
+    const filters: Filters = { japanese: 'basic', specialties: ['ml'] }
+
+    expect([
+        filtersToSearch(filters, 3),
+        filtersToSearch(filters, 1),
+        filtersToSearch({ japanese: 'any', specialties: null }, 2),
+        postingsUrl(true, filters, 3),
+        postingsUrl(false, { japanese: 'any', specialties: null }, 2),
+        postingsUrl(false, filters, 1),
+    ]).toEqual([
+        'japanese=basic&specialty=ml&page=3',
+        'japanese=basic&specialty=ml',
+        'page=2',
+        '/api/postings?following=true&japanese=basic&specialty=ml&page=3',
+        '/api/postings?page=2',
+        '/api/postings?japanese=basic&specialty=ml',
     ])
 })

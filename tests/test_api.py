@@ -64,7 +64,7 @@ def test_list_postings_shows_each_open_candidate_once_with_its_newest_extraction
     response = client.get("/api/postings", params={"token": "kansei-test"})
 
     assert response.status_code == 200
-    assert [(row["posting"]["url"], row["facts"]["role_summary"]) for row in response.json()] == [
+    assert [(row["posting"]["url"], row["facts"]["role_summary"]) for row in response.json()["postings"]] == [
         ("https://example.com/1", "Newest."),
     ]
 
@@ -84,7 +84,7 @@ def test_list_postings_shows_an_hrmos_candidate_by_its_headline_and_with_no_loca
 
     response = client.get("/api/postings", params={"token": "kansei-test"})
 
-    assert sorted(row["posting"]["url"] for row in response.json()) == [
+    assert sorted(row["posting"]["url"] for row in response.json()["postings"]) == [
         "https://example.com/1", "https://example.com/2",
     ]
 
@@ -97,7 +97,7 @@ def test_list_postings_puts_the_newest_first_seen_first(client, session, make_po
 
     response = client.get("/api/postings", params={"token": "kansei-test"})
 
-    assert [row["posting"]["url"] for row in response.json()] == ["https://example.com/2", "https://example.com/1"]
+    assert [row["posting"]["url"] for row in response.json()["postings"]] == ["https://example.com/2", "https://example.com/1"]
 
 
 def test_get_posting_returns_404_for_a_posting_that_doesnt_exist(client):
@@ -130,7 +130,7 @@ def test_a_posting_whose_board_has_a_name_shows_that_name_everywhere(client, ses
     log_in_as("ada@example.com")
     client.post("/api/me/tracked", json={"posting_id": posting_id})
 
-    listed = client.get("/api/postings", params={"token": "kansei-test"}).json()
+    listed = client.get("/api/postings", params={"token": "kansei-test"}).json()["postings"]
     single = client.get(f"/api/postings/{posting_id}").json()
     tracked = client.get("/api/me/tracked").json()
 
@@ -181,7 +181,7 @@ def test_a_posting_carries_its_boards_logo_url_or_null(client, session, make_pos
     )
     session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
 
-    rows = client.get("/api/postings").json()
+    rows = client.get("/api/postings").json()["postings"]
 
     assert sorted(
         (row["posting"]["url"], row["posting"]["logo_url"]) for row in rows if row["posting"]["url"] in ids
@@ -213,7 +213,7 @@ def japanese_postings(session, make_posting):
 def test_each_posting_carries_its_japanese_requirement(client, japanese_postings):
     response = client.get("/api/postings", params={"token": "kansei-test"})
 
-    assert [(row["posting"]["url"], row["japanese_requirement"]) for row in response.json()] == [
+    assert [(row["posting"]["url"], row["japanese_requirement"]) for row in response.json()["postings"]] == [
         ("https://example.com/none", "none"),
         ("https://example.com/not-stated", "not_stated"),
         ("https://example.com/basic", "basic"),
@@ -229,7 +229,7 @@ def test_my_japanese_keeps_postings_at_or_below_it_plus_none_and_not_stated(clie
     shown = {
         choice: [
             row["posting"]["url"].removeprefix("https://example.com/")
-            for row in client.get("/api/postings", params={"token": "kansei-test", "japanese": choice}).json()
+            for row in client.get("/api/postings", params={"token": "kansei-test", "japanese": choice}).json()["postings"]
         ]
         for choice in choices
     }
@@ -273,7 +273,7 @@ def test_specialty_keeps_postings_with_any_of_the_picks_and_other_keeps_those_wi
             row["posting"]["url"].removeprefix("https://example.com/")
             for row in client.get(
                 "/api/postings", params={"token": "kansei-test"} | ({} if choice is None else {"specialty": choice})
-            ).json()
+            ).json()["postings"]
         ]
         for choice in choices
     }
@@ -296,4 +296,93 @@ def test_specialty_keeps_postings_with_any_of_the_picks_and_other_keeps_those_wi
 def test_a_postings_row_carries_no_sales_or_support_flag(client, specialty_postings):
     response = client.get("/api/postings", params={"token": "kansei-test", "specialty": "backend"})
 
-    assert [sorted(row) for row in response.json()] == [["facts", "japanese_requirement", "posting"]] * 2
+    assert [sorted(row) for row in response.json()["postings"]] == [["facts", "japanese_requirement", "posting"]] * 2
+
+
+@pytest.fixture
+def paged_postings(session, make_posting):
+    # 60 seen an hour ago, then 60 seen now; a Remote - USA posting in each batch is no candidate.
+    now = datetime.now(UTC)
+    for batch, seen_at in [("older", now - timedelta(hours=1)), ("newer", now)]:
+        jobs = [
+            make_posting(token="kansei-test", id=f"{batch}-{n}", url=f"https://example.com/{batch}-{n}")
+            for n in range(60)
+        ]
+        jobs.insert(30, make_posting(
+            token="kansei-test", id=f"{batch}-usa", url=f"https://example.com/{batch}-usa", location="Remote - USA"
+        ))
+        ids = save_postings(session, jobs, seen_at)
+        session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
+
+
+def page_of(client, page: str) -> tuple[int, list[str]]:
+    body = client.get("/api/postings", params={"token": "kansei-test", "page": page}).json()
+    return body["page"], [row["posting"]["url"].removeprefix("https://example.com/") for row in body["postings"]]
+
+
+def test_a_middle_page_holds_the_next_50_newest_first_then_by_id(client, paged_postings):
+    assert page_of(client, "2") == (
+        2,
+        [f"newer-{n}" for n in range(9, -1, -1)] + [f"older-{n}" for n in range(59, 19, -1)],
+    )
+
+
+def test_the_last_page_holds_what_is_left(client, paged_postings):
+    assert page_of(client, "3") == (3, [f"older-{n}" for n in range(19, -1, -1)])
+
+
+def test_a_page_out_of_range_or_not_a_number_serves_the_nearest_page(client, paged_postings):
+    first, last = page_of(client, "1"), page_of(client, "3")
+
+    assert {page: page_of(client, page) for page in ["0", "-2", "two", "2.5", "", "4", "99999999999999999999"]} == {
+        "0": first,
+        "-2": first,
+        "two": first,
+        "2.5": first,
+        "": first,
+        "4": last,
+        "99999999999999999999": last,
+    }
+
+
+def test_the_total_counts_every_page_under_the_filters(client, paged_postings, japanese_postings):
+    totals = [
+        client.get("/api/postings", params={"token": "kansei-test", "japanese": japanese}).json()["total"]
+        for japanese in ["any", "none"]
+    ]
+
+    # 120 paged postings plus 6 Japanese ones; "none" keeps the 120 (not stated) and 2 of the 6.
+    assert totals == [126, 122]
+
+
+def test_checked_is_the_newest_board_posting_on_any_page_ignoring_pasted_ones(client, session, make_posting):
+    now = datetime.now(UTC)
+    seen_again = make_posting(token="kansei-test", id="seen-again", url="https://example.com/seen-again")
+    ids = save_postings(session, [seen_again], now - timedelta(days=1))
+    ids |= save_postings(session, [
+        make_posting(token="kansei-test", id=f"{n}", url=f"https://example.com/{n}") for n in range(50)
+    ], now - timedelta(hours=1))
+    ids |= save_postings(session, [seen_again], now - timedelta(minutes=10))
+    ids |= save_postings(session, [
+        make_posting(source="url", token="kansei-test", id="pasted", url="https://example.com/pasted")
+    ], now - timedelta(minutes=1))
+    session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
+
+    pages = [client.get("/api/postings", params={"token": "kansei-test", "page": page}).json() for page in ["1", "2"]]
+
+    assert [
+        (
+            [row["posting"]["url"].removeprefix("https://example.com/") for row in body["postings"]],
+            datetime.fromisoformat(body["checked_at"]),
+        )
+        for body in pages
+    ] == [
+        (["pasted"] + [str(n) for n in range(49, 0, -1)], now - timedelta(minutes=10)),
+        (["0", "seen-again"], now - timedelta(minutes=10)),
+    ]
+
+
+def test_no_postings_is_page_1_of_nothing(client):
+    body = client.get("/api/postings", params={"token": "kansei-test", "page": "3"}).json()
+
+    assert body == {"postings": [], "total": 0, "page": 1, "checked_at": None}
