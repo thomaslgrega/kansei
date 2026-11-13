@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router'
-import { loginHref } from './loginRedirect'
+import { navLinks } from './navLinks'
 
 type Props = {
     email: string | null
@@ -10,15 +10,23 @@ export default function Header({ email, onLogOut }: Props) {
     const location = useLocation()
 
     return (
-        <header>
+        <header className="site-header">
             <Link to="/" className="brand">kansei</Link>
-            {email === null ? (
-                <span>
-                    <Link to={loginHref(location)}>Log in</Link> · <Link to="/signup">Sign up</Link>
-                </span>
-            ) : (
-                <span>
-                    <Link to="/following">Following</Link> · <Link to="/tracker">Tracker</Link> · {email} · <button onClick={onLogOut}>Log out</button>
+            <nav aria-label="Main">
+                {navLinks(email !== null, location).map((link) => (
+                    <Link
+                        key={link.label}
+                        to={link.to}
+                        className={link.look === 'button' ? 'nav-signup' : 'nav-link'}
+                        aria-current={link.current ? 'page' : undefined}
+                    >
+                        {link.label}
+                    </Link>
+                ))}
+            </nav>
+            {email !== null && (
+                <span className="header-account">
+                    {email} · <button onClick={onLogOut}>Log out</button>
                 </span>
             )}
         </header>

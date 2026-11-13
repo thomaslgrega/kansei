@@ -26,10 +26,58 @@ a {
   outline-offset: 2px;
 }
 
-header {
+.site-header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.site-header .brand {
+  margin-right: auto;
+}
+
+.site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+.nav-link {
+  padding: 0.15rem 0;
+  border-bottom: 2px solid transparent;
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  color: var(--accent);
+}
+
+.nav-link[aria-current="page"] {
+  border-bottom-color: var(--accent);
+}
+
+.nav-signup {
+  padding: 0.35rem 0.85rem;
+  border-radius: 0.4rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav-signup[aria-current="page"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.header-account {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .brand {
@@ -172,19 +220,24 @@ li {
   font-size: 0.9em;
 }
 
+.auth-submit,
+.nav-signup {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.auth-submit:hover,
+.nav-signup:hover {
+  background: var(--accent-hover);
+}
+
 .auth-submit {
   height: 2.9rem;
   border: 0;
   border-radius: 0.6rem;
-  background: var(--accent);
-  color: var(--on-accent);
   font: inherit;
   font-weight: 650;
   cursor: pointer;
-}
-
-.auth-submit:hover {
-  background: var(--accent-hover);
 }
 
 .auth-submit:disabled {
@@ -965,6 +1018,11 @@ li {
 }
 
 @media (max-width: 36rem) {
+  .site-header,
+  .site-header nav {
+    gap: 0.5rem 0.75rem;
+  }
+
   .posting {
     grid-template-columns: 2.5rem minmax(0, 1fr);
     gap: 0.75rem;
