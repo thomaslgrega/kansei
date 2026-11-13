@@ -1,6 +1,7 @@
-import { type JapaneseFacts, type JapaneseRequirement, japaneseBadge, japaneseRequirement } from './japanese'
+import { type JapaneseRequired, type JapaneseRequirement, japaneseBadge } from './japanese'
 
-export type ChipFacts = JapaneseFacts & {
+export type ChipFacts = {
+    japanese_required: JapaneseRequired
     remote_policy: string
     seniority: string
     must_have_skills: string[]
@@ -26,16 +27,17 @@ const SENIORITIES = new Map([
 
 const MAX_SKILLS = 5
 
-export function postingChips(facts: ChipFacts): Chip[] {
-    return chipsUpTo(facts, MAX_SKILLS)
+export function postingChips(facts: ChipFacts, requirement: JapaneseRequirement): Chip[] {
+    return chipsUpTo(facts, requirement, MAX_SKILLS)
 }
 
-export function allPostingChips(facts: ChipFacts): Chip[] {
-    return chipsUpTo(facts, Infinity)
+export function allPostingChips(facts: ChipFacts, requirement: JapaneseRequirement): Chip[] {
+    return chipsUpTo(facts, requirement, Infinity)
 }
 
-function chipsUpTo(facts: ChipFacts, maxSkills: number): Chip[] {
-    const chips: Chip[] = [{ kind: 'japanese', label: japaneseBadge(facts), requirement: japaneseRequirement(facts) }]
+function chipsUpTo(facts: ChipFacts, requirement: JapaneseRequirement, maxSkills: number): Chip[] {
+    const label = japaneseBadge(requirement, facts.japanese_required)
+    const chips: Chip[] = [{ kind: 'japanese', label, requirement }]
     for (const label of [REMOTE_POLICIES.get(facts.remote_policy), SENIORITIES.get(facts.seniority)]) {
         if (label) chips.push({ kind: 'fact', label })
     }

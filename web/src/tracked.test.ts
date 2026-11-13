@@ -25,6 +25,7 @@ function row(id: number, postingId: number): Tracked {
             listed: true,
         },
         facts: null,
+        japanese_requirement: null,
     }
 }
 

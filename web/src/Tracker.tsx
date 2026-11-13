@@ -4,6 +4,7 @@ import CompanyLogo from './CompanyLogo'
 import Dropdown from './Dropdown'
 import type { Facts, Posting } from './PostingRow'
 import { allPostingChips } from './chips'
+import type { JapaneseRequirement } from './japanese'
 import PostingChips from './PostingChips'
 import Title from './Title'
 import UntrackConfirm from './UntrackConfirm'
@@ -42,6 +43,7 @@ export type Tracked = {
     moved_at: string
     posting: Posting & { listed: boolean }
     facts: Facts | null
+    japanese_requirement: JapaneseRequirement | null
 }
 
 export type Move = { stage: Stage } | { archived: true }
@@ -258,7 +260,9 @@ function TrackerRow({ row, faded, expanded, onToggle, onExpand, onMove, onNote, 
                         Tracked <time dateTime={row.tracked_at}>{day(row.tracked_at)}</time> · Moved{' '}
                         <time dateTime={row.moved_at}>{day(row.moved_at)}</time>
                     </p>
-                    {row.facts && <PostingChips chips={allPostingChips(row.facts)} />}
+                    {row.facts && row.japanese_requirement && (
+                        <PostingChips chips={allPostingChips(row.facts, row.japanese_requirement)} />
+                    )}
                     <div className="tracker-actions">
                         <a href={row.posting.url} target="_blank">
                             Open posting

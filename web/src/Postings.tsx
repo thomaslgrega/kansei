@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
-import { type Filters, filtersToSearch, readFilters } from "./filters";
-import { capitalize, JAPANESE_CHOICES, japaneseRequirement, passesJapanese, readJapaneseChoice } from "./japanese";
+import { type Filters, filtersToSearch, postingsUrl, readFilters } from "./filters";
+import { capitalize, JAPANESE_CHOICES, type JapaneseRequirement, readJapaneseChoice } from "./japanese";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo, lastChecked } from "./checked";
 import type { TrackControls } from "./tracked";
@@ -11,6 +11,7 @@ import UntrackConfirm from "./UntrackConfirm";
 type Row = {
     posting: Posting
     facts: Facts
+    japanese_requirement: JapaneseRequirement
     sales_or_support: boolean
 }
 
@@ -32,7 +33,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
 
     useEffect(() => {
         let current = true
-        const url = followingOnly ? '/api/postings?following=true' : '/api/postings'
+        const url = postingsUrl(followingOnly, filters.japanese)
         fetch(url)
             .then((response) => {
                 if (!response.ok) throw new Error(`GET ${url}: ${response.status}`)
@@ -47,16 +48,15 @@ export default function Postings({ followingOnly = false, tracking, following }:
         return () => {
             current = false
         }
-    }, [followingOnly, followsSignature])
+    }, [followingOnly, followsSignature, filters.japanese])
 
     if (failed) return <p>Couldn't load postings. Try reloading the page.</p>
     if (rows === undefined) return <p>Loading postings...</p>
 
     // An unfollowed board's postings leave at once, without waiting for the refetch.
     const shown = followingOnly && following ? rows.filter(({ posting }) => following.keys.has(boardKey(posting))) : rows
-    const passing = shown.filter(({ facts }) => passesJapanese(japaneseRequirement(facts), filters.japanese))
-    const hidden = passing.filter((row) => row.sales_or_support).length
-    const visible = filters.showSales ? passing : passing.filter((row) => !row.sales_or_support)
+    const hidden = shown.filter((row) => row.sales_or_support).length
+    const visible = filters.showSales ? shown : shown.filter((row) => !row.sales_or_support)
     const checkedAt = followingOnly ? null : lastChecked(rows)
 
     function companyAction(posting: Posting) {
@@ -104,11 +104,12 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 </label>
             </div>
             <ul className="postings">
-                {visible.map(({ posting, facts }) => (
+                {visible.map(({ posting, facts, japanese_requirement }) => (
                     <PostingRow
                         key={posting.id}
                         posting={posting}
                         facts={facts}
+                        japaneseRequirement={japanese_requirement}
                         actions={tracking && <TrackToggle posting={posting} tracking={tracking} />}
                         companyAction={companyAction(posting)}
                     />

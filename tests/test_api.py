@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from kansei import save_postings, sha256
 from kansei.config import settings
 from kansei.db import Board, Extraction
@@ -188,3 +190,56 @@ def test_a_posting_carries_its_boards_logo_url_or_null(client, session, make_pos
         ("https://example.com/2", None),
         ("https://example.com/3", None),
     ]
+
+
+@pytest.fixture
+def japanese_postings(session, make_posting):
+    cases = [
+        ("none", "preferred", "business", "not_stated"),
+        ("not-stated", "not_stated", "not_stated", "not_stated"),
+        ("basic", "required", "not_stated", "N4"),
+        ("conversational", "required", "conversational", "not_stated"),
+        ("business", "required", "not_stated", "not_stated"),
+        ("native", "required", "native", "N1"),
+    ]
+    now = datetime.now(UTC)
+    for hours_ago, (name, required, level, jlpt) in enumerate(cases):
+        url = f"https://example.com/{name}"
+        ids = save_postings(session, [make_posting(token="kansei-test", id=name, url=url)], now - timedelta(hours=hours_ago))
+        facts = FACTS.model_copy(update={"japanese_required": required, "japanese_level": level, "jlpt": jlpt})
+        session.add(make_extraction(ids[url], 6, name, facts=facts.model_dump(mode="json")))
+
+
+def test_each_posting_carries_its_japanese_requirement(client, japanese_postings):
+    response = client.get("/api/postings", params={"token": "kansei-test"})
+
+    assert [(row["posting"]["url"], row["japanese_requirement"]) for row in response.json()] == [
+        ("https://example.com/none", "none"),
+        ("https://example.com/not-stated", "not_stated"),
+        ("https://example.com/basic", "basic"),
+        ("https://example.com/conversational", "conversational"),
+        ("https://example.com/business", "business"),
+        ("https://example.com/native", "native"),
+    ]
+
+
+def test_my_japanese_keeps_postings_at_or_below_it_plus_none_and_not_stated(client, japanese_postings):
+    choices = ["any", "none", "basic", "conversational", "business", "native", "fluent"]
+
+    shown = {
+        choice: [
+            row["posting"]["url"].removeprefix("https://example.com/")
+            for row in client.get("/api/postings", params={"token": "kansei-test", "japanese": choice}).json()
+        ]
+        for choice in choices
+    }
+
+    assert shown == {
+        "any": ["none", "not-stated", "basic", "conversational", "business", "native"],
+        "none": ["none", "not-stated"],
+        "basic": ["none", "not-stated", "basic"],
+        "conversational": ["none", "not-stated", "basic", "conversational"],
+        "business": ["none", "not-stated", "basic", "conversational", "business"],
+        "native": ["none", "not-stated", "basic", "conversational", "business", "native"],
+        "fluent": ["none", "not-stated", "basic", "conversational", "business", "native"],
+    }

@@ -1,13 +1,12 @@
 import { expect, test } from 'vitest'
 import { allPostingChips, type ChipFacts, postingChips } from './chips'
+import type { JapaneseRequirement } from './japanese'
 
 const SKILLS = ['Go', 'Kubernetes', 'PostgreSQL', 'gRPC', 'Terraform', 'AWS', 'Kafka']
 
 function facts(change: Partial<ChipFacts>): ChipFacts {
     return {
         japanese_required: 'not_stated',
-        japanese_level: 'not_stated',
-        jlpt: 'not_stated',
         remote_policy: 'not_stated',
         seniority: 'not_stated',
         must_have_skills: [],
@@ -17,7 +16,8 @@ function facts(change: Partial<ChipFacts>): ChipFacts {
 
 test('the chips start with the Japanese requirement, then remote policy, seniority and five skills plus the rest counted', () => {
     const chips = postingChips(
-        facts({ japanese_required: 'required', jlpt: 'N2', remote_policy: 'hybrid', seniority: 'senior', must_have_skills: SKILLS }),
+        facts({ japanese_required: 'required', remote_policy: 'hybrid', seniority: 'senior', must_have_skills: SKILLS }),
+        'business',
     )
 
     expect(chips).toEqual([
@@ -34,7 +34,7 @@ test('the chips start with the Japanese requirement, then remote policy, seniori
 })
 
 test('facts that are not stated get no chip, and five skills need no count', () => {
-    const chips = postingChips(facts({ must_have_skills: SKILLS.slice(0, 5) }))
+    const chips = postingChips(facts({ must_have_skills: SKILLS.slice(0, 5) }), 'not_stated')
 
     expect(chips).toEqual([
         { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
@@ -47,14 +47,14 @@ test('facts that are not stated get no chip, and five skills need no count', () 
 })
 
 test('each remote policy and seniority has its own label', () => {
-    const cases = [
-        facts({ japanese_required: 'not_required', remote_policy: 'remote', seniority: 'intern' }),
-        facts({ japanese_required: 'preferred', remote_policy: 'onsite', seniority: 'junior' }),
-        facts({ remote_policy: 'hybrid', seniority: 'mid' }),
-        facts({ seniority: 'staff_plus' }),
+    const cases: [ChipFacts, JapaneseRequirement][] = [
+        [facts({ japanese_required: 'not_required', remote_policy: 'remote', seniority: 'intern' }), 'none'],
+        [facts({ japanese_required: 'preferred', remote_policy: 'onsite', seniority: 'junior' }), 'none'],
+        [facts({ remote_policy: 'hybrid', seniority: 'mid' }), 'not_stated'],
+        [facts({ seniority: 'staff_plus' }), 'not_stated'],
     ]
 
-    expect(cases.map(postingChips)).toEqual([
+    expect(cases.map(([chipFacts, requirement]) => postingChips(chipFacts, requirement))).toEqual([
         [
             { kind: 'japanese', label: 'No Japanese', requirement: 'none' },
             { kind: 'fact', label: 'Remote' },
@@ -78,7 +78,7 @@ test('each remote policy and seniority has its own label', () => {
 })
 
 test('the full chips list every skill with no count', () => {
-    const chips = allPostingChips(facts({ remote_policy: 'remote', must_have_skills: SKILLS }))
+    const chips = allPostingChips(facts({ remote_policy: 'remote', must_have_skills: SKILLS }), 'not_stated')
 
     expect(chips).toEqual([
         { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { filtersToSearch, readFilters } from './filters'
+import { filtersToSearch, postingsUrl, readFilters } from './filters'
 
 test('reads both filters from the query string', () => {
     const searches = ['?japanese=basic&sales=1', '?japanese=native', '?sales=1', '']
@@ -31,4 +31,20 @@ test('writes the filters to the query string and leaves defaults out', () => {
     ]
 
     expect(searches).toEqual(['japanese=conversational&sales=1', 'japanese=none', 'sales=1', ''])
+})
+
+test('the postings URL asks for followed boards and My Japanese, and leaves defaults out', () => {
+    const urls = [
+        postingsUrl(false, 'any'),
+        postingsUrl(true, 'any'),
+        postingsUrl(false, 'none'),
+        postingsUrl(true, 'business'),
+    ]
+
+    expect(urls).toEqual([
+        '/api/postings',
+        '/api/postings?following=true',
+        '/api/postings?japanese=none',
+        '/api/postings?following=true&japanese=business',
+    ])
 })

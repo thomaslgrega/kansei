@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { type ChipFacts, postingChips } from './chips'
+import type { JapaneseRequirement } from './japanese'
 import PostingChips from './PostingChips'
 import CompanyLogo from './CompanyLogo'
 import { firstSeenAgo } from './firstSeen'
@@ -24,11 +25,12 @@ export type Facts = ChipFacts & { role_summary: string }
 type Props = {
     posting: Posting
     facts: Facts
+    japaneseRequirement: JapaneseRequirement
     actions?: ReactNode
     companyAction?: ReactNode
 }
 
-export default function PostingRow({ posting, facts, actions, companyAction }: Props) {
+export default function PostingRow({ posting, facts, japaneseRequirement, actions, companyAction }: Props) {
     const [now] = useState(Date.now)
 
     return (
@@ -49,7 +51,7 @@ export default function PostingRow({ posting, facts, actions, companyAction }: P
                     </time>
                 </p>
                 <p className="muted">{facts.role_summary}</p>
-                <PostingChips chips={postingChips(facts)} />
+                <PostingChips chips={postingChips(facts, japaneseRequirement)} />
             </div>
             {actions && <div className="posting-actions">{actions}</div>}
         </li>

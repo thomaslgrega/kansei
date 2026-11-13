@@ -127,6 +127,30 @@ def test_facts_that_dont_fit_the_current_schema_are_null_without_breaking_the_li
     ]
 
 
+def test_a_tracked_posting_carries_the_japanese_requirement_of_its_facts_or_null_without_them(
+    client, session, log_in_as, posting_ids
+):
+    required = {"japanese_required": "required", "jlpt": "N3"}
+    old_schema = FACTS.model_dump(mode="json", exclude={"remote_policy"}) | required
+    session.add_all([
+        make_extraction(posting_ids[0], 5, "Older.", facts=FACTS.model_dump(mode="json")),
+        make_extraction(posting_ids[0], 6, "Newest.", facts=FACTS.model_copy(update=required).model_dump(mode="json")),
+        make_extraction(posting_ids[2], 5, "Old schema.", prompt_sha="70b7a0b0", facts=old_schema),
+    ])
+    session.flush()
+    log_in_as("ada@example.com")
+    created = [client.post("/api/me/tracked", json={"posting_id": posting_id}).json() for posting_id in posting_ids]
+
+    response = client.get("/api/me/tracked")
+
+    assert [row["japanese_requirement"] for row in created] == ["conversational", None, None]
+    assert [(row["posting"]["id"], row["japanese_requirement"]) for row in response.json()] == [
+        (posting_ids[2], None),
+        (posting_ids[1], None),
+        (posting_ids[0], "conversational"),
+    ]
+
+
 def tracked_fields(row: dict) -> dict:
     return {
         "id": row["id"],
