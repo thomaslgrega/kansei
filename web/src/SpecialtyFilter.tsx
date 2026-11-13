@@ -31,7 +31,8 @@ export default function SpecialtyFilter({ selected, onChange }: Props) {
     }
 
     function onBlur(event: FocusEvent) {
-        if (!rootRef.current?.contains(event.relatedTarget)) setOpen(false)
+        // Clicking a row's text blurs to nothing; only focus landing outside, as on Tab, closes the list.
+        if (event.relatedTarget && !rootRef.current?.contains(event.relatedTarget)) setOpen(false)
     }
 
     return (
