@@ -7,11 +7,12 @@ export function readFilters(params: URLSearchParams): Filters {
     return { japanese: readJapaneseChoice(params.get('japanese')), specialties: readSpecialties(params.get('specialty')) }
 }
 
-function filterParams(filters: Filters): URLSearchParams {
+function filterParams(filters: Filters, page: number): URLSearchParams {
     const params = new URLSearchParams()
     if (filters.japanese !== 'any') params.set('japanese', filters.japanese)
     const specialty = specialtiesParam(filters.specialties)
     if (specialty !== null) params.set('specialty', specialty)
+    if (page !== 1) params.set('page', String(page))
     return params
 }
 
@@ -20,14 +21,14 @@ function toSearch(params: URLSearchParams): string {
     return params.toString().replaceAll('%2C', ',')
 }
 
-export function filtersToSearch(filters: Filters): string {
-    return toSearch(filterParams(filters))
+export function filtersToSearch(filters: Filters, page = 1): string {
+    return toSearch(filterParams(filters, page))
 }
 
-export function postingsUrl(followingOnly: boolean, filters: Filters): string {
+export function postingsUrl(followingOnly: boolean, filters: Filters, page = 1): string {
     const params = new URLSearchParams()
     if (followingOnly) params.set('following', 'true')
-    filterParams(filters).forEach((value, key) => params.set(key, value))
+    filterParams(filters, page).forEach((value, key) => params.set(key, value))
     const search = toSearch(params)
     return search ? `/api/postings?${search}` : '/api/postings'
 }
