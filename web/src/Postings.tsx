@@ -73,10 +73,11 @@ export default function Postings({ followingOnly = false, tracking, following }:
     if (failed) return <p>Couldn't load postings. Try reloading the page.</p>
     if (loaded === undefined) return <p>Loading postings...</p>
 
-    const { postings: rows, total, page, checked_at: checkedAt } = loaded.body
-    const last = lastPage(total)
+    const { postings: rows, page, checked_at: checkedAt } = loaded.body
     // An unfollowed board's postings leave at once, without waiting for the refetch.
     const shown = followingOnly && following ? rows.filter(({ posting }) => following.keys.has(boardKey(posting))) : rows
+    const total = loaded.body.total - (rows.length - shown.length)
+    const last = lastPage(total)
 
     function companyAction(posting: Posting) {
         if (!following || !posting.has_board) return null
@@ -100,12 +101,12 @@ export default function Postings({ followingOnly = false, tracking, following }:
         navigate(`?${filtersToSearch({ ...filters, ...change })}`, { replace: true })
     }
 
-    function pageLink(to: number, label: string) {
+    function pageLink(to: number, label: string, current = false) {
         return (
             <Link
                 key={label}
                 to={`?${filtersToSearch(filters, to)}`}
-                aria-current={label === String(page) ? 'page' : undefined}
+                aria-current={current ? 'page' : undefined}
                 onClick={() => top.current?.scrollIntoView()}
             >
                 {label}
@@ -140,7 +141,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 <nav className="pager" aria-label="Pages">
                     {page > 1 ? pageLink(page - 1, 'Prev') : <span className="muted">Prev</span>}
                     {pageNumbers(page, last).map((number, index) =>
-                        number === '…' ? <span key={`gap-${index}`} className="muted">…</span> : pageLink(number, String(number))
+                        number === '…' ? <span key={`gap-${index}`} className="muted">…</span> : pageLink(number, String(number), number === page)
                     )}
                     {page < last ? pageLink(page + 1, 'Next') : <span className="muted">Next</span>}
                     <span className="muted pager-range">{pageRange(page, total)}</span>

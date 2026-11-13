@@ -371,11 +371,14 @@ def test_checked_is_the_newest_board_posting_on_any_page_ignoring_pasted_ones(cl
     pages = [client.get("/api/postings", params={"token": "kansei-test", "page": page}).json() for page in ["1", "2"]]
 
     assert [
-        ([row["posting"]["url"] for row in body["postings"]][-1], datetime.fromisoformat(body["checked_at"]))
+        (
+            [row["posting"]["url"].removeprefix("https://example.com/") for row in body["postings"]],
+            datetime.fromisoformat(body["checked_at"]),
+        )
         for body in pages
     ] == [
-        ("https://example.com/1", now - timedelta(minutes=10)),
-        ("https://example.com/seen-again", now - timedelta(minutes=10)),
+        (["pasted"] + [str(n) for n in range(49, 0, -1)], now - timedelta(minutes=10)),
+        (["0", "seen-again"], now - timedelta(minutes=10)),
     ]
 
 

@@ -141,16 +141,16 @@ def list_postings(
             .where(Follow.user_id == user.id)
         )
         statement = statement.where(tuple_(Posting.source, Posting.token).in_(followed))
-    # is_candidate runs in Python, so the cheap columns of every match come first and the page's facts after.
-    matches = [
+    # is_candidate runs in Python, so the few columns it needs come first for every posting, and facts for the page after.
+    candidates = [
         row
         for row in session.execute(statement.with_only_columns(
             Posting.id, Posting.source, Posting.title, Posting.headline, Posting.location, Posting.last_seen_at
         ))
         if is_candidate(row)
     ]
-    served = page_to_serve(page, len(matches))
-    shown = [row.id for row in matches[(served - 1) * PAGE_SIZE:served * PAGE_SIZE]]
+    served = page_to_serve(page, len(candidates))
+    shown = [row.id for row in candidates[(served - 1) * PAGE_SIZE:served * PAGE_SIZE]]
     return PostingsPage(
         postings=[
             PostingWithFacts(
@@ -160,10 +160,9 @@ def list_postings(
             )
             for posting, facts, requirement in session.execute(statement.where(Posting.id.in_(shown)))
         ],
-        total=len(matches),
+        total=len(candidates),
         page=served,
-        # A pasted posting doesn't say when the boards were last read.
-        checked_at=max((row.last_seen_at for row in matches if row.source != "url"), default=None),
+        checked_at=max((row.last_seen_at for row in candidates if row.source != "url"), default=None),
     )
 
 
