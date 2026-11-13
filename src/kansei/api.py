@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Scope
 
-from kansei import JobPosting, auth, board_jobs, is_candidate, is_sales_or_support
+from kansei import JobPosting, auth, board_jobs, is_candidate
 from kansei.auth import CurrentUser, SessionCookie, current_user
 from kansei.config import settings
 from kansei.db import (
@@ -40,6 +40,7 @@ from kansei.sources import (
     name_slugs,
     parse_board_url,
 )
+from kansei.specialties import passes_specialty
 
 api = APIRouter(prefix="/api")
 api.include_router(auth.router)
@@ -89,7 +90,6 @@ class PostingWithFacts(BaseModel):
     posting: PostingOut
     facts: PostingFacts
     japanese_requirement: JapaneseRequirement
-    sales_or_support: bool
 
 
 @api.get("/postings")
@@ -98,6 +98,7 @@ def list_postings(
     token: str | None = None,
     following: bool = False,
     japanese: str = "any",
+    specialty: str | None = None,
     cookie: SessionCookie = None,
 ) -> list[PostingWithFacts]:
     prompt_sha, _ = prompt_snapshot()
@@ -112,7 +113,11 @@ def list_postings(
     statement = (
         select(Posting, newest.c.facts, requirement)
         .join(newest, newest.c.posting_id == Posting.id)
-        .where(Posting.listed, passes_japanese(requirement, japanese))
+        .where(
+            Posting.listed,
+            passes_japanese(requirement, japanese),
+            passes_specialty(newest.c.facts, specialty),
+        )
         .order_by(Posting.first_seen_at.desc(), Posting.id.desc())
     )
     if token is not None:
@@ -130,7 +135,6 @@ def list_postings(
             posting=PostingOut.model_validate(posting),
             facts=facts,
             japanese_requirement=requirement,
-            sales_or_support=is_sales_or_support(posting.title),
         )
         for posting, facts, requirement in session.execute(statement)
         if is_candidate(posting)

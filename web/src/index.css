@@ -498,6 +498,38 @@ li {
   font-size: 0.85em;
 }
 
+.checklist {
+  max-height: min(32rem, 70vh);
+  overflow-y: auto;
+}
+
+.checklist-actions {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.checklist-option {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checklist-option:hover {
+  background: var(--chip);
+}
+
 .stage-saved {
   --stage-bg: light-dark(#e6e8ec, #2c323c);
   --stage-fg: light-dark(#3d434d, #c9cfd9);

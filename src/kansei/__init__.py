@@ -59,14 +59,6 @@ def is_candidate(posting: JobPosting | Posting) -> bool:
     return bool(engineering and reachable)
 
 
-def is_sales_or_support(title: str) -> bool:
-    customer_facing = re.compile(
-        r"\b(sales|support|solutions?|field|customer success)\b|セールス|サポート|カスタマーサクセス",
-        re.IGNORECASE,
-    )
-    return bool(customer_facing.search(title))
-
-
 def boards_to_fetch(session: Session) -> list[str]:
     if settings.boards is not None:
         return settings.boards
