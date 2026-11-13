@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { readSpecialties, type Selected, SPECIALTY_CHOICES, specialtiesParam, specialtyLabel, toggleSpecialty } from './specialty'
+import { readSpecialties, type Selected, SPECIALTY_VALUES, specialtiesParam, specialtyLabel, toggleSpecialty } from './specialty'
 
 const ALL = 'backend,frontend,mobile,infrastructure,data,ml,security,qa,embedded,management,customer_facing,other'
 
@@ -19,8 +19,7 @@ test('reads every specialty from no param or all 12, and drops unknown values', 
 })
 
 test('writes picks in list order, an empty param once cleared, and no param for every specialty', () => {
-    const every = SPECIALTY_CHOICES.map(([choice]) => choice)
-    const selections: Selected[] = [null, ['ml', 'backend'], every, [], ['other']]
+    const selections: Selected[] = [null, ['ml', 'backend'], [...SPECIALTY_VALUES], [], ['other']]
 
     expect(selections.map(specialtiesParam)).toEqual([
         null,

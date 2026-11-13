@@ -11,7 +11,7 @@ Live: https://kansei.cloud.run/
 - Uses OpenAI structured outputs to extract a role summary, specialties, seniority, required skills, Japanese requirements, and remote work policy.
 - Processes several postings at a time, limits concurrent requests, and reports failures for individual postings.
 - Reports API cost and median and p95 request times.
-- Shows the open postings on a public web page with the extracted facts, newest first. Sales and support roles are hidden until you ask for them, and logged-in users can track postings.
+- Shows the open postings on a public web page with the extracted facts, newest first, filtered by the Japanese they ask for and by specialty. Logged-in users can track postings.
 
 ## Run it
 

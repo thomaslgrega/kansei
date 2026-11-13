@@ -258,13 +258,15 @@ def specialty_postings(session, make_posting):
     for hours_ago, (name, specialties) in enumerate(cases):
         url = f"https://example.com/{name}"
         ids = save_postings(session, [make_posting(token="kansei-test", id=name, url=url)], now - timedelta(hours=hours_ago))
-        # Validating adds frontend and backend to fullstack, as extraction does.
         facts = PostingFacts.model_validate(FACTS.model_dump() | {"specialties": specialties})
         session.add(make_extraction(ids[url], 6, name, facts=facts.model_dump(mode="json")))
 
 
 def test_specialty_keeps_postings_with_any_of_the_picks_and_other_keeps_those_with_none(client, specialty_postings):
-    choices = [None, "backend", "frontend", "backend,ml", "", "bogus", "ml,bogus", "other", "customer_facing", "security,other"]
+    choices = [
+        None, "backend", "frontend", "backend,ml", "", "bogus", "ml,bogus", "fullstack", "other", "customer_facing",
+        "security,other",
+    ]
 
     shown = {
         choice: [
@@ -284,6 +286,7 @@ def test_specialty_keeps_postings_with_any_of_the_picks_and_other_keeps_those_wi
         "": [],
         "bogus": [],
         "ml,bogus": ["data-ml"],
+        "fullstack": [],
         "other": ["other"],
         "customer_facing": ["sales-manager"],
         "security,other": ["other"],

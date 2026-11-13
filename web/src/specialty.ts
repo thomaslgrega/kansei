@@ -15,12 +15,14 @@ export const SPECIALTY_CHOICES = [
 
 export type SpecialtyChoice = (typeof SPECIALTY_CHOICES)[number][0]
 
+export const SPECIALTY_VALUES: readonly SpecialtyChoice[] = SPECIALTY_CHOICES.map(([choice]) => choice)
+
 // null: no param, every specialty. []: the user cleared them all.
 export type Selected = SpecialtyChoice[] | null
 
 function normalize(values: readonly string[]): Selected {
-    const picked = SPECIALTY_CHOICES.map(([choice]) => choice).filter((choice) => values.includes(choice))
-    return picked.length === SPECIALTY_CHOICES.length ? null : picked
+    const picked = SPECIALTY_VALUES.filter((choice) => values.includes(choice))
+    return picked.length === SPECIALTY_VALUES.length ? null : picked
 }
 
 export function readSpecialties(param: string | null): Selected {
@@ -44,6 +46,6 @@ export function isTicked(selected: Selected, choice: SpecialtyChoice): boolean {
 }
 
 export function toggleSpecialty(selected: Selected, choice: SpecialtyChoice): Selected {
-    const ticked = SPECIALTY_CHOICES.map(([value]) => value).filter((value) => isTicked(selected, value))
+    const ticked = SPECIALTY_VALUES.filter((value) => isTicked(selected, value))
     return normalize(isTicked(selected, choice) ? ticked.filter((value) => value !== choice) : [...ticked, choice])
 }
