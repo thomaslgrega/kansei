@@ -8,13 +8,15 @@ export type JapaneseRequirement = Level | 'none' | 'not_stated'
 
 export type JapaneseChoice = 'any' | 'none' | Level
 
-export const JAPANESE_CHOICES: readonly JapaneseChoice[] = ['any', 'none', ...LEVELS]
+const JAPANESE_CHOICES: readonly JapaneseChoice[] = ['any', 'none', ...LEVELS]
+
+export const JAPANESE_OPTIONS = JAPANESE_CHOICES.map((choice) => ({ value: choice, label: capitalize(choice) }))
 
 export function readJapaneseChoice(value: string | null): JapaneseChoice {
     return JAPANESE_CHOICES.find((choice) => choice === value) ?? 'any'
 }
 
-export function capitalize(value: string): string {
+function capitalize(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1)
 }
 

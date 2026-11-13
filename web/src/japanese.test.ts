@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { type JapaneseRequired, type JapaneseRequirement, japaneseBadge } from './japanese'
+import { JAPANESE_OPTIONS, type JapaneseRequired, type JapaneseRequirement, japaneseBadge } from './japanese'
 
 test('the badge names the level, and tells preferred, not required and not stated apart', () => {
     const cases: [JapaneseRequirement, JapaneseRequired][] = [
@@ -20,5 +20,16 @@ test('the badge names the level, and tells preferred, not required and not state
         'Japanese preferred',
         'No Japanese',
         'Japanese not stated',
+    ])
+})
+
+test('the My Japanese options keep their order and labels', () => {
+    expect(JAPANESE_OPTIONS).toEqual([
+        { value: 'any', label: 'Any' },
+        { value: 'none', label: 'None' },
+        { value: 'basic', label: 'Basic' },
+        { value: 'conversational', label: 'Conversational' },
+        { value: 'business', label: 'Business' },
+        { value: 'native', label: 'Native' },
     ])
 })
