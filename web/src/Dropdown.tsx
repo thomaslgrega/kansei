@@ -1,5 +1,6 @@
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 import { listKeyAction } from './listKeyAction'
+import { useCloseOnOutsideClick } from './useCloseOnOutsideClick'
 
 export type DropdownOption<T extends string> = {
     value: T
@@ -41,20 +42,10 @@ export default function Dropdown<T extends string>({ label, options, value, onCh
     }
 
     useEffect(() => {
-        if (!open) return
-        listRef.current?.focus()
-        function closeOutside(event: PointerEvent) {
-            if (rootRef.current?.contains(event.target as Node)) return
-            setHighlighted(null)
-            // After the click has moved focus, so a click on another control keeps it.
-            setTimeout(() => {
-                const focused = document.activeElement
-                if (!focused || focused === document.body || rootRef.current?.contains(focused)) triggerRef.current?.focus()
-            })
-        }
-        document.addEventListener('pointerdown', closeOutside)
-        return () => document.removeEventListener('pointerdown', closeOutside)
+        if (open) listRef.current?.focus()
     }, [open])
+
+    useCloseOnOutsideClick(open, rootRef, triggerRef, () => setHighlighted(null))
 
     function onTriggerKeyDown(event: KeyboardEvent) {
         if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
