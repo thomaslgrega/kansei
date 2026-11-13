@@ -8,7 +8,7 @@ export type JapaneseRequirement = Level | 'none' | 'not_stated'
 
 export type JapaneseChoice = 'any' | 'none' | Level
 
-export const JAPANESE_CHOICES: readonly JapaneseChoice[] = ['any', 'none', ...LEVELS]
+const JAPANESE_CHOICES: readonly JapaneseChoice[] = ['any', 'none', ...LEVELS]
 
 export const JAPANESE_OPTIONS = JAPANESE_CHOICES.map((choice) => ({ value: choice, label: capitalize(choice) }))
 
