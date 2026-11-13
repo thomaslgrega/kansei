@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useCloseOnOutsideClick } from './useCloseOnOutsideClick'
 
 type Props = {
@@ -14,15 +14,21 @@ export default function AccountMenu({ email, onLogOut }: Props) {
 
     useCloseOnOutsideClick({ open, rootRef, triggerRef, onClose: () => setOpen(false) })
 
-    function onKeyDown(event: KeyboardEvent) {
-        if (!open || event.key !== 'Escape') return
-        event.preventDefault()
-        setOpen(false)
-        triggerRef.current?.focus()
-    }
+    // On the document, since Safari leaves focus on the body after a click on the trigger.
+    useEffect(() => {
+        if (!open) return
+        function closeOnEscape(event: KeyboardEvent) {
+            if (event.key !== 'Escape') return
+            event.preventDefault()
+            setOpen(false)
+            triggerRef.current?.focus()
+        }
+        document.addEventListener('keydown', closeOnEscape)
+        return () => document.removeEventListener('keydown', closeOnEscape)
+    }, [open])
 
     return (
-        <div className="account-menu" ref={rootRef} onKeyDown={onKeyDown}>
+        <div className="account-menu" ref={rootRef}>
             <button
                 ref={triggerRef}
                 type="button"

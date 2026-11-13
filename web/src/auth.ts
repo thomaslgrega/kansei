@@ -52,7 +52,7 @@ export async function submitAuth(mode: AuthMode, credentials: Credentials, fetch
 }
 
 // Returns where to go next: home, since the page left behind may need a login.
-export async function logOut(fetchFn = fetch): Promise<string> {
+export async function submitLogOut(fetchFn = fetch): Promise<string> {
     await fetchFn('/api/logout', { method: 'POST' })
     return '/'
 }

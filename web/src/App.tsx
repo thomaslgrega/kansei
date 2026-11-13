@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router'
-import { logOut as requestLogOut } from './auth'
+import { submitLogOut } from './auth'
 import AuthForm from './AuthForm'
 import { type Board, boardKey, latestOnly } from './boards'
 import Following from './Following'
@@ -47,10 +47,10 @@ export default function App() {
   }
 
   async function logOut() {
-    const to = await requestLogOut()
-    // One render for both, so a page that needs a login never sees the logged-out session.
+    const to = await submitLogOut()
+    // In the router's transition, so RequireLogin never renders the old page logged out.
     startTransition(() => {
-      navigate(to)
+      navigate(to, { replace: true })
       setSession(null)
     })
   }

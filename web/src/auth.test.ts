@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { AUTH_COPY, logOut, submitAuth } from './auth'
+import { AUTH_COPY, submitAuth, submitLogOut } from './auth'
 
 type Sent = { url: string; method?: string; headers?: HeadersInit; body?: BodyInit | null }
 
@@ -64,7 +64,7 @@ test('a signup error without a JSON body still has a message', async () => {
 test('logging out posts to the logout endpoint and lands on the home page, from any page', async () => {
     const { sent, fetchFn } = fakeFetch(new Response(null, { status: 204 }))
 
-    expect(await logOut(fetchFn)).toBe('/')
+    expect(await submitLogOut(fetchFn)).toBe('/')
     expect(sent).toEqual([{ url: '/api/logout', method: 'POST', headers: undefined, body: undefined }])
 })
 
