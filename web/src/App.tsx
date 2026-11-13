@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { startTransition, useEffect, useRef, useState } from 'react'
+import { Navigate, Route, Routes, useNavigate } from 'react-router'
+import { submitLogOut } from './auth'
 import AuthForm from './AuthForm'
 import { type Board, boardKey, latestOnly } from './boards'
 import Following from './Following'
@@ -35,6 +36,7 @@ export default function App() {
   const [pendingTracks, setPendingTracks] = useState<Set<number>>(new Set())
   const latestPatches = useRef(new Map<number, number>())
   const patchQueues = useRef(new Map<number, Promise<unknown>>())
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadSession().then(setSession)
@@ -45,8 +47,12 @@ export default function App() {
   }
 
   async function logOut() {
-    await fetch('/api/logout', { method: 'POST' })
-    setSession(null)
+    const to = await submitLogOut()
+    // In the router's transition, so RequireLogin never renders the old page logged out.
+    startTransition(() => {
+      navigate(to, { replace: true })
+      setSession(null)
+    })
   }
 
   function changeTrack(postingId: number, request: () => Promise<Response>, onDone: (response: Response) => Promise<void>) {

@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router'
+import AccountMenu from './AccountMenu'
 import { navLinks } from './navLinks'
 
 type Props = {
@@ -23,12 +24,8 @@ export default function Header({ email, onLogOut }: Props) {
                         {link.label}
                     </Link>
                 ))}
+                {email !== null && <AccountMenu email={email} onLogOut={onLogOut} />}
             </nav>
-            {email !== null && (
-                <span className="header-account">
-                    {email} · <button onClick={onLogOut}>Log out</button>
-                </span>
-            )}
         </header>
     )
 }
