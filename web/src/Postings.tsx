@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
 import { type Filters, filtersToSearch, postingsUrl, readFilters } from "./filters";
 import Dropdown from "./Dropdown";
@@ -7,13 +7,13 @@ import { JAPANESE_OPTIONS, type JapaneseRequirement } from "./japanese";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo, lastChecked } from "./checked";
 import type { TrackControls } from "./tracked";
+import SpecialtyFilter from "./SpecialtyFilter";
 import UntrackConfirm from "./UntrackConfirm";
 
 type Row = {
     posting: Posting
     facts: Facts
     japanese_requirement: JapaneseRequirement
-    sales_or_support: boolean
 }
 
 type Props = {
@@ -24,8 +24,10 @@ type Props = {
 
 export default function Postings({ followingOnly = false, tracking, following }: Props) {
     const [rows, setRows] = useState<Row[] | undefined>(undefined)
-    const [searchParams, setSearchParams] = useSearchParams()
+    const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
     const filters = readFilters(searchParams)
+    const url = postingsUrl(followingOnly, filters)
     const [failed, setFailed] = useState(false)
     const [now] = useState(Date.now)
 
@@ -34,7 +36,6 @@ export default function Postings({ followingOnly = false, tracking, following }:
 
     useEffect(() => {
         let current = true
-        const url = postingsUrl(followingOnly, filters.japanese)
         fetch(url)
             .then((response) => {
                 if (!response.ok) throw new Error(`GET ${url}: ${response.status}`)
@@ -49,15 +50,13 @@ export default function Postings({ followingOnly = false, tracking, following }:
         return () => {
             current = false
         }
-    }, [followingOnly, followsSignature, filters.japanese])
+    }, [url, followsSignature])
 
     if (failed) return <p>Couldn't load postings. Try reloading the page.</p>
     if (rows === undefined) return <p>Loading postings...</p>
 
     // An unfollowed board's postings leave at once, without waiting for the refetch.
     const shown = followingOnly && following ? rows.filter(({ posting }) => following.keys.has(boardKey(posting))) : rows
-    const hidden = shown.filter((row) => row.sales_or_support).length
-    const visible = filters.showSales ? shown : shown.filter((row) => !row.sales_or_support)
     const checkedAt = followingOnly ? null : lastChecked(rows)
 
     function companyAction(posting: Posting) {
@@ -78,24 +77,23 @@ export default function Postings({ followingOnly = false, tracking, following }:
     }
 
     function setFilters(change: Partial<Filters>) {
-        setSearchParams(filtersToSearch({ ...filters, ...change }), { replace: true })
+        // Not setSearchParams, which would write the commas in `specialty` as %2C.
+        navigate(`?${filtersToSearch({ ...filters, ...change })}`, { replace: true })
     }
 
     return (
         <section>
             <div className="postings-heading">
-                <h2>Postings ({visible.length})</h2>
+                <h2>Postings ({shown.length})</h2>
                 {checkedAt && <span className="muted">checked {checkedAgo(checkedAt, now)}</span>}
             </div>
             <div className="filters">
                 <Dropdown label="My Japanese" options={JAPANESE_OPTIONS} value={filters.japanese} onChange={(japanese) => setFilters({ japanese })} />
-                <label>
-                    <input type="checkbox" checked={filters.showSales} onChange={(event) => setFilters({ showSales: event.target.checked })} />
-                    Show sales and support roles ({hidden})
-                </label>
+                <SpecialtyFilter selected={filters.specialties} onChange={(specialties) => setFilters({ specialties })} />
             </div>
+            {filters.specialties?.length === 0 && <p className="muted">No specialties selected.</p>}
             <ul className="postings">
-                {visible.map(({ posting, facts, japanese_requirement }) => (
+                {shown.map(({ posting, facts, japanese_requirement }) => (
                     <PostingRow
                         key={posting.id}
                         posting={posting}

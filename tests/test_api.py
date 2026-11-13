@@ -243,3 +243,57 @@ def test_my_japanese_keeps_postings_at_or_below_it_plus_none_and_not_stated(clie
         "native": ["none", "not-stated", "basic", "conversational", "business", "native"],
         "fluent": ["none", "not-stated", "basic", "conversational", "business", "native"],
     }
+
+
+@pytest.fixture
+def specialty_postings(session, make_posting):
+    cases = [
+        ("backend", ["backend"]),
+        ("fullstack", ["fullstack"]),
+        ("data-ml", ["data", "ml"]),
+        ("sales-manager", ["management", "customer_facing"]),
+        ("other", []),
+    ]
+    now = datetime.now(UTC)
+    for hours_ago, (name, specialties) in enumerate(cases):
+        url = f"https://example.com/{name}"
+        ids = save_postings(session, [make_posting(token="kansei-test", id=name, url=url)], now - timedelta(hours=hours_ago))
+        facts = PostingFacts.model_validate(FACTS.model_dump() | {"specialties": specialties})
+        session.add(make_extraction(ids[url], 6, name, facts=facts.model_dump(mode="json")))
+
+
+def test_specialty_keeps_postings_with_any_of_the_picks_and_other_keeps_those_with_none(client, specialty_postings):
+    choices = [
+        None, "backend", "frontend", "backend,ml", "", "bogus", "ml,bogus", "fullstack", "other", "customer_facing",
+        "security,other",
+    ]
+
+    shown = {
+        choice: [
+            row["posting"]["url"].removeprefix("https://example.com/")
+            for row in client.get(
+                "/api/postings", params={"token": "kansei-test"} | ({} if choice is None else {"specialty": choice})
+            ).json()
+        ]
+        for choice in choices
+    }
+
+    assert shown == {
+        None: ["backend", "fullstack", "data-ml", "sales-manager", "other"],
+        "backend": ["backend", "fullstack"],
+        "frontend": ["fullstack"],
+        "backend,ml": ["backend", "fullstack", "data-ml"],
+        "": [],
+        "bogus": [],
+        "ml,bogus": ["data-ml"],
+        "fullstack": [],
+        "other": ["other"],
+        "customer_facing": ["sales-manager"],
+        "security,other": ["other"],
+    }
+
+
+def test_a_postings_row_carries_no_sales_or_support_flag(client, specialty_postings):
+    response = client.get("/api/postings", params={"token": "kansei-test", "specialty": "backend"})
+
+    assert [sorted(row) for row in response.json()] == [["facts", "japanese_requirement", "posting"]] * 2

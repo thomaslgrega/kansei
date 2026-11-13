@@ -1,15 +1,15 @@
 import { expect, test } from 'vitest'
 import { checkedAgo, lastChecked } from './checked'
 
-function row(source: string, lastSeenAt: string, salesOrSupport = false) {
-    return { posting: { source, last_seen_at: lastSeenAt }, sales_or_support: salesOrSupport }
+function row(source: string, lastSeenAt: string) {
+    return { posting: { source, last_seen_at: lastSeenAt } }
 }
 
-test('checked is the newest board posting, counting sales roles and ignoring pasted postings', () => {
+test('checked is the newest board posting, ignoring pasted postings', () => {
     const rows = [
         row('greenhouse', '2026-11-10T03:00:00+00:00'),
         row('lever', '2026-11-10T13:30:00+09:00'),
-        row('ashby', '2026-11-10T05:00:00+00:00', true),
+        row('ashby', '2026-11-10T05:00:00+00:00'),
         row('url', '2026-11-10T09:00:00+00:00'),
     ]
 

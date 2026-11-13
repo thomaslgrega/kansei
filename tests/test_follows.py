@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from test_api import make_extraction
+from test_api import FACTS, make_extraction
 
 from kansei import save_postings
 from kansei.db import Board
@@ -107,6 +107,26 @@ def test_following_lists_only_open_candidates_with_an_extraction_from_followed_b
     response = client.get("/api/postings", params={"following": "true"})
 
     assert response.status_code == 200
+    assert [row["posting"]["url"] for row in response.json()] == ["https://example.com/followed"]
+
+
+def test_following_applies_my_japanese_and_specialty_too(client, session, log_in_as, make_posting, boards):
+    cases = [
+        ("followed", "greenhouse", "kansei-test", ["backend"], "not_required"),
+        ("needs-japanese", "greenhouse", "kansei-test", ["backend"], "required"),
+        ("frontend", "greenhouse", "kansei-test", ["frontend"], "not_required"),
+        ("not-followed", "lever", "kansei-unnamed", ["backend"], "not_required"),
+    ]
+    for name, source, token, specialties, required in cases:
+        url = f"https://example.com/{name}"
+        ids = save_postings(session, [make_posting(source=source, token=token, id=name, url=url)], datetime.now(UTC))
+        facts = FACTS.model_copy(update={"specialties": specialties, "japanese_required": required})
+        session.add(make_extraction(ids[url], 6, name, facts=facts.model_dump(mode="json")))
+    log_in_as("ada@example.com")
+    client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
+
+    response = client.get("/api/postings", params={"following": "true", "japanese": "none", "specialty": "backend"})
+
     assert [row["posting"]["url"] for row in response.json()] == ["https://example.com/followed"]
 
 

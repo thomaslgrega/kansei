@@ -1,22 +1,33 @@
 import { type JapaneseChoice, readJapaneseChoice } from './japanese'
+import { readSpecialties, type Selected, specialtiesParam } from './specialty'
 
-export type Filters = { japanese: JapaneseChoice; showSales: boolean }
+export type Filters = { japanese: JapaneseChoice; specialties: Selected }
 
 export function readFilters(params: URLSearchParams): Filters {
-    return { japanese: readJapaneseChoice(params.get('japanese')), showSales: params.get('sales') === '1' }
+    return { japanese: readJapaneseChoice(params.get('japanese')), specialties: readSpecialties(params.get('specialty')) }
+}
+
+function filterParams(filters: Filters): URLSearchParams {
+    const params = new URLSearchParams()
+    if (filters.japanese !== 'any') params.set('japanese', filters.japanese)
+    const specialty = specialtiesParam(filters.specialties)
+    if (specialty !== null) params.set('specialty', specialty)
+    return params
+}
+
+function toSearch(params: URLSearchParams): string {
+    // Every value comes from a fixed list, so a plain comma can't be confused for one inside a value.
+    return params.toString().replaceAll('%2C', ',')
 }
 
 export function filtersToSearch(filters: Filters): string {
-    const params = new URLSearchParams()
-    if (filters.japanese !== 'any') params.set('japanese', filters.japanese)
-    if (filters.showSales) params.set('sales', '1')
-    return params.toString()
+    return toSearch(filterParams(filters))
 }
 
-export function postingsUrl(followingOnly: boolean, japanese: JapaneseChoice): string {
+export function postingsUrl(followingOnly: boolean, filters: Filters): string {
     const params = new URLSearchParams()
     if (followingOnly) params.set('following', 'true')
-    if (japanese !== 'any') params.set('japanese', japanese)
-    const search = params.toString()
+    filterParams(filters).forEach((value, key) => params.set(key, value))
+    const search = toSearch(params)
     return search ? `/api/postings?${search}` : '/api/postings'
 }

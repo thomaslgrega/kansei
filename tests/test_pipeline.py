@@ -4,7 +4,6 @@ import pytest
 from kansei import (
     fetch_posting,
     is_candidate,
-    is_sales_or_support,
     pending_extractions,
     sha256,
     validate,
@@ -38,25 +37,6 @@ from kansei import (
 )
 def test_is_candidate(make_posting, title, location, expected):
     assert is_candidate(make_posting(title, location)) is expected
-
-
-@pytest.mark.parametrize(
-        ("title", "expected"),
-        [
-            ("Senior Sales Engineer - Telco", True),
-            ("Technical Support Engineer II", True),
-            ("Sr. Technical Solutions Engineer - Platform (Support)", True),
-            ("Manager, Field Engineering", True),
-            ("Senior Customer Success Engineer, Japan", True),
-            ("（夜間専任）ロボットシステムサポートエンジニア", True),
-            ("Senior AI Engineer - FDE (Forward Deployed Engineer)", False),
-            ("ADAS HMI Engineer, Customer Application", False),
-            ("Salesforce Engineer", False),
-            ("物流自動化トータルソリューション・システムエンジニア", False),
-        ],
-)
-def test_is_sales_or_support(title, expected):
-    assert is_sales_or_support(title) is expected
 
 
 def test_validate_keeps_the_good_records_and_names_the_bad_one():
