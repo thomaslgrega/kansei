@@ -53,7 +53,7 @@ header {
   letter-spacing: -0.02em;
 }
 
-.hero > p {
+.hero-lead {
   margin: 1rem auto 0;
   max-width: 34rem;
   font-size: 1.15rem;
@@ -97,8 +97,8 @@ header {
   background: var(--chip);
 }
 
-.hero .hero-note {
-  margin-top: 0.75rem;
+.hero-note {
+  margin: 0.75rem 0 0;
   font-size: 0.9em;
 }
 
