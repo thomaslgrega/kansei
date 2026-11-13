@@ -366,7 +366,7 @@ def print_specialties(labels: list[Label], predictions: list[Label], titles: dic
     for url in misses:
         you = ", ".join(by_url[url].specialties) or "other"
         model = ", ".join(predicted[url].specialties) or "other"
-        print(f"\nspecialties: you {you}, model {model}")
+        print(f"\nspecialties:\n  you:   {you}\n  model: {model}")
         print(f"  {titles[url]}\n  {url}")
 
 
