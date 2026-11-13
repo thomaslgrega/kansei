@@ -45,7 +45,7 @@ export default function Dropdown<T extends string>({ label, options, value, onCh
         if (open) listRef.current?.focus()
     }, [open])
 
-    useCloseOnOutsideClick(open, rootRef, triggerRef, () => setHighlighted(null))
+    useCloseOnOutsideClick({ open, rootRef, triggerRef, onClose: () => setHighlighted(null) })
 
     function onTriggerKeyDown(event: KeyboardEvent) {
         if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
