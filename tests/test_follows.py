@@ -149,6 +149,30 @@ def test_following_applies_my_japanese_and_specialty_too(client, session, log_in
     assert ([row["posting"]["url"] for row in body["postings"]], body["total"]) == (["https://example.com/followed"], 1)
 
 
+def test_following_one_board_excludes_the_other_follows_and_its_token_on_another_source(
+    client, session, log_in_as, make_posting, boards
+):
+    session.add(Board(source="ashby", token="kansei-test", name="Kansei Test Ashby"))
+    cases = [
+        ("chosen", "greenhouse", "kansei-test"),
+        ("same-token", "ashby", "kansei-test"),
+        ("other-follow", "lever", "kansei-unnamed"),
+    ]
+    for name, source, token in cases:
+        url = f"https://example.com/{name}"
+        ids = save_postings(session, [make_posting(source=source, token=token, id=name, url=url)], datetime.now(UTC))
+        session.add(make_extraction(ids[url], 6, name))
+    log_in_as("ada@example.com")
+    for _, source, token in cases:
+        client.post("/api/me/follows", json={"source": source, "token": token})
+
+    body = client.get(
+        "/api/postings", params={"following": "true", "source": "greenhouse", "token": "kansei-test"}
+    ).json()
+
+    assert ([row["posting"]["url"] for row in body["postings"]], body["total"]) == (["https://example.com/chosen"], 1)
+
+
 def test_following_postings_while_logged_out_is_401(client):
     response = client.get("/api/postings", params={"following": "true"})
 
