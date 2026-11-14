@@ -105,7 +105,7 @@ CANDIDATE_COLUMNS = (Posting.id, Posting.source, Posting.token, Posting.title, P
 
 
 def filtered_postings(japanese: str, specialty: str | None) -> Select[tuple[Posting, dict, str]]:
-    # Listed postings with an extraction under the current model and prompt, passing the filters; not yet candidates.
+    # Not yet candidates: is_candidate runs in Python on the rows.
     prompt_sha, _ = prompt_snapshot()
     newest = (
         select(Extraction.posting_id, Extraction.facts)
