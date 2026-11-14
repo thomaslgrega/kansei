@@ -7,21 +7,21 @@ function board(source: string, token: string, company: string): Board {
 }
 
 test('only boards that share a company name with another followed board name their source', () => {
-    const boards = [
-        board('greenhouse', 'mercari', 'Mercari'),
-        board('hrmos', 'mercari', 'mercari'),
-        board('lever', 'mujin', 'Mujin'),
-        board('ashby', 'stripe', 'Stripe'),
-        board('greenhouse', 'stripe', 'Stripe'),
-        board('greenhouse', 'stripe-jp', 'Stripe'),
-    ]
+    const greenhouseMercari = board('greenhouse', 'mercari', 'Mercari')
+    const hrmosMercari = board('hrmos', 'mercari', 'mercari')
+    const mujin = { ...board('lever', 'mujin', 'Mujin'), logo_url: 'https://example.com/mujin.png' }
+    const ashbyStripe = board('ashby', 'stripe', 'Stripe')
+    const greenhouseStripe = board('greenhouse', 'stripe', 'Stripe')
+    const greenhouseStripeJp = board('greenhouse', 'stripe-jp', 'Stripe')
 
-    expect(followChips(boards).map((chip) => [chip.key, chip.source])).toEqual([
-        ['greenhouse:mercari', 'greenhouse'],
-        ['hrmos:mercari', 'hrmos'],
-        ['lever:mujin', null],
-        ['ashby:stripe', 'ashby'],
-        ['greenhouse:stripe', 'greenhouse'],
-        ['greenhouse:stripe-jp', 'greenhouse'],
+    const chips = followChips([greenhouseMercari, hrmosMercari, mujin, ashbyStripe, greenhouseStripe, greenhouseStripeJp])
+
+    expect(chips).toEqual([
+        { board: greenhouseMercari, sourceLabel: 'greenhouse' },
+        { board: hrmosMercari, sourceLabel: 'hrmos' },
+        { board: mujin, sourceLabel: null },
+        { board: ashbyStripe, sourceLabel: 'ashby' },
+        { board: greenhouseStripe, sourceLabel: 'greenhouse' },
+        { board: greenhouseStripeJp, sourceLabel: 'greenhouse' },
     ])
 })

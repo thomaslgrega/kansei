@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import AddCompany from './AddCompany'
-import { type Board, type FollowControls } from './boards'
+import { type Board, boardKey, type FollowControls } from './boards'
 import CompanyLogo from './CompanyLogo'
 import { followChips } from './followChips'
 import Postings from './Postings'
@@ -41,16 +41,16 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                 </p>
             ) : (
                 <ul className="follow-chips">
-                    {followChips(follows).map(({ key, board, source }) => (
-                        <li key={key} className="follow-chip">
+                    {followChips(follows).map(({ board, sourceLabel }) => (
+                        <li key={boardKey(board)} className="follow-chip">
                             <CompanyLogo company={board.company} logoUrl={board.logo_url} />
                             <span className="follow-chip-name">{board.company}</span>
-                            {source && <span className="follow-chip-source">{source}</span>}
+                            {sourceLabel && <span className="follow-chip-source">{sourceLabel}</span>}
                             {managing && (
                                 <button
                                     className="follow-chip-unfollow"
-                                    aria-label={source ? `Unfollow ${board.company} on ${source}` : `Unfollow ${board.company}`}
-                                    disabled={following.pending.has(key)}
+                                    aria-label={sourceLabel ? `Unfollow ${board.company} on ${sourceLabel}` : `Unfollow ${board.company}`}
+                                    disabled={following.pending.has(boardKey(board))}
                                     onClick={() => following.unfollow(board.source, board.token)}
                                 >
                                     ×

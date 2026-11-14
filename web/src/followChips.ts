@@ -1,6 +1,6 @@
-import { type Board, boardKey } from './boards'
+import type { Board } from './boards'
 
-export type FollowChip = { key: string; board: Board; source: string | null }
+export type FollowChip = { board: Board; sourceLabel: string | null }
 
 export function followChips(boards: Board[]): FollowChip[] {
     const counts = new Map<string, number>()
@@ -9,8 +9,7 @@ export function followChips(boards: Board[]): FollowChip[] {
         counts.set(name, (counts.get(name) ?? 0) + 1)
     }
     return boards.map((board) => ({
-        key: boardKey(board),
         board,
-        source: (counts.get(board.company.toLowerCase()) ?? 0) > 1 ? board.source : null,
+        sourceLabel: (counts.get(board.company.toLowerCase()) ?? 0) > 1 ? board.source : null,
     }))
 }
