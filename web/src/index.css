@@ -1276,6 +1276,16 @@ li {
   font-weight: 500;
 }
 
+.follow-chip-new {
+  flex: none;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: #c0392b;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .follow-chip-unfollow {
   padding: 0 0.6rem 0 0.3rem;
   border-radius: 0 999px 999px 0;

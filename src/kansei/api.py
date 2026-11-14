@@ -1,4 +1,5 @@
 import asyncio
+from collections import Counter
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
@@ -8,7 +9,7 @@ import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import Select, delete, func, select, true, tuple_
+from sqlalchemy import ColumnElement, Select, delete, func, select, true, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -100,6 +101,34 @@ class PostingsPage(BaseModel):
 
 
 PAGE_SIZE = 50
+CANDIDATE_COLUMNS = (Posting.id, Posting.source, Posting.token, Posting.title, Posting.headline, Posting.location, Posting.last_seen_at)
+
+
+def filtered_postings(japanese: str, specialty: str | None) -> Select[tuple[Posting, dict, str]]:
+    # Not yet candidates: is_candidate runs in Python on the rows.
+    prompt_sha, _ = prompt_snapshot()
+    newest = (
+        select(Extraction.posting_id, Extraction.facts)
+        .where(Extraction.model == settings.openai_model, Extraction.prompt_sha == prompt_sha)
+        .ext(distinct_on(Extraction.posting_id))
+        .order_by(Extraction.posting_id, Extraction.created_at.desc(), Extraction.id.desc())
+        .subquery()
+    )
+    requirement = japanese_requirement(newest.c.facts)
+    return (
+        select(Posting, newest.c.facts, requirement)
+        .join(newest, newest.c.posting_id == Posting.id)
+        .where(
+            Posting.listed,
+            passes_japanese(requirement, japanese),
+            passes_specialty(newest.c.facts, specialty),
+        )
+    )
+
+
+def on_followed_boards(user_id: int) -> ColumnElement[bool]:
+    followed = select(Board.source, Board.token).join(Follow, Follow.board_id == Board.id).where(Follow.user_id == user_id)
+    return tuple_(Posting.source, Posting.token).in_(followed)
 
 
 @api.get("/postings")
@@ -113,43 +142,17 @@ def list_postings(
     page: str = "1",
     cookie: SessionCookie = None,
 ) -> PostingsPage:
-    prompt_sha, _ = prompt_snapshot()
-    newest = (
-        select(Extraction.posting_id, Extraction.facts)
-        .where(Extraction.model == settings.openai_model, Extraction.prompt_sha == prompt_sha)
-        .ext(distinct_on(Extraction.posting_id))
-        .order_by(Extraction.posting_id, Extraction.created_at.desc(), Extraction.id.desc())
-        .subquery()
-    )
-    requirement = japanese_requirement(newest.c.facts)
-    statement = (
-        select(Posting, newest.c.facts, requirement)
-        .join(newest, newest.c.posting_id == Posting.id)
-        .where(
-            Posting.listed,
-            passes_japanese(requirement, japanese),
-            passes_specialty(newest.c.facts, specialty),
-        )
-        .order_by(Posting.first_seen_at.desc(), Posting.id.desc())
-    )
+    statement = filtered_postings(japanese, specialty).order_by(Posting.first_seen_at.desc(), Posting.id.desc())
     if source is not None:
         statement = statement.where(Posting.source == source)
     if token is not None:
         statement = statement.where(Posting.token == token)
     if following:
-        user = current_user(session, cookie)
-        followed = (
-            select(Board.source, Board.token)
-            .join(Follow, Follow.board_id == Board.id)
-            .where(Follow.user_id == user.id)
-        )
-        statement = statement.where(tuple_(Posting.source, Posting.token).in_(followed))
+        statement = statement.where(on_followed_boards(current_user(session, cookie).id))
     # is_candidate runs in Python, so the few columns it needs come first for every posting, and facts for the page after.
     candidates = [
         row
-        for row in session.execute(statement.with_only_columns(
-            Posting.id, Posting.source, Posting.title, Posting.headline, Posting.location, Posting.last_seen_at
-        ))
+        for row in session.execute(statement.with_only_columns(*CANDIDATE_COLUMNS))
         if is_candidate(row)
     ]
     served = page_to_serve(page, len(candidates))
@@ -422,6 +425,16 @@ def list_follows(user: CurrentUser, session: SessionDep) -> list[BoardOut]:
 def locked_board(session: Session, source: str, token: str) -> Board | None:
     # FOR SHARE waits out a concurrent removal, so no follow lands after its DELETE.
     return session.scalar(board_named(source, token).with_for_update(read=True))
+
+
+@api.get("/me/follows/new")
+def new_counts(user: CurrentUser, session: SessionDep, japanese: str = "any", specialty: str | None = None) -> dict[str, int]:
+    rows = session.execute(
+        filtered_postings(japanese, specialty)
+        .with_only_columns(*CANDIDATE_COLUMNS)
+        .where(Posting.new, on_followed_boards(user.id))
+    )
+    return Counter(f"{row.source}:{row.token}" for row in rows if is_candidate(row))
 
 
 @api.post("/me/follows", status_code=201)

@@ -83,6 +83,7 @@ class Extraction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 OPEN_FOR = timedelta(days=2)
+NEW_FOR = timedelta(days=2)
 
 
 class Posting(Base):
@@ -120,6 +121,10 @@ class Posting(Base):
     @hybrid_property
     def listed(self) -> bool:
         return self.last_seen_at > datetime.now(UTC) - OPEN_FOR
+
+    @hybrid_property
+    def new(self) -> bool:
+        return self.first_seen_at > datetime.now(UTC) - NEW_FOR
 
 
 class User(Base):
