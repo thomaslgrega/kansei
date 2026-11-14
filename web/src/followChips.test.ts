@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { Board } from './boards'
-import { followChips } from './followChips'
+import { clampChips, type FollowChip, followChips, twoRowFit } from './followChips'
 
 function board(source: string, token: string, company: string): Board {
     return { source, token, company, logo_url: null }
@@ -47,4 +47,48 @@ test('no chip counts new candidates while managing follows', () => {
     const chips = followChips([mercari], { 'greenhouse:mercari': 3 }, true)
 
     expect(chips).toEqual([{ board: mercari, sourceLabel: null, newLabel: null }])
+})
+
+function chipsFor(...tokens: string[]): FollowChip[] {
+    return tokens.map((token) => ({ board: board('greenhouse', token, token), sourceLabel: null, newLabel: null }))
+}
+
+test('chips past the clamp are hidden and counted', () => {
+    const chips = chipsFor('a', 'b', 'c', 'd', 'e')
+
+    expect(clampChips(chips, 3, null)).toEqual({ shown: chips.slice(0, 3), hidden: 2 })
+})
+
+test('nothing is hidden when every chip fits', () => {
+    const chips = chipsFor('a', 'b', 'c')
+
+    expect(clampChips(chips, 5, null)).toEqual({ shown: chips, hidden: 0 })
+})
+
+test('a selected chip already in view stays where it is', () => {
+    const chips = chipsFor('a', 'b', 'c', 'd', 'e')
+
+    expect(clampChips(chips, 3, 'greenhouse:b')).toEqual({ shown: chips.slice(0, 3), hidden: 2 })
+})
+
+test('a selected chip past the clamp takes the last visible place, and the count covers the others', () => {
+    const [a, b, c, d, e] = chipsFor('a', 'b', 'c', 'd', 'e')
+
+    expect(clampChips([a, b, c, d, e], 3, 'greenhouse:e')).toEqual({ shown: [a, b, e], hidden: 2 })
+})
+
+test('chips that fit in two rows are all kept', () => {
+    expect(twoRowFit([0, 0, 0, 40, 40, 40], 5)).toEqual(5)
+})
+
+test('a third row drops the chips on it', () => {
+    expect(twoRowFit([0, 0, 40, 40, 80, 80, 80], 6)).toEqual(4)
+})
+
+test('a "+N more" chip alone on the third row drops one chip', () => {
+    expect(twoRowFit([0, 0, 0, 40, 40, 40, 80], 6)).toEqual(5)
+})
+
+test('no chips are kept when even the second row overflows past the first chip', () => {
+    expect(twoRowFit([0, 40, 80], 1)).toEqual(0)
 })

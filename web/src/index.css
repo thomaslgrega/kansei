@@ -1500,6 +1500,15 @@ li {
   font-weight: 700;
 }
 
+.follow-chip-item.more {
+  border-style: dashed;
+}
+
+.follow-chip-more {
+  padding: 0 0.8rem;
+  color: var(--muted);
+}
+
 .follow-chip-unfollow {
   padding: 0 0.6rem 0 0.3rem;
   border-radius: 0 999px 999px 0;

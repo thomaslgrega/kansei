@@ -17,3 +17,19 @@ export function followChips(boards: Board[], newCounts: Record<string, number>, 
         }
     })
 }
+
+export function clampChips(chips: FollowChip[], visible: number, selected: string | null): { shown: FollowChip[]; hidden: number } {
+    if (visible >= chips.length) return { shown: chips, hidden: 0 }
+    const shown = chips.slice(0, visible)
+    const selectedChip = chips.find((chip) => boardKey(chip.board) === selected)
+    if (visible > 0 && selectedChip && !shown.includes(selectedChip)) shown[visible - 1] = selectedChip
+    return { shown, hidden: chips.length - visible }
+}
+
+// tops: offsetTop of each rendered chip, then of any chips after them such as "+N more".
+export function twoRowFit(tops: number[], chips: number): number {
+    const rows = [...new Set(tops)].sort((a, b) => a - b)
+    if (rows.length <= 2) return chips
+    const fit = tops.slice(0, chips).filter((top) => top <= rows[1]).length
+    return Math.max(0, Math.min(chips - 1, fit))
+}
