@@ -1,4 +1,4 @@
-export type Board = { source: string; token: string; company: string }
+export type Board = { source: string; token: string; company: string; logo_url: string | null }
 
 export type FollowControls = {
     keys: Set<string>

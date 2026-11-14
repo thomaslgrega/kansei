@@ -23,9 +23,9 @@ def test_following_a_board_twice_leaves_one_follow(client, log_in_as, boards):
     second = client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
 
     assert (first.status_code, second.status_code) == (201, 200)
-    assert second.json() == {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."}
+    assert second.json() == {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": None}
     assert client.get("/api/me/follows").json() == [
-        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
+        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": None},
     ]
 
 
@@ -52,11 +52,11 @@ def test_unfollowing_removes_only_that_follow(client, log_in_as, boards):
 
     assert response.status_code == 204
     assert client.get("/api/me/follows").json() == [
-        {"source": "lever", "token": "kansei-unnamed", "company": "kansei-unnamed"},
+        {"source": "lever", "token": "kansei-unnamed", "company": "kansei-unnamed", "logo_url": None},
     ]
     client.post("/api/login", json={"email": "bob@example.com", "password": "correct password"})
     assert client.get("/api/me/follows").json() == [
-        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
+        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": None},
     ]
 
 
@@ -75,8 +75,27 @@ def test_follows_lists_only_your_boards_by_company_name_even_without_open_candid
     response = client.get("/api/me/follows")
 
     assert response.json() == [
-        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
-        {"source": "lever", "token": "kansei-unnamed", "company": "kansei-unnamed"},
+        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": None},
+        {"source": "lever", "token": "kansei-unnamed", "company": "kansei-unnamed", "logo_url": None},
+    ]
+
+
+def test_follows_give_each_boards_logo_in_company_order_ignoring_case(client, session, log_in_as, boards):
+    session.add_all([
+        Board(source="ashby", token="kansei-mercari", name="mercari", logo_url="https://example.com/mercari.png"),
+        Board(source="hrmos", token="kansei-zeta", name="Zeta"),
+    ])
+    session.flush()
+    log_in_as("ada@example.com")
+    for source, token in [("hrmos", "kansei-zeta"), ("greenhouse", "kansei-test"), ("ashby", "kansei-mercari")]:
+        client.post("/api/me/follows", json={"source": source, "token": token})
+
+    response = client.get("/api/me/follows")
+
+    assert response.json() == [
+        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": None},
+        {"source": "ashby", "token": "kansei-mercari", "company": "mercari", "logo_url": "https://example.com/mercari.png"},
+        {"source": "hrmos", "token": "kansei-zeta", "company": "Zeta", "logo_url": None},
     ]
 
 

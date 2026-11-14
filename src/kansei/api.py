@@ -339,6 +339,7 @@ class BoardOut(BaseModel):
     source: BoardSource
     token: str
     company: str
+    logo_url: str | None
 
 
 class ProbeHit(BaseModel):

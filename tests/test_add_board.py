@@ -464,11 +464,11 @@ def test_adding_a_board_not_on_kansei_creates_it_with_its_name_and_adder_and_fol
     ada = session.scalar(select(User.id).where(User.email == "ada@example.com"))
     board = session.scalar(select(Board).where(Board.token == "kansei-test"))
     assert (response.status_code, response.json()) == (
-        201, {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
+        201, {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": None},
     )
     assert (board.source, board.name, board.status, board.added_by) == ("greenhouse", "Kansei Test K.K.", "active", ada)
     assert client.get("/api/me/follows").json() == [
-        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K."},
+        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": None},
     ]
 
 
@@ -481,11 +481,11 @@ def test_adding_an_hrmos_board_not_on_kansei_creates_it_and_follows_it(client, s
     ada = session.scalar(select(User.id).where(User.email == "ada@example.com"))
     board = session.scalar(select(Board).where(Board.source == "hrmos"))
     assert (response.status_code, response.json()) == (
-        201, {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社"},
+        201, {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社", "logo_url": None},
     )
     assert (board.token, board.name, board.status, board.added_by) == ("visional", "ビジョナル株式会社", "active", ada)
     assert client.get("/api/me/follows").json() == [
-        {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社"},
+        {"source": "hrmos", "token": "visional", "company": "ビジョナル株式会社", "logo_url": None},
     ]
 
 
@@ -507,11 +507,11 @@ def test_adding_a_board_whose_name_cant_be_read_leaves_the_name_for_the_ingest(c
     response = client.post("/api/me/follows", json={"source": "lever", "token": "kansei-lever"})
 
     assert (response.status_code, response.json()) == (
-        201, {"source": "lever", "token": "kansei-lever", "company": "kansei-lever"},
+        201, {"source": "lever", "token": "kansei-lever", "company": "kansei-lever", "logo_url": None},
     )
     assert session.scalar(select(Board.name).where(Board.token == "kansei-lever")) is None
     assert client.get("/api/me/follows").json() == [
-        {"source": "lever", "token": "kansei-lever", "company": "kansei-lever"},
+        {"source": "lever", "token": "kansei-lever", "company": "kansei-lever", "logo_url": None},
     ]
 
 

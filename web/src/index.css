@@ -1183,3 +1183,92 @@ li {
     field-sizing: content;
   }
 }
+
+.following-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.following-heading h1 {
+  margin-bottom: 0.5rem;
+}
+
+.following-manage {
+  margin-left: auto;
+}
+
+.follow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.25rem 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.follow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0 0.7rem 0 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 0.88rem;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.follow-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.follow-chip .tile {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.follow-chip .tile-logo {
+  padding: 2px;
+}
+
+.follow-chip-source {
+  padding: 0 0.3rem;
+  border-radius: 0.25rem;
+  background: var(--chip);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.follow-chip-unfollow {
+  align-self: stretch;
+  margin-right: -0.7rem;
+  padding: 0 0.6rem 0 0.3rem;
+  border-radius: 0 999px 999px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.follow-chip-unfollow:hover {
+  color: var(--error);
+}
+
+.following-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.9em;
+}
