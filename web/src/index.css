@@ -1208,20 +1208,46 @@ li {
   list-style: none;
 }
 
-.follow-chip {
+.follow-chip-item {
   display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
   height: 2rem;
   margin: 0;
-  padding: 0 0.7rem 0 0.25rem;
   border: 1px solid var(--line);
   border-radius: 999px;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.follow-chip-item:has(.follow-chip:not([aria-disabled="true"]):hover) {
+  border-color: var(--muted);
+}
+
+.follow-chip-item:has(.follow-chip[aria-pressed="true"]) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.follow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0 0.7rem 0 0.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
   font-size: 0.88rem;
   font-weight: 550;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.follow-chip[aria-disabled="true"] {
+  padding-right: 0;
+  cursor: default;
 }
 
 .follow-chip-name {
@@ -1251,8 +1277,6 @@ li {
 }
 
 .follow-chip-unfollow {
-  align-self: stretch;
-  margin-right: -0.7rem;
   padding: 0 0.6rem 0 0.3rem;
   border-radius: 0 999px 999px 0;
   border: 0;
@@ -1268,7 +1292,8 @@ li {
   color: var(--error);
 }
 
-.following-hint {
+.following-hint,
+.following-selected {
   margin: 0 0 0.75rem;
   font-size: 0.9em;
 }

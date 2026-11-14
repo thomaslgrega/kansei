@@ -11,6 +11,11 @@ export function boardKey(board: { source: string; token: string }): string {
     return `${board.source}:${board.token}`
 }
 
+export function parseBoardKey(key: string): { source: string; token: string } {
+    const colon = key.indexOf(':')
+    return { source: key.slice(0, colon), token: key.slice(colon + 1) }
+}
+
 export function followsKey(followed: Set<string>): string {
     return [...followed].sort().join(' ')
 }

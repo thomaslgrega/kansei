@@ -105,6 +105,7 @@ PAGE_SIZE = 50
 @api.get("/postings")
 def list_postings(
     session: SessionDep,
+    source: BoardSource | None = None,
     token: str | None = None,
     following: bool = False,
     japanese: str = "any",
@@ -131,6 +132,8 @@ def list_postings(
         )
         .order_by(Posting.first_seen_at.desc(), Posting.id.desc())
     )
+    if source is not None:
+        statement = statement.where(Posting.source == source)
     if token is not None:
         statement = statement.where(Posting.token == token)
     if following:
