@@ -319,6 +319,12 @@ def test_a_probe_hit_carries_the_stored_logo_or_else_the_fetched_one(
     assert [hit["logo_url"] for hit in response.json()["hits"]] == [logo_url]
 
 
+def serve_greenhouse_logo(ats) -> None:
+    ats.pages[GREENHOUSE_BOARD_PAGE.format(token="kansei-test")] = httpx.Response(
+        200, text=f'<img alt="Kansei Test logo" src="{FETCHED_LOGO}">'
+    )
+
+
 def hold_name_and_logo_until_both_are_asked(ats) -> None:
     both = {GREENHOUSE_BOARD_INFO.format(token="kansei-test"), GREENHOUSE_BOARD_PAGE.format(token="kansei-test")}
     met = asyncio.Barrier(2)
@@ -574,12 +580,6 @@ def test_adding_a_board_holds_no_transaction_while_waiting_on_the_ats(client, se
     response = client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
 
     assert (response.status_code, seen) == (201, [False, False, False])
-
-
-def serve_greenhouse_logo(ats) -> None:
-    ats.pages[GREENHOUSE_BOARD_PAGE.format(token="kansei-test")] = httpx.Response(
-        200, text=f'<img alt="Kansei Test logo" src="{FETCHED_LOGO}">'
-    )
 
 
 def test_adding_a_board_not_on_kansei_stores_its_logo(client, session, log_in_as, ats):
