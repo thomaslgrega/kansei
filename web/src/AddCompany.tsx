@@ -1,15 +1,7 @@
 import { type SubmitEvent, useState } from 'react'
 import { boardKey } from './boards'
-
-type Hit = {
-    source: string
-    token: string
-    company: string | null
-    titles: string[]
-    candidates: number
-    state: 'not_on_kansei' | 'on_kansei' | 'removed'
-    following: boolean
-}
+import CompanyLogo from './CompanyLogo'
+import { candidateCount, followedNotice, type Hit, hitAction, hitName } from './probeHits'
 
 type Probe = { hits: Hit[]; message: string | null }
 
@@ -19,19 +11,21 @@ const FAILED: Probe = { hits: [], message: "Couldn't search. Try again." }
 type Props = {
     followed: Set<string>
     onFollowsChanged: () => Promise<void>
+    onFollowed: (notice: string) => void
+    autoFocus?: boolean
 }
 
-export default function AddCompany({ followed, onFollowsChanged }: Props) {
+export default function AddCompany({ followed, onFollowsChanged, onFollowed, autoFocus }: Props) {
     const [probe, setProbe] = useState<Probe | null>(null)
     const [searching, setSearching] = useState(false)
     const [adding, setAdding] = useState<string | null>(null)
-    const [notice, setNotice] = useState('')
+    const [error, setError] = useState('')
 
     async function find(event: SubmitEvent<HTMLFormElement>) {
         event.preventDefault()
         const q = String(new FormData(event.currentTarget).get('q') ?? '')
         setSearching(true)
-        setNotice('')
+        setError('')
         try {
             const response = await fetch(`/api/probe?q=${encodeURIComponent(q)}`)
             setProbe(response.ok ? await response.json() : FAILED)
@@ -43,10 +37,8 @@ export default function AddCompany({ followed, onFollowsChanged }: Props) {
     }
 
     async function add(hit: Hit) {
-        const key = boardKey(hit)
-        const name = hit.company ?? hit.token
-        setAdding(key)
-        setNotice('')
+        setAdding(boardKey(hit))
+        setError('')
         try {
             const response = await fetch('/api/me/follows', {
                 method: 'POST',
@@ -55,54 +47,78 @@ export default function AddCompany({ followed, onFollowsChanged }: Props) {
             })
             if (!response.ok) {
                 const body = await response.json().catch(() => null)
-                setNotice(typeof body?.detail === 'string' ? body.detail : `Couldn't add ${name}. Try again.`)
+                setError(typeof body?.detail === 'string' ? body.detail : `Couldn't add ${hitName(hit)}. Try again.`)
                 return
             }
-            setNotice(
-                hit.state === 'not_on_kansei'
-                    ? `Added ${name}. Its jobs will appear after the next update.`
-                    : `Following ${name}.`,
-            )
-            setProbe((current) => current && {
-                ...current,
-                hits: current.hits.map((other) => (boardKey(other) === key ? { ...other, state: 'on_kansei' } : other)),
-            })
             await onFollowsChanged()
+            onFollowed(followedNotice(hit))
         } finally {
             setAdding(null)
         }
     }
 
     function action(hit: Hit) {
-        if (hit.state === 'removed') return <p className="status">{REMOVED}</p>
-        if (followed.has(boardKey(hit))) return <span className="status">Following</span>
+        const shown = hitAction(hit, followed)
+        if (shown === 'removed') return null
+        if (shown === 'following') return <span className="hit-following">Following ✓</span>
         return (
-            <button disabled={adding === boardKey(hit)} onClick={() => add(hit)}>
-                {hit.state === 'not_on_kansei' ? 'Add' : 'Follow'}
+            <button className="hit-follow" disabled={adding === boardKey(hit)} onClick={() => add(hit)}>
+                {shown === 'add' ? '+ Add' : '+ Follow'}
             </button>
         )
     }
 
     return (
-        <>
-            <form onSubmit={find}>
-                <input name="q" type="text" placeholder="Company name, or a Greenhouse, Lever, Ashby or HRMOS board or job URL" required />
-                <button disabled={searching}>Find company</button>
+        <div className="add-company">
+            <form className="company-search" onSubmit={find}>
+                <label className="company-search-field">
+                    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                        <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                        <path d="M13 13l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                    <input
+                        name="q"
+                        type="search"
+                        aria-label="Company name or board URL"
+                        placeholder="Company name, or a Greenhouse, Lever, Ashby or HRMOS URL"
+                        autoFocus={autoFocus}
+                        required
+                    />
+                </label>
+                <button className="company-search-go" disabled={searching}>{searching ? 'Searching…' : 'Search'}</button>
             </form>
-            {probe?.message && <p role="status">{probe.message}</p>}
-            <ul>
-                {probe?.hits.map((hit) => (
-                    <li key={boardKey(hit)}>
-                        <strong>{hit.company ?? hit.token}</strong>{' '}
-                        <span className="status">
-                            {hit.source} · {hit.candidates} Japan engineering {hit.candidates === 1 ? 'job' : 'jobs'} open now
-                        </span>
-                        <p className="status">{hit.titles.length > 0 ? hit.titles.join(' · ') : 'No open jobs'}</p>
-                        {action(hit)}
-                    </li>
-                ))}
-            </ul>
-            {notice && <p role="status">{notice}</p>}
-        </>
+            {probe?.message && <p className="muted" role="status">{probe.message}</p>}
+            {error && <p role="status">{error}</p>}
+            {probe && probe.hits.length > 0 && (
+                <ul className="hits">
+                    {probe.hits.map((hit) => (
+                        <li key={boardKey(hit)} className={hit.state === 'removed' ? 'hit removed' : 'hit'}>
+                            <CompanyLogo company={hitName(hit)} logoUrl={hit.logo_url} />
+                            <div className="hit-body">
+                                <div className="hit-name">
+                                    <strong>{hitName(hit)}</strong>
+                                    <span className="hit-source">{hit.source}</span>
+                                </div>
+                                {hit.state === 'removed' ? (
+                                    <p className="muted">{REMOVED}</p>
+                                ) : (
+                                    <>
+                                        <p className="hit-count">{candidateCount(hit.candidates)}</p>
+                                        {hit.titles.length > 0 ? (
+                                            <ul className="hit-titles">
+                                                {hit.titles.map((title, index) => <li key={index}>{title}</li>)}
+                                            </ul>
+                                        ) : (
+                                            <p className="muted">No open jobs</p>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                            <div className="hit-action">{action(hit)}</div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
     )
 }

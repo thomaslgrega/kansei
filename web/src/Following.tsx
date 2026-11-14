@@ -18,6 +18,8 @@ type Props = {
 
 export default function Following({ follows, following, onFollowsChanged, tracking }: Props) {
     const [managing, setManaging] = useState(false)
+    const [adding, setAdding] = useState(false)
+    const [notice, setNotice] = useState('')
     if (managing && follows.length === 0) setManaging(false)
     const [params] = useSearchParams()
     const navigate = useNavigate()
@@ -35,59 +37,81 @@ export default function Following({ follows, following, onFollowsChanged, tracki
 
     const newCounts = useNewCounts(newCountsUrl(filters), followsKey(following.keys))
 
+    function followed(message: string) {
+        setAdding(false)
+        setNotice(message)
+    }
+
+    if (follows.length === 0) {
+        return (
+            <main>
+                <Title>Following · kansei</Title>
+                <h1>Following</h1>
+                <p>Follow a company and its Japan engineering postings will show here.</p>
+                <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={followed} />
+            </main>
+        )
+    }
+
     return (
         <main>
             <Title>Following · kansei</Title>
             <div className="following-heading">
                 <h1>Following</h1>
-                {follows.length > 0 && (
-                    <>
-                        <span className="muted">
-                            {follows.length} {follows.length === 1 ? 'company' : 'companies'}
-                        </span>
-                        <button className="link-button following-manage" onClick={() => setManaging(!managing)}>
-                            {managing ? 'Done' : 'Manage'}
-                        </button>
-                    </>
-                )}
+                <span className="muted">
+                    {follows.length} {follows.length === 1 ? 'company' : 'companies'}
+                </span>
+                <div className="following-actions">
+                    <button className="link-button" onClick={() => setManaging(!managing)}>
+                        {managing ? 'Done' : 'Manage'}
+                    </button>
+                    <button
+                        className={adding ? 'add-button open' : 'add-button'}
+                        aria-expanded={adding}
+                        aria-controls="add-company"
+                        onClick={() => {
+                            setNotice('')
+                            setAdding(!adding)
+                        }}
+                    >
+                        {adding ? 'Close' : '+ Add company'}
+                    </button>
+                </div>
             </div>
-            {follows.length === 0 ? (
-                <p>
-                    You don't follow any companies yet. Find one under <a href="#add-company">Add a company</a>, and
-                    its postings will show here.
-                </p>
-            ) : (
-                <ul className={managing ? 'follow-chips managing' : 'follow-chips'}>
-                    {followChips(follows, newCounts, managing).map(({ board, sourceLabel, newLabel }) => (
-                        <li key={boardKey(board)} className="follow-chip-item">
-                            <button
-                                className="follow-chip"
-                                aria-pressed={boardKey(board) === filters.board}
-                                aria-disabled={managing}
-                                onClick={() => go(boardClickSearch(filters, boardKey(board), managing))}
-                            >
-                                <CompanyLogo company={board.company} logoUrl={board.logo_url} />
-                                <span className="follow-chip-name">{board.company}</span>
-                                {sourceLabel && <span className="follow-chip-source">{sourceLabel}</span>}
-                                {newLabel && <span className="follow-chip-new">{newLabel}</span>}
-                            </button>
-                            {managing && (
-                                <button
-                                    className="follow-chip-unfollow"
-                                    aria-label={sourceLabel ? `Unfollow ${board.company} on ${sourceLabel}` : `Unfollow ${board.company}`}
-                                    disabled={following.pending.has(boardKey(board))}
-                                    onClick={() => following.unfollow(board.source, board.token)}
-                                >
-                                    ×
-                                </button>
-                            )}
-                        </li>
-                    ))}
-                </ul>
+            {adding && (
+                <section id="add-company" className="add-panel" aria-label="Add a company">
+                    <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={followed} autoFocus />
+                </section>
             )}
+            {notice && <p className="add-notice" role="status">{notice}</p>}
+            <ul className={managing ? 'follow-chips managing' : 'follow-chips'}>
+                {followChips(follows, newCounts, managing).map(({ board, sourceLabel, newLabel }) => (
+                    <li key={boardKey(board)} className="follow-chip-item">
+                        <button
+                            className="follow-chip"
+                            aria-pressed={boardKey(board) === filters.board}
+                            aria-disabled={managing}
+                            onClick={() => go(boardClickSearch(filters, boardKey(board), managing))}
+                        >
+                            <CompanyLogo company={board.company} logoUrl={board.logo_url} />
+                            <span className="follow-chip-name">{board.company}</span>
+                            {sourceLabel && <span className="follow-chip-source">{sourceLabel}</span>}
+                            {newLabel && <span className="follow-chip-new">{newLabel}</span>}
+                        </button>
+                        {managing && (
+                            <button
+                                className="follow-chip-unfollow"
+                                aria-label={sourceLabel ? `Unfollow ${board.company} on ${sourceLabel}` : `Unfollow ${board.company}`}
+                                disabled={following.pending.has(boardKey(board))}
+                                onClick={() => following.unfollow(board.source, board.token)}
+                            >
+                                ×
+                            </button>
+                        )}
+                    </li>
+                ))}
+            </ul>
             {managing && <p className="muted following-hint">Click × to unfollow.</p>}
-            <h2 id="add-company">Add a company</h2>
-            <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} />
             {selected && (
                 <p className="following-selected">
                     Showing only <strong>{selected.company}</strong> ·{' '}
@@ -96,9 +120,7 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                     </button>
                 </p>
             )}
-            {follows.length > 0 && (
-                <Postings followingOnly tracking={tracking} following={following} />
-            )}
+            <Postings followingOnly tracking={tracking} following={following} />
         </main>
     )
 }

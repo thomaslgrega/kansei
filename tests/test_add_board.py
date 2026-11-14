@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import httpx
@@ -10,6 +11,7 @@ from kansei.sources import (
     ASHBY_GRAPHQL,
     GREENHOUSE_BOARD,
     GREENHOUSE_BOARD_INFO,
+    GREENHOUSE_BOARD_PAGE,
     HRMOS_BOARD,
     HRMOS_JOB,
     LEVER_BOARD,
@@ -52,10 +54,11 @@ def test_probing_a_board_url_finds_the_board(client, log_in_as, ats):
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer"],
+            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
             "candidates": 3,
             "state": "not_on_kansei",
             "following": False,
+            "logo_url": None,
         }],
     }
 
@@ -79,7 +82,7 @@ def test_probing_holds_no_transaction_while_waiting_on_the_ats(client, session, 
 
     response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
 
-    assert (response.status_code, seen) == (200, [False, False])
+    assert (response.status_code, seen) == (200, [False, False, False])
 
 
 def serve_lever_board(ats, token: str = "kansei-lever") -> None:
@@ -148,7 +151,7 @@ HRMOS_HIT = {
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer"],
+            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
             "candidates": 3,
         },
     ),
@@ -195,7 +198,7 @@ def test_probing_a_single_job_url_finds_its_whole_board(client, log_in_as, ats, 
 
     response = client.get("/api/probe", params={"q": url})
 
-    assert response.json() == {"message": None, "hits": [{**hit, "state": "not_on_kansei", "following": False}]}
+    assert response.json() == {"message": None, "hits": [{**hit, "state": "not_on_kansei", "following": False, "logo_url": None}]}
 
 
 UNKNOWN_HOST = (
@@ -261,12 +264,62 @@ def test_probing_a_board_on_kansei_reports_its_state_and_name_on_kansei(
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer"],
+            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
             "candidates": 3,
             "state": state,
             "following": following,
+            "logo_url": None,
         }],
     }
+
+
+STORED_LOGO = "https://example.com/stored.png"
+FETCHED_LOGO = "https://example.com/fetched.png"
+
+
+@pytest.mark.parametrize(("stored", "stored_logo", "page_logo", "logo_url"), [
+    (False, None, True, FETCHED_LOGO),
+    (False, None, False, None),
+    (True, STORED_LOGO, True, STORED_LOGO),
+    (True, STORED_LOGO, False, STORED_LOGO),
+    (True, None, True, FETCHED_LOGO),
+    (True, None, False, None),
+])
+def test_a_probe_hit_carries_the_stored_logo_or_else_the_fetched_one(
+    client, session, log_in_as, ats, stored, stored_logo, page_logo, logo_url
+):
+    serve_greenhouse_board(ats)
+    if page_logo:
+        ats.pages[GREENHOUSE_BOARD_PAGE.format(token="kansei-test")] = httpx.Response(
+            200, text=f'<img alt="Kansei Test logo" src="{FETCHED_LOGO}">'
+        )
+    if stored:
+        session.add(Board(source="greenhouse", token="kansei-test", name="Kansei Test K.K.", logo_url=stored_logo))
+        session.flush()
+    log_in_as("ada@example.com")
+
+    response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
+
+    assert [hit["logo_url"] for hit in response.json()["hits"]] == [logo_url]
+
+
+def test_probing_fetches_the_name_and_the_logo_at_the_same_time(client, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    log_in_as("ada@example.com")
+    both = {GREENHOUSE_BOARD_INFO.format(token="kansei-test"), GREENHOUSE_BOARD_PAGE.format(token="kansei-test")}
+    met = asyncio.Barrier(2)
+    handle = ats.handle
+
+    async def meet(request: httpx.Request) -> httpx.Response:
+        if str(request.url) in both:
+            await asyncio.wait_for(met.wait(), timeout=2)
+        return handle(request)
+
+    ats.handle = meet
+
+    response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
+
+    assert [hit["company"] for hit in response.json()["hits"]] == ["Kansei Test K.K."]
 
 
 def test_probing_a_board_with_no_readable_name_gives_no_company(client, log_in_as, ats):
@@ -282,10 +335,11 @@ def test_probing_a_board_with_no_readable_name_gives_no_company(client, log_in_a
             "source": "greenhouse",
             "token": "kansei-test",
             "company": None,
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer"],
+            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
             "candidates": 3,
             "state": "not_on_kansei",
             "following": False,
+            "logo_url": None,
         }],
     }
 
@@ -305,10 +359,11 @@ def test_a_board_on_kansei_is_found_whatever_the_case_of_the_pasted_token(client
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer"],
+            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
             "candidates": 3,
             "state": "removed",
             "following": False,
+            "logo_url": None,
         }],
     }
     assert added.status_code == 409
@@ -327,7 +382,7 @@ def test_an_hrmos_board_on_kansei_is_found_whatever_the_case_of_the_pasted_token
 
     assert response.json() == {
         "message": None,
-        "hits": [{**HRMOS_HIT, "company": "ビジョナル", "state": "on_kansei", "following": False}],
+        "hits": [{**HRMOS_HIT, "company": "ビジョナル", "state": "on_kansei", "following": False, "logo_url": None}],
     }
 
 
@@ -390,6 +445,7 @@ def test_probing_a_name_returns_the_board_its_slug_finds(client, log_in_as, ats)
             "candidates": 1,
             "state": "not_on_kansei",
             "following": False,
+            "logo_url": None,
         }],
     }
 
@@ -412,12 +468,11 @@ def test_probing_a_name_returns_every_board_it_finds_across_sources(client, sess
                 "source": "greenhouse",
                 "token": "kansei-test",
                 "company": "Kansei Test K.K.",
-                "titles": [
-                    "Backend Engineer", "Account Executive", "Frontend Engineer", "Platform Engineer", "Designer",
-                ],
+                "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
                 "candidates": 3,
                 "state": "not_on_kansei",
                 "following": False,
+                "logo_url": None,
             },
             {
                 "source": "lever",
@@ -427,6 +482,7 @@ def test_probing_a_name_returns_every_board_it_finds_across_sources(client, sess
                 "candidates": 1,
                 "state": "removed",
                 "following": False,
+                "logo_url": None,
             },
             {
                 "source": "ashby",
@@ -436,6 +492,7 @@ def test_probing_a_name_returns_every_board_it_finds_across_sources(client, sess
                 "candidates": 1,
                 "state": "not_on_kansei",
                 "following": False,
+                "logo_url": None,
             },
         ],
     }
