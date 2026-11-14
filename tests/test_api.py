@@ -361,9 +361,9 @@ def test_checked_is_the_newest_board_posting_whatever_the_filters_ignoring_paste
     ids = save_postings(session, [
         make_posting(token="kansei-test", id=f"{n}", url=f"https://example.com/{n}") for n in range(51)
     ], now - timedelta(days=1))
-    ids |= save_postings(session, [
-        make_posting(token="kansei-other", id="unextracted", url="https://example.com/unextracted")
-    ], now)
+    unextracted = make_posting(token="kansei-other", id="unextracted", url="https://example.com/unextracted")
+    ids |= save_postings(session, [unextracted], now - timedelta(days=2))
+    ids |= save_postings(session, [unextracted], now)
     ids |= save_postings(session, [
         make_posting(source="url", token="kansei-test", id="pasted", url="https://example.com/pasted")
     ], now + timedelta(minutes=1))
@@ -396,4 +396,4 @@ def test_checked_is_the_newest_board_posting_whatever_the_filters_ignoring_paste
 def test_no_postings_is_page_1_of_nothing(client):
     body = client.get("/api/postings", params={"token": "kansei-test", "page": "3"}).json()
 
-    assert (body["postings"], body["total"], body["page"]) == ([], 0, 1)
+    assert {key: value for key, value in body.items() if key != "checked_at"} == {"postings": [], "total": 0, "page": 1}
