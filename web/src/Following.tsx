@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import AddCompany from './AddCompany'
 import { type Board, boardKey, type FollowControls } from './boards'
 import CompanyLogo from './CompanyLogo'
-import { companyClickSearch, droppedCompanySearch, filtersToSearch, readFilters } from './filters'
+import { boardClickSearch, droppedBoardSearch, filtersToSearch, readFilters } from './filters'
 import { followChips } from './followChips'
 import Postings from './Postings'
 import Title from './Title'
@@ -22,9 +22,9 @@ export default function Following({ follows, following, onFollowsChanged, tracki
     const [params] = useSearchParams()
     const navigate = useNavigate()
     const filters = readFilters(params, following.keys)
-    const selected = follows.find((board) => boardKey(board) === filters.company)
+    const selected = follows.find((board) => boardKey(board) === filters.board)
 
-    const dropped = droppedCompanySearch(params, following.keys)
+    const dropped = droppedBoardSearch(params, following.keys)
     useEffect(() => {
         if (dropped !== null) navigate(`?${dropped}`, { replace: true })
     }, [dropped, navigate])
@@ -60,9 +60,9 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                         <li key={boardKey(board)} className="follow-chip-item">
                             <button
                                 className="follow-chip"
-                                aria-pressed={boardKey(board) === filters.company}
+                                aria-pressed={boardKey(board) === filters.board}
                                 aria-disabled={managing}
-                                onClick={() => go(companyClickSearch(filters, boardKey(board), managing))}
+                                onClick={() => go(boardClickSearch(filters, boardKey(board), managing))}
                             >
                                 <CompanyLogo company={board.company} logoUrl={board.logo_url} />
                                 <span className="follow-chip-name">{board.company}</span>
@@ -88,7 +88,7 @@ export default function Following({ follows, following, onFollowsChanged, tracki
             {selected && (
                 <p className="following-selected">
                     Showing only <strong>{selected.company}</strong> ·{' '}
-                    <button className="link-button" onClick={() => go(filtersToSearch({ ...filters, company: null }))}>
+                    <button className="link-button" onClick={() => go(filtersToSearch({ ...filters, board: null }))}>
                         Show all
                     </button>
                 </p>
