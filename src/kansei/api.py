@@ -3,7 +3,7 @@ from collections import Counter
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, NamedTuple
 
 import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
@@ -36,6 +36,7 @@ from kansei.sources import (
     SLUG,
     SOURCES,
     NotABoard,
+    fetch_board_logo,
     fetch_board_name,
     looks_like_url,
     name_slugs,
@@ -356,6 +357,7 @@ class ProbeHit(BaseModel):
     candidates: int
     state: Literal["not_on_kansei", "on_kansei", "removed"]
     following: bool
+    logo_url: str | None
 
 
 class ProbeOut(BaseModel):
@@ -372,21 +374,30 @@ NO_BOARD_AT_URL = "No board found at that URL."
 TRY_THE_URL = "No board found for that name. Try pasting its Greenhouse, Lever, Ashby or HRMOS board URL."
 
 
-async def fetch_board(http: httpx.AsyncClient, source: str, token: str) -> tuple[list[JobPosting], str | None] | None:
+class FetchedBoard(NamedTuple):
+    jobs: list[JobPosting]
+    name: str | None
+    logo: str | None
+
+
+async def fetch_board(http: httpx.AsyncClient, source: str, token: str) -> FetchedBoard | None:
     jobs = await board_jobs(http, source, token)
     if jobs is None:
         return None
-    return jobs, await fetch_board_name(http, source, token)
+    name, logo = await asyncio.gather(fetch_board_name(http, source, token), fetch_board_logo(http, source, token))
+    return FetchedBoard(jobs, name, logo)
 
 
-def probe_hit(session: Session, user_id: int, source: str, token: str, jobs: list[JobPosting], name: str | None) -> ProbeHit:
+def probe_hit(session: Session, user_id: int, source: str, token: str, fetched: FetchedBoard) -> ProbeHit:
     board = session.scalar(board_named(source, token))
+    candidates = [job for job in fetched.jobs if is_candidate(job)]
     return ProbeHit(
         source=source,
         token=board.token if board else token,
-        company=(board.name if board else None) or name,
-        titles=[job.title for job in jobs[:5]],
-        candidates=sum(is_candidate(job) for job in jobs),
+        company=(board.name if board else None) or fetched.name,
+        logo_url=(board.logo_url if board else None) or fetched.logo,
+        titles=[job.title for job in candidates[:3]],
+        candidates=len(candidates),
         state="not_on_kansei" if board is None else "removed" if board.status == "removed" else "on_kansei",
         following=board is not None and session.get(Follow, (user_id, board.id)) is not None,
     )
@@ -409,7 +420,7 @@ async def probe(q: str, user: CurrentUser, session: SessionDep, http: HttpDep, n
     session.rollback()
     found = await asyncio.gather(*(fetch_board(http, source, token) for source, token in guesses))
     hits = [
-        probe_hit(session, user_id, source, token, *fetched)
+        probe_hit(session, user_id, source, token, fetched)
         for (source, token), fetched in zip(guesses, found, strict=True)
         if fetched is not None
     ]
