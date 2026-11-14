@@ -27,9 +27,9 @@ export function clampChips(chips: FollowChip[], visible: number, selected: strin
 }
 
 // tops: offsetTop of each rendered chip, then of any chips after them such as "+N more".
-export function twoRowFit(tops: number[], chips: number): number {
+export function twoRowFit(tops: number[], count: number): number {
     const rows = [...new Set(tops)].sort((a, b) => a - b)
-    if (rows.length <= 2) return chips
-    const fit = tops.slice(0, chips).filter((top) => top <= rows[1]).length
-    return Math.max(0, Math.min(chips - 1, fit))
+    if (rows.length <= 2) return count
+    const fit = tops.slice(0, count).filter((top) => top <= rows[1]).length
+    return Math.min(count - 1, fit)
 }

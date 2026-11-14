@@ -15,15 +15,15 @@ type Props = {
 
 export default function FollowChipList({ chips, selected, managing, pending, onClick, onUnfollow }: Props) {
     const [expanded, setExpanded] = useState(false)
-    const [visible, setVisible] = useState(Infinity)
+    const [limit, setLimit] = useState(Infinity)
     const list = useRef<HTMLUListElement>(null)
 
     // Anything that changes a chip's width shows every chip again, and the layout effect drops them until two rows hold.
-    const layout = [managing, selected, ...chips.map((chip) => `${boardKey(chip.board)} ${chip.sourceLabel} ${chip.newLabel}`)].join('|')
-    const [measuredFor, setMeasuredFor] = useState(layout)
-    if (measuredFor !== layout) {
-        setMeasuredFor(layout)
-        setVisible(Infinity)
+    const layoutKey = [managing, selected, ...chips.map((chip) => `${boardKey(chip.board)} ${chip.sourceLabel} ${chip.newLabel}`)].join('|')
+    const [measuredFor, setMeasuredFor] = useState(layoutKey)
+    if (measuredFor !== layoutKey) {
+        setMeasuredFor(layoutKey)
+        setLimit(Infinity)
     }
 
     useLayoutEffect(() => {
@@ -33,21 +33,21 @@ export default function FollowChipList({ chips, selected, managing, pending, onC
         const observer = new ResizeObserver(() => {
             if (element.clientWidth === width) return
             width = element.clientWidth
-            flushSync(() => setVisible(Infinity))
+            flushSync(() => setLimit(Infinity))
         })
         observer.observe(element)
         return () => observer.disconnect()
     }, [])
 
-    const { shown, hidden } = expanded ? { shown: chips, hidden: 0 } : clampChips(chips, visible, selected)
+    const { shown, hidden } = expanded ? { shown: chips, hidden: 0 } : clampChips(chips, limit, selected)
 
     useLayoutEffect(() => {
         const element = list.current
         if (!element || expanded) return
         const tops = [...element.children].map((item) => (item as HTMLElement).offsetTop)
         const fit = twoRowFit(tops, shown.length)
-        if (fit < shown.length) setVisible(fit)
-    }, [expanded, layout, visible, shown.length])
+        if (fit < shown.length) setLimit(fit)
+    }, [expanded, layoutKey, limit, shown.length])
 
     return (
         <ul ref={list} className={managing ? 'follow-chips managing' : 'follow-chips'}>
@@ -76,24 +76,15 @@ export default function FollowChipList({ chips, selected, managing, pending, onC
                     )}
                 </li>
             ))}
-            {hidden > 0 && (
-                <li className="follow-chip-item more">
-                    <button className="follow-chip follow-chip-more" aria-expanded={false} onClick={() => setExpanded(true)}>
-                        +{hidden} more
-                    </button>
-                </li>
-            )}
-            {expanded && (
-                <li className="follow-chip-item more">
+            {(hidden > 0 || expanded) && (
+                // One keyed item for both labels, so focus stays on it when it toggles.
+                <li key="more" className="follow-chip-item more">
                     <button
                         className="follow-chip follow-chip-more"
-                        aria-expanded={true}
-                        onClick={() => {
-                            setExpanded(false)
-                            setVisible(Infinity)
-                        }}
+                        aria-expanded={expanded}
+                        onClick={() => setExpanded(!expanded)}
                     >
-                        Show fewer
+                        {expanded ? 'Show fewer' : `+${hidden} more`}
                     </button>
                 </li>
             )}

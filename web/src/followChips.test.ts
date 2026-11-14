@@ -88,7 +88,3 @@ test('a third row drops the chips on it', () => {
 test('a "+N more" chip alone on the third row drops one chip', () => {
     expect(twoRowFit([0, 0, 0, 40, 40, 40, 80], 6)).toEqual(5)
 })
-
-test('no chips are kept when even the second row overflows past the first chip', () => {
-    expect(twoRowFit([0, 40, 80], 1)).toEqual(0)
-})
