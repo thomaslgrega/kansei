@@ -23,7 +23,7 @@ export default function AddCompany({ followed, onFollowsChanged, onFollowed, aut
     const [adding, setAdding] = useState<string | null>(null)
     const [error, setError] = useState('')
     const input = useRef<HTMLInputElement>(null)
-    // Guards Strict Mode's second effect run, so the link spends one probe.
+    // The effect runs every render, and twice in Strict Mode; this keeps it to one probe per link.
     const probed = useRef<string | null>(null)
 
     async function search(event: SubmitEvent<HTMLFormElement>) {
