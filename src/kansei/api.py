@@ -454,12 +454,12 @@ async def follow(body: BoardIn, user: CurrentUser, session: SessionDep, http: Ht
     board = locked_board(session, body.source, body.token)
     if board is None:
         session.rollback()
-        if await board_jobs(http, body.source, body.token) is None:
+        fetched = await fetch_board(http, body.source, body.token)
+        if fetched is None:
             raise HTTPException(status_code=404, detail=f"No board {body.token} on {body.source}.")
-        name = await fetch_board_name(http, body.source, body.token)
         session.execute(
             insert(Board)
-            .values(source=body.source, token=body.token, name=name, added_by=user_id)
+            .values(source=body.source, token=body.token, name=fetched.name, logo_url=fetched.logo, added_by=user_id)
             .on_conflict_do_nothing()
         )
         board = locked_board(session, body.source, body.token)

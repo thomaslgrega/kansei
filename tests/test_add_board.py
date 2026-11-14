@@ -308,9 +308,7 @@ def test_a_probe_hit_carries_the_stored_logo_or_else_the_fetched_one(
 ):
     serve_greenhouse_board(ats)
     if page_logo:
-        ats.pages[GREENHOUSE_BOARD_PAGE.format(token="kansei-test")] = httpx.Response(
-            200, text=f'<img alt="Kansei Test logo" src="{FETCHED_LOGO}">'
-        )
+        serve_greenhouse_logo(ats)
     if stored:
         session.add(Board(source="greenhouse", token="kansei-test", name="Kansei Test K.K.", logo_url=stored_logo))
         session.flush()
@@ -321,9 +319,13 @@ def test_a_probe_hit_carries_the_stored_logo_or_else_the_fetched_one(
     assert [hit["logo_url"] for hit in response.json()["hits"]] == [logo_url]
 
 
-def test_probing_fetches_the_name_and_the_logo_at_the_same_time(client, log_in_as, ats):
-    serve_greenhouse_board(ats)
-    log_in_as("ada@example.com")
+def serve_greenhouse_logo(ats) -> None:
+    ats.pages[GREENHOUSE_BOARD_PAGE.format(token="kansei-test")] = httpx.Response(
+        200, text=f'<img alt="Kansei Test logo" src="{FETCHED_LOGO}">'
+    )
+
+
+def hold_name_and_logo_until_both_are_asked(ats) -> None:
     both = {GREENHOUSE_BOARD_INFO.format(token="kansei-test"), GREENHOUSE_BOARD_PAGE.format(token="kansei-test")}
     met = asyncio.Barrier(2)
     handle = ats.handle
@@ -334,6 +336,12 @@ def test_probing_fetches_the_name_and_the_logo_at_the_same_time(client, log_in_a
         return handle(request)
 
     ats.handle = meet
+
+
+def test_probing_fetches_the_name_and_the_logo_at_the_same_time(client, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    log_in_as("ada@example.com")
+    hold_name_and_logo_until_both_are_asked(ats)
 
     response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
 
@@ -571,7 +579,44 @@ def test_adding_a_board_holds_no_transaction_while_waiting_on_the_ats(client, se
 
     response = client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
 
-    assert (response.status_code, seen) == (201, [False, False])
+    assert (response.status_code, seen) == (201, [False, False, False])
+
+
+def test_adding_a_board_not_on_kansei_stores_its_logo(client, session, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    serve_greenhouse_logo(ats)
+    log_in_as("ada@example.com")
+
+    response = client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
+
+    followed = {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "logo_url": FETCHED_LOGO}
+    assert (response.status_code, response.json()) == (201, followed)
+    assert session.scalars(select(Board.logo_url).where(Board.token == "kansei-test")).all() == [FETCHED_LOGO]
+    assert client.get("/api/me/follows").json() == [followed]
+
+
+def test_adding_a_board_takes_its_logo_from_the_ats_not_the_client(client, session, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    serve_greenhouse_logo(ats)
+    log_in_as("ada@example.com")
+
+    response = client.post(
+        "/api/me/follows",
+        json={"source": "greenhouse", "token": "kansei-test", "logo_url": "https://example.com/not-the-logo.png"},
+    )
+
+    assert (response.status_code, response.json()["logo_url"]) == (201, FETCHED_LOGO)
+    assert session.scalars(select(Board.logo_url).where(Board.token == "kansei-test")).all() == [FETCHED_LOGO]
+
+
+def test_adding_a_board_fetches_the_name_and_the_logo_at_the_same_time(client, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    log_in_as("ada@example.com")
+    hold_name_and_logo_until_both_are_asked(ats)
+
+    response = client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
+
+    assert (response.status_code, response.json()["company"]) == (201, "Kansei Test K.K.")
 
 
 def test_adding_a_board_whose_name_cant_be_read_leaves_the_name_for_the_ingest(client, session, log_in_as, ats):
