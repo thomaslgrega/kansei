@@ -1,7 +1,7 @@
 import { type SubmitEvent, useState } from 'react'
 import { boardKey } from './boards'
 import CompanyLogo from './CompanyLogo'
-import { candidateCount, followedNotice, type Hit, hitAction, hitName } from './probeHits'
+import { candidateCountLabel, followedNotice, type Hit, hitAction, hitName } from './probeHits'
 
 type Probe = { hits: Hit[]; message: string | null }
 
@@ -103,7 +103,7 @@ export default function AddCompany({ followed, onFollowsChanged, onFollowed, aut
                                     <p className="muted">{REMOVED}</p>
                                 ) : (
                                     <>
-                                        <p className="hit-count">{candidateCount(hit.candidates)}</p>
+                                        <p className="hit-count">{candidateCountLabel(hit.candidates)}</p>
                                         {hit.titles.length > 0 ? (
                                             <ul className="hit-titles">
                                                 {hit.titles.map((title, index) => <li key={index}>{title}</li>)}

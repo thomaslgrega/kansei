@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { candidateCount, followedNotice, type Hit, hitAction } from './probeHits'
+import { candidateCountLabel, followedNotice, type Hit, hitAction } from './probeHits'
 
 function hit(state: Hit['state'], token = 'acme'): Hit {
     return {
@@ -29,7 +29,7 @@ test('a hit offers to add, follow, says it is followed, or that it was removed',
 })
 
 test('the candidate count names Japan engineering jobs, one or many', () => {
-    expect([0, 1, 2].map(candidateCount)).toEqual([
+    expect([0, 1, 2].map(candidateCountLabel)).toEqual([
         '0 Japan engineering jobs',
         '1 Japan engineering job',
         '2 Japan engineering jobs',

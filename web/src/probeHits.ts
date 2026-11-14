@@ -19,7 +19,7 @@ export function hitAction(hit: Hit, followed: Set<string>): HitAction {
     return hit.state === 'not_on_kansei' ? 'add' : 'follow'
 }
 
-export function candidateCount(candidates: number): string {
+export function candidateCountLabel(candidates: number): string {
     return `${candidates} Japan engineering ${candidates === 1 ? 'job' : 'jobs'}`
 }
 

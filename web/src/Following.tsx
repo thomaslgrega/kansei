@@ -18,7 +18,7 @@ type Props = {
 
 export default function Following({ follows, following, onFollowsChanged, tracking }: Props) {
     const [managing, setManaging] = useState(false)
-    const [adding, setAdding] = useState(false)
+    const [panelOpen, setPanelOpen] = useState(false)
     const [notice, setNotice] = useState('')
     if (managing && follows.length === 0) setManaging(false)
     const [params] = useSearchParams()
@@ -37,8 +37,8 @@ export default function Following({ follows, following, onFollowsChanged, tracki
 
     const newCounts = useNewCounts(newCountsUrl(filters), followsKey(following.keys))
 
-    function followed(message: string) {
-        setAdding(false)
+    function showFollowed(message: string) {
+        setPanelOpen(false)
         setNotice(message)
     }
 
@@ -48,7 +48,7 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                 <Title>Following · kansei</Title>
                 <h1>Following</h1>
                 <p>Follow a company and its Japan engineering postings will show here.</p>
-                <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={followed} />
+                <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={showFollowed} />
             </main>
         )
     }
@@ -66,21 +66,21 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                         {managing ? 'Done' : 'Manage'}
                     </button>
                     <button
-                        className={adding ? 'add-button open' : 'add-button'}
-                        aria-expanded={adding}
+                        className={panelOpen ? 'add-button open' : 'add-button'}
+                        aria-expanded={panelOpen}
                         aria-controls="add-company"
                         onClick={() => {
                             setNotice('')
-                            setAdding(!adding)
+                            setPanelOpen(!panelOpen)
                         }}
                     >
-                        {adding ? 'Close' : '+ Add company'}
+                        {panelOpen ? 'Close' : '+ Add company'}
                     </button>
                 </div>
             </div>
-            {adding && (
+            {panelOpen && (
                 <section id="add-company" className="add-panel" aria-label="Add a company">
-                    <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={followed} autoFocus />
+                    <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={showFollowed} autoFocus />
                 </section>
             )}
             {notice && <p className="add-notice" role="status">{notice}</p>}
