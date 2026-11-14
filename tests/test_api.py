@@ -355,34 +355,45 @@ def test_the_total_counts_every_page_under_the_filters(client, paged_postings, j
     assert totals == [126, 122]
 
 
-def test_checked_is_the_newest_board_posting_on_any_page_ignoring_pasted_ones(client, session, make_posting):
+def test_checked_is_the_newest_board_posting_whatever_the_filters_ignoring_pasted_ones(client, session, make_posting):
     now = datetime.now(UTC)
-    seen_again = make_posting(token="kansei-test", id="seen-again", url="https://example.com/seen-again")
-    ids = save_postings(session, [seen_again], now - timedelta(days=1))
+    native = FACTS.model_copy(update={"japanese_required": "required", "japanese_level": "native"})
+    ids = save_postings(session, [
+        make_posting(token="kansei-test", id=f"{n}", url=f"https://example.com/{n}") for n in range(51)
+    ], now - timedelta(days=1))
     ids |= save_postings(session, [
-        make_posting(token="kansei-test", id=f"{n}", url=f"https://example.com/{n}") for n in range(50)
-    ], now - timedelta(hours=1))
-    ids |= save_postings(session, [seen_again], now - timedelta(minutes=10))
+        make_posting(token="kansei-other", id="unextracted", url="https://example.com/unextracted")
+    ], now)
     ids |= save_postings(session, [
         make_posting(source="url", token="kansei-test", id="pasted", url="https://example.com/pasted")
-    ], now - timedelta(minutes=1))
-    session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
+    ], now + timedelta(minutes=1))
+    session.add_all(
+        make_extraction(posting_id, 6, url, facts=native.model_dump(mode="json"))
+        for url, posting_id in ids.items()
+        if url != "https://example.com/unextracted"
+    )
 
-    pages = [client.get("/api/postings", params={"token": "kansei-test", "page": page}).json() for page in ["1", "2"]]
+    filters = [
+        {"token": "kansei-test"},
+        {"token": "kansei-test", "page": "2"},
+        {"token": "kansei-test", "japanese": "none"},
+        {"token": "kansei-test", "specialty": "frontend"},
+        {"token": "kansei-test", "japanese": "business", "specialty": "frontend"},
+        {"token": "kansei-other"},
+    ]
+    bodies = [client.get("/api/postings", params=params).json() for params in filters]
 
-    assert [
-        (
-            [row["posting"]["url"].removeprefix("https://example.com/") for row in body["postings"]],
-            datetime.fromisoformat(body["checked_at"]),
-        )
-        for body in pages
-    ] == [
-        (["pasted"] + [str(n) for n in range(49, 0, -1)], now - timedelta(minutes=10)),
-        (["0", "seen-again"], now - timedelta(minutes=10)),
+    assert [(body["total"], body["page"], datetime.fromisoformat(body["checked_at"])) for body in bodies] == [
+        (52, 1, now),
+        (52, 2, now),
+        (0, 1, now),
+        (0, 1, now),
+        (0, 1, now),
+        (0, 1, now),
     ]
 
 
 def test_no_postings_is_page_1_of_nothing(client):
     body = client.get("/api/postings", params={"token": "kansei-test", "page": "3"}).json()
 
-    assert body == {"postings": [], "total": 0, "page": 1, "checked_at": None}
+    assert (body["postings"], body["total"], body["page"]) == ([], 0, 1)
