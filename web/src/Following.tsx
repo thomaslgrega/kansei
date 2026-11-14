@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import AddCompany from './AddCompany'
+import { readAddParam, searchWithoutAdd } from './addParam'
 import { type Board, boardKey, type FollowControls, followsKey } from './boards'
 import FollowChipList from './FollowChipList'
 import { boardClickSearch, droppedBoardSearch, filtersToSearch, newCountsUrl, readFilters } from './filters'
@@ -25,6 +26,11 @@ export default function Following({ follows, following, onFollowsChanged, tracki
     const navigate = useNavigate()
     const filters = readFilters(params, following.keys)
     const selected = follows.find((board) => boardKey(board) === filters.board)
+    const arriving = readAddParam(params)
+    if (arriving !== null && !panelOpen) {
+        setPanelOpen(true)
+        setNotice('')
+    }
 
     const dropped = droppedBoardSearch(params, following.keys)
     useEffect(() => {
@@ -37,6 +43,10 @@ export default function Following({ follows, following, onFollowsChanged, tracki
 
     const newCounts = useNewCounts(newCountsUrl(filters), followsKey(following.keys))
 
+    function dropAddParam() {
+        navigate({ search: searchWithoutAdd(params) }, { replace: true })
+    }
+
     function showFollowed(message: string) {
         setPanelOpen(false)
         setNotice(message)
@@ -48,7 +58,13 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                 <Title>Following · kansei</Title>
                 <h1>Following</h1>
                 <p>Follow a company and its Japan engineering postings will show here.</p>
-                <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={showFollowed} />
+                <AddCompany
+                    followed={following.keys}
+                    onFollowsChanged={onFollowsChanged}
+                    onFollowed={showFollowed}
+                    probeOnArrival={arriving}
+                    onArrivalProbed={dropAddParam}
+                />
             </main>
         )
     }
@@ -80,7 +96,14 @@ export default function Following({ follows, following, onFollowsChanged, tracki
             </div>
             {panelOpen && (
                 <section id="add-company" className="add-panel" aria-label="Add a company">
-                    <AddCompany followed={following.keys} onFollowsChanged={onFollowsChanged} onFollowed={showFollowed} autoFocus />
+                    <AddCompany
+                        followed={following.keys}
+                        onFollowsChanged={onFollowsChanged}
+                        onFollowed={showFollowed}
+                        probeOnArrival={arriving}
+                        onArrivalProbed={dropAddParam}
+                        autoFocus
+                    />
                 </section>
             )}
             {notice && <p className="add-notice" role="status">{notice}</p>}

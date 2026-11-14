@@ -1,4 +1,4 @@
-import { type SubmitEvent, useState } from 'react'
+import { type SubmitEvent, useEffect, useRef, useState } from 'react'
 import { boardKey } from './boards'
 import CompanyLogo from './CompanyLogo'
 import { candidateCountLabel, followedNotice, type Hit, hitAction, hitName } from './probeHits'
@@ -13,17 +13,25 @@ type Props = {
     onFollowsChanged: () => Promise<void>
     onFollowed: (notice: string) => void
     autoFocus?: boolean
+    probeOnArrival?: string | null
+    onArrivalProbed?: () => void
 }
 
-export default function AddCompany({ followed, onFollowsChanged, onFollowed, autoFocus }: Props) {
+export default function AddCompany({ followed, onFollowsChanged, onFollowed, autoFocus, probeOnArrival = null, onArrivalProbed }: Props) {
     const [probe, setProbe] = useState<Probe | null>(null)
     const [searching, setSearching] = useState(false)
     const [adding, setAdding] = useState<string | null>(null)
     const [error, setError] = useState('')
+    const input = useRef<HTMLInputElement>(null)
+    // Guards Strict Mode's second effect run, so the link spends one probe.
+    const probed = useRef<string | null>(null)
 
-    async function find(event: SubmitEvent<HTMLFormElement>) {
+    async function search(event: SubmitEvent<HTMLFormElement>) {
         event.preventDefault()
-        const q = String(new FormData(event.currentTarget).get('q') ?? '')
+        await find(String(new FormData(event.currentTarget).get('q') ?? ''))
+    }
+
+    async function find(q: string) {
         setSearching(true)
         setError('')
         try {
@@ -35,6 +43,18 @@ export default function AddCompany({ followed, onFollowsChanged, onFollowed, aut
             setSearching(false)
         }
     }
+
+    useEffect(() => {
+        if (probeOnArrival === null) {
+            probed.current = null
+            return
+        }
+        if (probed.current === probeOnArrival) return
+        probed.current = probeOnArrival
+        if (input.current) input.current.value = probeOnArrival
+        void find(probeOnArrival)
+        onArrivalProbed?.()
+    })
 
     async function add(hit: Hit) {
         setAdding(boardKey(hit))
@@ -70,13 +90,14 @@ export default function AddCompany({ followed, onFollowsChanged, onFollowed, aut
 
     return (
         <div className="add-company">
-            <form className="company-search" onSubmit={find}>
+            <form className="company-search" onSubmit={search}>
                 <label className="company-search-field">
                     <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
                         <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" />
                         <path d="M13 13l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
                     <input
+                        ref={input}
                         name="q"
                         type="search"
                         aria-label="Company name or board URL"
