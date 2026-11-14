@@ -595,6 +595,20 @@ def test_adding_a_board_not_on_kansei_stores_its_logo(client, session, log_in_as
     assert client.get("/api/me/follows").json() == [followed]
 
 
+def test_adding_a_board_takes_its_logo_from_the_ats_not_the_client(client, session, log_in_as, ats):
+    serve_greenhouse_board(ats)
+    serve_greenhouse_logo(ats)
+    log_in_as("ada@example.com")
+
+    response = client.post(
+        "/api/me/follows",
+        json={"source": "greenhouse", "token": "kansei-test", "logo_url": "https://example.com/not-the-logo.png"},
+    )
+
+    assert (response.status_code, response.json()["logo_url"]) == (201, FETCHED_LOGO)
+    assert session.scalars(select(Board.logo_url).where(Board.token == "kansei-test")).all() == [FETCHED_LOGO]
+
+
 def test_adding_a_board_fetches_the_name_and_the_logo_at_the_same_time(client, log_in_as, ats):
     serve_greenhouse_board(ats)
     log_in_as("ada@example.com")
