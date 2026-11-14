@@ -102,7 +102,7 @@ class PostingsPage(BaseModel):
 
 
 PAGE_SIZE = 50
-CANDIDATE_COLUMNS = (Posting.id, Posting.source, Posting.token, Posting.title, Posting.headline, Posting.location, Posting.last_seen_at)
+CANDIDATE_COLUMNS = (Posting.id, Posting.source, Posting.token, Posting.title, Posting.headline, Posting.location)
 
 
 def filtered_postings(japanese: str, specialty: str | None) -> Select[tuple[Posting, dict, str]]:
@@ -169,7 +169,7 @@ def list_postings(
         ],
         total=len(candidates),
         page=served,
-        checked_at=max((row.last_seen_at for row in candidates if row.source != "url"), default=None),
+        checked_at=session.scalar(select(func.max(Posting.last_seen_at)).where(Posting.source != "url")),
     )
 
 
