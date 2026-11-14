@@ -42,6 +42,12 @@ export function droppedBoardSearch(params: URLSearchParams, followed: ReadonlySe
     return params.has('company') && filters.board === null ? filtersToSearch(filters) : null
 }
 
+// Every chip shows its count, so the company picked to filter the postings is left out.
+export function newCountsUrl(filters: Filters): string {
+    const search = filtersToSearch({ ...filters, board: null })
+    return search ? `/api/me/follows/new?${search}` : '/api/me/follows/new'
+}
+
 export function postingsUrl(followingOnly: boolean, filters: Filters, page = 1): string {
     const params = new URLSearchParams()
     if (followingOnly) params.set('following', 'true')

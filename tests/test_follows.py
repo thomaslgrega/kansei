@@ -181,6 +181,7 @@ def test_following_postings_while_logged_out_is_401(client):
 
 @pytest.mark.parametrize(("method", "path", "body"), [
     ("GET", "/api/me/follows", None),
+    ("GET", "/api/me/follows/new", None),
     ("POST", "/api/me/follows", {"source": "greenhouse", "token": "kansei-test"}),
     ("POST", "/api/me/follows", {"source": "lever", "token": "kansei-missing"}),
     ("DELETE", "/api/me/follows/greenhouse/kansei-test", None),
@@ -212,6 +213,68 @@ def test_a_posting_says_whether_it_has_a_board_to_follow(client, session, make_p
         "https://example.com/pasted": False,
         "https://example.com/removed": False,
     }
+
+
+def test_new_counts_give_each_followed_board_its_listed_new_candidates(client, session, log_in_as, make_posting, boards):
+    session.add_all([
+        Board(source="ashby", token="kansei-quiet", name="Quiet Co"),
+        Board(source="hrmos", token="kansei-other", name="Other Co"),
+    ])
+    now = datetime.now(UTC)
+    ids = save_postings(
+        session,
+        [
+            make_posting(token="kansei-test", url="https://example.com/seen-3-days-ago"),
+            make_posting(source="ashby", token="kansei-quiet", url="https://example.com/quiet"),
+        ],
+        now - timedelta(days=3),
+    )
+    ids |= save_postings(session, [make_posting(token="kansei-test", url="https://example.com/not-listed")], now - timedelta(hours=49))
+    ids |= save_postings(session, [make_posting(token="kansei-test", url="https://example.com/seen-47-hours-ago")], now - timedelta(hours=47))
+    ids |= save_postings(
+        session,
+        [
+            make_posting(token="kansei-test", url="https://example.com/seen-3-days-ago"),
+            make_posting(token="kansei-test", url="https://example.com/new"),
+            make_posting(token="kansei-test", title="Account Executive", url="https://example.com/not-a-candidate"),
+            make_posting(source="ashby", token="kansei-quiet", url="https://example.com/quiet"),
+            make_posting(source="lever", token="kansei-unnamed", url="https://example.com/unnamed"),
+            make_posting(source="hrmos", token="kansei-other", url="https://example.com/not-followed"),
+        ],
+        now,
+    )
+    session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
+    log_in_as("bob@example.com")
+    client.post("/api/me/follows", json={"source": "hrmos", "token": "kansei-other"})
+    log_in_as("ada@example.com")
+    for source, token in [("greenhouse", "kansei-test"), ("ashby", "kansei-quiet"), ("lever", "kansei-unnamed")]:
+        client.post("/api/me/follows", json={"source": source, "token": token})
+
+    response = client.get("/api/me/follows/new")
+
+    assert response.status_code == 200
+    assert response.json() == {"greenhouse:kansei-test": 2, "lever:kansei-unnamed": 1}
+
+
+def test_new_counts_apply_my_japanese_and_specialty_as_the_list_does(client, session, log_in_as, make_posting, boards):
+    cases = [
+        ("passes", ["backend"], "not_required"),
+        ("needs-business-japanese", ["backend"], "required"),
+        ("frontend", ["frontend"], "not_required"),
+    ]
+    for name, specialties, required in cases:
+        url = f"https://example.com/{name}"
+        ids = save_postings(session, [make_posting(token="kansei-test", id=name, url=url)], datetime.now(UTC))
+        facts = FACTS.model_copy(update={"specialties": specialties, "japanese_required": required})
+        session.add(make_extraction(ids[url], 6, name, facts=facts.model_dump(mode="json")))
+    log_in_as("ada@example.com")
+    client.post("/api/me/follows", json={"source": "greenhouse", "token": "kansei-test"})
+    filters = {"japanese": "conversational", "specialty": "backend"}
+
+    counts = client.get("/api/me/follows/new", params=filters).json()
+    listed = client.get("/api/postings", params={"following": "true", **filters}).json()["total"]
+
+    assert (counts, listed) == ({"greenhouse:kansei-test": 1}, 1)
 
 
 def test_unfollowing_a_board_you_dont_follow_is_404(client, log_in_as, boards):

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import AddCompany from './AddCompany'
-import { type Board, boardKey, type FollowControls } from './boards'
+import { type Board, boardKey, type FollowControls, followsKey } from './boards'
 import CompanyLogo from './CompanyLogo'
-import { boardClickSearch, droppedBoardSearch, filtersToSearch, readFilters } from './filters'
+import { boardClickSearch, droppedBoardSearch, filtersToSearch, newCountsUrl, readFilters } from './filters'
 import { followChips } from './followChips'
 import Postings from './Postings'
 import Title from './Title'
@@ -33,6 +33,8 @@ export default function Following({ follows, following, onFollowsChanged, tracki
         if (search !== null) navigate(`?${search}`, { replace: true })
     }
 
+    const newCounts = useNewCounts(newCountsUrl(filters), followsKey(following.keys))
+
     return (
         <main>
             <Title>Following · kansei</Title>
@@ -56,7 +58,7 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                 </p>
             ) : (
                 <ul className={managing ? 'follow-chips managing' : 'follow-chips'}>
-                    {followChips(follows).map(({ board, sourceLabel }) => (
+                    {followChips(follows, newCounts, managing).map(({ board, sourceLabel, newLabel }) => (
                         <li key={boardKey(board)} className="follow-chip-item">
                             <button
                                 className="follow-chip"
@@ -67,6 +69,7 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                                 <CompanyLogo company={board.company} logoUrl={board.logo_url} />
                                 <span className="follow-chip-name">{board.company}</span>
                                 {sourceLabel && <span className="follow-chip-source">{sourceLabel}</span>}
+                                {newLabel && <span className="follow-chip-new">{newLabel}</span>}
                             </button>
                             {managing && (
                                 <button
@@ -98,4 +101,23 @@ export default function Following({ follows, following, onFollowsChanged, tracki
             )}
         </main>
     )
+}
+
+// Refetches when follows change too, so a newly followed board gets its count.
+function useNewCounts(url: string, followsSignature: string): Record<string, number> {
+    const [counts, setCounts] = useState<Record<string, number>>({})
+    useEffect(() => {
+        let current = true
+        fetch(url)
+            .then((response) => {
+                if (!response.ok) throw new Error(`GET ${url}: ${response.status}`)
+                return response.json()
+            })
+            .then((body: Record<string, number>) => current && setCounts(body))
+            .catch(() => current && setCounts({}))
+        return () => {
+            current = false
+        }
+    }, [url, followsSignature])
+    return counts
 }

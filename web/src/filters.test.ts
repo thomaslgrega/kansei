@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { boardClickSearch, droppedBoardSearch, type Filters, filtersToSearch, postingsUrl, readFilters } from './filters'
+import { boardClickSearch, droppedBoardSearch, type Filters, filtersToSearch, newCountsUrl, postingsUrl, readFilters } from './filters'
 
 test('reads both filters from the query string and ignores sales', () => {
     const searches = ['?japanese=basic&specialty=backend,ml', '?japanese=native', '?specialty=', '?sales=1', '']
@@ -53,6 +53,20 @@ test('the postings URL asks for followed boards, My Japanese and Specialty, and 
         '/api/postings?following=true',
         '/api/postings?japanese=none&specialty=',
         '/api/postings?following=true&japanese=business&specialty=backend,other',
+    ])
+})
+
+test('the new counts URL asks for My Japanese and Specialty but not the company, and leaves defaults out', () => {
+    const urls = [
+        newCountsUrl({ japanese: 'any', specialties: null, board: null }),
+        newCountsUrl({ japanese: 'conversational', specialties: [], board: 'greenhouse:acme' }),
+        newCountsUrl({ japanese: 'any', specialties: ['backend', 'other'], board: null }),
+    ]
+
+    expect(urls).toEqual([
+        '/api/me/follows/new',
+        '/api/me/follows/new?japanese=conversational&specialty=',
+        '/api/me/follows/new?specialty=backend,other',
     ])
 })
 
