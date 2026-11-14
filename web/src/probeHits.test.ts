@@ -28,9 +28,9 @@ test('a hit offers to add, follow, says it is followed, or that it was removed',
     expect(actions).toEqual(['add', 'follow', 'following', 'removed', 'removed'])
 })
 
-test('the candidate count names Japan engineering jobs, one or many', () => {
+test('the candidate count names Japan engineering jobs, none, one or many', () => {
     expect([0, 1, 2].map(candidateCountLabel)).toEqual([
-        '0 Japan engineering jobs',
+        'No Japan engineering jobs right now',
         '1 Japan engineering job',
         '2 Japan engineering jobs',
     ])

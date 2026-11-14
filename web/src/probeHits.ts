@@ -20,6 +20,7 @@ export function hitAction(hit: Hit, followed: Set<string>): HitAction {
 }
 
 export function candidateCountLabel(candidates: number): string {
+    if (candidates === 0) return 'No Japan engineering jobs right now'
     return `${candidates} Japan engineering ${candidates === 1 ? 'job' : 'jobs'}`
 }
 

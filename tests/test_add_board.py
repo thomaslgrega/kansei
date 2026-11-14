@@ -54,13 +54,31 @@ def test_probing_a_board_url_finds_the_board(client, log_in_as, ats):
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
+            "titles": ["Backend Engineer", "Platform Engineer", "Data Engineer"],
             "candidates": 3,
             "state": "not_on_kansei",
             "following": False,
             "logo_url": None,
         }],
     }
+
+
+def test_a_probe_hit_lists_the_titles_of_its_first_three_candidates(client, log_in_as, ats):
+    ats.pages[GREENHOUSE_BOARD.format(token="kansei-test")] = httpx.Response(200, json={"jobs": [
+        greenhouse_job(1, "Account Executive", "Tokyo, Japan"),
+        greenhouse_job(2, "Backend Engineer", "Tokyo, Japan"),
+        greenhouse_job(3, "Frontend Engineer", "Berlin, Germany"),
+        greenhouse_job(4, "Platform Engineer", "Remote"),
+        greenhouse_job(5, "Data Engineer", "Osaka, Japan"),
+        greenhouse_job(6, "Site Reliability Engineer", "Tokyo, Japan"),
+    ]})
+    log_in_as("ada@example.com")
+
+    response = client.get("/api/probe", params={"q": "https://job-boards.greenhouse.io/kansei-test"})
+
+    assert [(hit["titles"], hit["candidates"]) for hit in response.json()["hits"]] == [
+        (["Backend Engineer", "Platform Engineer", "Data Engineer"], 4),
+    ]
 
 
 def transaction_open_at_each_request(ats, session) -> list[bool]:
@@ -138,7 +156,7 @@ HRMOS_HIT = {
     "source": "hrmos",
     "token": "visional",
     "company": "ビジョナル株式会社",
-    "titles": ["バックエンドエンジニア", "SREエンジニア"],
+    "titles": ["バックエンドエンジニア"],
     "candidates": 1,
 }
 
@@ -151,7 +169,7 @@ HRMOS_HIT = {
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
+            "titles": ["Backend Engineer", "Platform Engineer", "Data Engineer"],
             "candidates": 3,
         },
     ),
@@ -264,7 +282,7 @@ def test_probing_a_board_on_kansei_reports_its_state_and_name_on_kansei(
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
+            "titles": ["Backend Engineer", "Platform Engineer", "Data Engineer"],
             "candidates": 3,
             "state": state,
             "following": following,
@@ -335,7 +353,7 @@ def test_probing_a_board_with_no_readable_name_gives_no_company(client, log_in_a
             "source": "greenhouse",
             "token": "kansei-test",
             "company": None,
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
+            "titles": ["Backend Engineer", "Platform Engineer", "Data Engineer"],
             "candidates": 3,
             "state": "not_on_kansei",
             "following": False,
@@ -359,7 +377,7 @@ def test_a_board_on_kansei_is_found_whatever_the_case_of_the_pasted_token(client
             "source": "greenhouse",
             "token": "kansei-test",
             "company": "Kansei Test K.K.",
-            "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
+            "titles": ["Backend Engineer", "Platform Engineer", "Data Engineer"],
             "candidates": 3,
             "state": "removed",
             "following": False,
@@ -468,7 +486,7 @@ def test_probing_a_name_returns_every_board_it_finds_across_sources(client, sess
                 "source": "greenhouse",
                 "token": "kansei-test",
                 "company": "Kansei Test K.K.",
-                "titles": ["Backend Engineer", "Account Executive", "Frontend Engineer"],
+                "titles": ["Backend Engineer", "Platform Engineer", "Data Engineer"],
                 "candidates": 3,
                 "state": "not_on_kansei",
                 "following": False,

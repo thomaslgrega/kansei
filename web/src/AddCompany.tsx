@@ -85,7 +85,10 @@ export default function AddCompany({ followed, onFollowsChanged, onFollowed, aut
                         required
                     />
                 </label>
-                <button className="company-search-go" disabled={searching}>{searching ? 'Searching…' : 'Search'}</button>
+                <button className="company-search-go" disabled={searching}>
+                    <span className={searching ? 'company-search-hidden' : undefined}>Search</span>
+                    <span className={searching ? undefined : 'company-search-hidden'}>Searching…</span>
+                </button>
             </form>
             {probe?.message && <p className="muted" role="status">{probe.message}</p>}
             {error && <p role="status">{error}</p>}
@@ -104,12 +107,10 @@ export default function AddCompany({ followed, onFollowsChanged, onFollowed, aut
                                 ) : (
                                     <>
                                         <p className="hit-count">{candidateCountLabel(hit.candidates)}</p>
-                                        {hit.titles.length > 0 ? (
+                                        {hit.titles.length > 0 && (
                                             <ul className="hit-titles">
                                                 {hit.titles.map((title, index) => <li key={index}>{title}</li>)}
                                             </ul>
-                                        ) : (
-                                            <p className="muted">No open jobs</p>
                                         )}
                                     </>
                                 )}

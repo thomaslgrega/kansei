@@ -390,13 +390,14 @@ async def fetch_board(http: httpx.AsyncClient, source: str, token: str) -> Fetch
 
 def probe_hit(session: Session, user_id: int, source: str, token: str, fetched: FetchedBoard) -> ProbeHit:
     board = session.scalar(board_named(source, token))
+    candidates = [job for job in fetched.jobs if is_candidate(job)]
     return ProbeHit(
         source=source,
         token=board.token if board else token,
         company=(board.name if board else None) or fetched.name,
         logo_url=(board.logo_url if board else None) or fetched.logo,
-        titles=[job.title for job in fetched.jobs[:3]],
-        candidates=sum(is_candidate(job) for job in fetched.jobs),
+        titles=[job.title for job in candidates[:3]],
+        candidates=len(candidates),
         state="not_on_kansei" if board is None else "removed" if board.status == "removed" else "on_kansei",
         following=board is not None and session.get(Follow, (user_id, board.id)) is not None,
     )

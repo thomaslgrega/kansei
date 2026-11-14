@@ -1286,6 +1286,16 @@ li {
   font: inherit;
   font-weight: 650;
   cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.company-search-go > span {
+  grid-area: 1 / 1;
+}
+
+.company-search-go > .company-search-hidden {
+  visibility: hidden;
 }
 
 .company-search-go:hover {
