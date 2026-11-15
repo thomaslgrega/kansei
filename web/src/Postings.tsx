@@ -142,7 +142,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                     />
                 ))}
             </ul>
-            {shown.length === 0 && filters.query !== '' && <p className="muted">No postings match.</p>}
+            {served !== null && shown.length === 0 && filters.query !== '' && <p className="muted">No postings match.</p>}
             {last > 1 && (
                 <nav className="pager" aria-label="Pages">
                     {page > 1 ? pageLink(page - 1, 'Prev') : <span className="muted">Prev</span>}

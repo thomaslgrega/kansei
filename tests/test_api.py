@@ -431,6 +431,7 @@ def searched_postings(session, make_posting):
         ),
         ("japanese", hrmos | {"title": "バックエンドエンジニア", "location": "東京都"}, "Builds the recommendation engine.", ["Java"]),
         ("google", {"token": "gjp", "title": "Site Reliability Engineer"}, "Runs the fleet.", ["C++"]),
+        ("ruby-ja", hrmos | {"title": "シニアRubyエンジニア", "location": "東京都"}, "Builds the store.", ["Rails"]),
     ]
     now = datetime.now(UTC)
     for hours_ago, (name, posting, role_summary, skills) in enumerate(cases):
@@ -443,7 +444,7 @@ def searched_postings(session, make_posting):
 def test_a_search_keeps_postings_where_every_word_matches_a_field(client, searched_postings):
     queries = [
         "zetaworks", "zw", "quokka", "umbra", "frontend", "firmware", "github", "ledger", "ORBIT", "orbit backend",
-        "kube", "go", "c++", "エンジニア", "recommendation", "  orbit  ", "", "orbit ledger", "nothingmatches",
+        "kube", "go", "c++", "ruby", "エンジニア", "recommendation", "  orbit  ", "", "orbit ledger", "nothingmatches",
     ]
 
     shown = {
@@ -469,10 +470,11 @@ def test_a_search_keeps_postings_where_every_word_matches_a_field(client, search
         "kube": ["umbra"],
         "go": ["quokka", "google"],
         "c++": ["google"],
-        "エンジニア": ["japanese"],
+        "ruby": ["orbit-backend", "ruby-ja"],
+        "エンジニア": ["japanese", "ruby-ja"],
         "recommendation": ["japanese"],
         "  orbit  ": ["orbit-backend", "orbit-frontend"],
-        "": ["orbit-backend", "orbit-frontend", "quokka", "zetaworks", "umbra", "firmware", "japanese", "google"],
+        "": ["orbit-backend", "orbit-frontend", "quokka", "zetaworks", "umbra", "firmware", "japanese", "google", "ruby-ja"],
         "orbit ledger": [],
         "nothingmatches": [],
     }

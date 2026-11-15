@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
 from kansei.db import Posting
 
-CJK = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff66-\uff9f]")
+CJK = re.compile(r"[\u3005\u3040-\u30ff\u31f0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]")
 
 
 def matches_search(facts: ColumnElement[dict], q: str) -> ColumnElement[bool]:
@@ -32,7 +32,8 @@ def matches_word(word: str, texts: list[ColumnElement[str]], skill: ColumnElemen
             *(text.icontains(word, autoescape=True) for text in texts),
             exists().where(skill.icontains(word, autoescape=True)),
         )
-    starts_a_word = rf"(?<![[:alnum:]_]){re.escape(word)}"
+    # Only a Latin letter or digit joins a word, so "ruby" starts a word in シニアRubyエンジニア.
+    starts_a_word = rf"(?<![0-9a-z\u00c0-\u024f_]){re.escape(word)}"
     skill_words = func.string_to_array(func.lower(skill), " ", type_=ARRAY(String))
     return or_(
         *(text.regexp_match(starts_a_word, "i") for text in texts),
