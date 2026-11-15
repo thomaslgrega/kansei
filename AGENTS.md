@@ -42,8 +42,11 @@ touch the database take the `session` fixture, which rolls back.
   issue (`12-cap-counts-uncached`), and commit there.
 - Commit subjects are plain imperative sentences, like `Track postings per user`.
 - Open the PR with `gh pr create`, with `Closes #N` in the body.
-- Write the PR description as a reading order: the tests first, then the core change, then the
-  plumbing. Name the lines most likely to be wrong.
+- After `Closes #N`, the PR body lists only these, one line per item, and drops any that are empty:
+  - choices the issue left open, and what you picked
+  - assumptions about inputs or data
+  - what you didn't run or test
+  - what outside the diff reads or writes what changed
 - A mechanical change (a rename, a move, formatting) gets its own PR, apart from logic changes.
 - I review and merge every PR, and I release (`scripts/release.sh`) myself.
 
