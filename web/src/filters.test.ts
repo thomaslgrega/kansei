@@ -1,5 +1,16 @@
 import { expect, test } from 'vitest'
-import { boardClickSearch, droppedBoardSearch, type Filters, filtersToSearch, newCountsUrl, postingsUrl, querySearch, readFilters } from './filters'
+import {
+    boardClickSearch,
+    correctedSearch,
+    droppedBoardSearch,
+    type Filters,
+    filtersToSearch,
+    newCountsUrl,
+    postingsUrl,
+    querySearch,
+    readFilters,
+    showAllSearch,
+} from './filters'
 
 test('reads both filters from the query string and ignores sales', () => {
     const searches = ['?japanese=basic&specialty=backend,ml', '?japanese=native', '?specialty=', '?sales=1', '']
@@ -103,15 +114,40 @@ test('reads a followed company and round-trips it with the other filters', () =>
     ])
 })
 
-test('a company the user does not follow, or one read without follows, reads as none', () => {
+test('on the Following page, a company the user does not follow reads as none', () => {
     const searches = ['?company=lever:acme', '?company=acme', '?company=']
 
     const none: Filters = { japanese: 'any', specialties: null, board: null, query: '' }
 
-    expect([
-        ...searches.map((search) => readFilters(new URLSearchParams(search), followed)),
-        readFilters(new URLSearchParams('?company=greenhouse:acme')),
-    ]).toEqual([none, none, none, none])
+    expect(searches.map((search) => readFilters(new URLSearchParams(search), followed))).toEqual([none, none, none])
+})
+
+test('on the postings page, any company that parses reads, followed or not, and one that does not reads as none', () => {
+    const searches = [
+        '?company=greenhouse:acme&japanese=business',
+        '?company=lever:woven-by-toyota',
+        '?company=hrmos:visional',
+        '?company=ashby:a:b',
+        '?company=acme',
+        '?company=url:careers.example.com',
+        '?company=toString:acme',
+        '?company=greenhouse:',
+        '?company=:acme',
+        '?company=',
+    ]
+
+    expect(searches.map((search) => readFilters(new URLSearchParams(search)).board)).toEqual([
+        'greenhouse:acme',
+        'lever:woven-by-toyota',
+        'hrmos:visional',
+        'ashby:a:b',
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+    ])
 })
 
 test('the postings URL asks for the company by source and token', () => {
@@ -156,6 +192,63 @@ test('reads the search trimmed and writes it first, round-tripping commas and pl
         'q=orbit+backend&japanese=basic&page=2',
         'q=c%2B%2B,go',
     ])
+})
+
+test('submitting a search drops the company, so the box always searches every company', () => {
+    const filters = readFilters(new URLSearchParams('?company=greenhouse:stripe&japanese=business&page=2'))
+
+    expect([querySearch(filters, 'stripe backend'), querySearch(filters, '')]).toEqual([
+        'q=stripe+backend&japanese=business',
+        'japanese=business',
+    ])
+})
+
+test('Show all drops the company and the page and keeps the other filters, on both pages', () => {
+    const search = '?q=go&company=greenhouse:acme&japanese=business&specialty=backend,ml&page=2'
+
+    expect([
+        showAllSearch(readFilters(new URLSearchParams(search))),
+        showAllSearch(readFilters(new URLSearchParams(search), followed)),
+    ]).toEqual(['q=go&japanese=business&specialty=backend,ml', 'q=go&japanese=business&specialty=backend,ml'])
+})
+
+const acme = { source: 'greenhouse', token: 'acme' }
+
+test('the postings answer corrects the page, and drops a company kansei does not have or that does not parse', () => {
+    const cases: [string, { page: number; board: { source: string; token: string } | null }][] = [
+        ['?company=greenhouse:acme&page=2', { page: 2, board: acme }],
+        ['?japanese=basic', { page: 1, board: null }],
+        ['?company=greenhouse:acme&japanese=basic&page=9', { page: 3, board: acme }],
+        ['?japanese=basic&page=0', { page: 1, board: null }],
+        ['?company=greenhouse:nope&japanese=basic&page=3', { page: 1, board: null }],
+        ['?company=nope&specialty=ml', { page: 1, board: null }],
+        ['?company=bogus:acme&page=2', { page: 2, board: null }],
+    ]
+
+    expect(cases.map(([search, served]) => {
+        const params = new URLSearchParams(search)
+        return correctedSearch(params, readFilters(params), served)
+    })).toEqual([
+        null,
+        null,
+        'japanese=basic&company=greenhouse:acme&page=3',
+        'japanese=basic',
+        'japanese=basic',
+        'specialty=ml',
+        'page=2',
+    ])
+})
+
+test('a removed board answers with its name, so its company stays in the URL', () => {
+    const params = new URLSearchParams('?company=ashby:gone&japanese=basic')
+
+    expect(correctedSearch(params, readFilters(params), { page: 1, board: { source: 'ashby', token: 'gone' } })).toEqual(null)
+})
+
+test('on the Following page, the answer drops a company the user does not follow', () => {
+    const params = new URLSearchParams('?company=lever:acme&japanese=basic')
+
+    expect(correctedSearch(params, readFilters(params, followed), { page: 1, board: { source: 'lever', token: 'acme' } })).toEqual('japanese=basic')
 })
 
 test('submitting a search writes it on page 1, and clearing it keeps the other filters', () => {

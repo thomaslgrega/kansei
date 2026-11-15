@@ -4,9 +4,10 @@ import AddCompany from './AddCompany'
 import { readAddParam, searchWithoutAdd } from './addParam'
 import { type Board, boardKey, type FollowControls, followsKey } from './boards'
 import FollowChipList from './FollowChipList'
-import { boardClickSearch, droppedBoardSearch, filtersToSearch, newCountsUrl, readFilters } from './filters'
+import { boardClickSearch, droppedBoardSearch, newCountsUrl, readFilters, showAllSearch } from './filters'
 import { followChips } from './followChips'
 import Postings from './Postings'
+import ShowingOnly from './ShowingOnly'
 import Title from './Title'
 import type { TrackControls } from './tracked'
 
@@ -116,14 +117,7 @@ export default function Following({ follows, following, onFollowsChanged, tracki
                 onUnfollow={(board) => following.unfollow(board.source, board.token)}
             />
             {managing && <p className="muted following-hint">Click × to unfollow.</p>}
-            {selected && (
-                <p className="following-selected">
-                    Showing only <strong>{selected.company}</strong> ·{' '}
-                    <button className="link-button" onClick={() => go(filtersToSearch({ ...filters, board: null }))}>
-                        Show all
-                    </button>
-                </p>
-            )}
+            {selected && <ShowingOnly company={selected.company} onShowAll={() => go(showAllSearch(filters))} />}
             <Postings followingOnly tracking={tracking} following={following} />
         </main>
     )
