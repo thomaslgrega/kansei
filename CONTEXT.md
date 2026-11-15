@@ -12,6 +12,10 @@ _Avoid_: Company, source
 Said of a board kansei has and hasn't removed, so it reads the board on every ingest.
 _Avoid_: In the database, tracked, indexed
 
+**Add**:
+A user's putting a board on kansei by following one that isn't on it yet. Its candidates then show for everyone, not only the user who added it.
+_Avoid_: Suggest, request, submit, import
+
 **Candidate**:
 A posting whose title is an engineering role and whose location is in Japan or remote without naming another place. An HRMOS posting that names no location counts as in Japan, and its headline on the board page counts as a title too.
 _Avoid_: Match, Japan posting
