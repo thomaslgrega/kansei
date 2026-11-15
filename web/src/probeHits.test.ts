@@ -41,7 +41,7 @@ test('following a board says so, and adding one new to kansei says when its jobs
 
     expect([hit('on_kansei'), hit('not_on_kansei'), unnamed].map(followedNotice)).toEqual([
         'Following Acme.',
-        'Added Acme. Its jobs will appear after the next update.',
+        "Added Acme. Its jobs will appear for everyone after the next update, and you're following it.",
         'Following acme.',
     ])
 })

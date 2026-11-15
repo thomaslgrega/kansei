@@ -23,7 +23,7 @@ function filterParams(filters: Filters, page: number): URLSearchParams {
     return params
 }
 
-function toSearch(params: URLSearchParams): string {
+export function toSearch(params: URLSearchParams): string {
     // Values are fixed words or board slugs, so neither a plain comma nor a colon can be confused for one inside a value.
     return params.toString().replaceAll('%2C', ',').replaceAll('%3A', ':')
 }
