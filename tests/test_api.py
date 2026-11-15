@@ -206,7 +206,7 @@ def japanese_postings(session, make_posting):
     for hours_ago, (name, required, level, jlpt) in enumerate(cases):
         url = f"https://example.com/{name}"
         ids = save_postings(session, [make_posting(token="kansei-test", id=name, url=url)], now - timedelta(hours=hours_ago))
-        facts = FACTS.model_copy(update={"japanese_required": required, "japanese_level": level, "jlpt": jlpt})
+        facts = FACTS.model_copy(update={"role_summary": name, "japanese_required": required, "japanese_level": level, "jlpt": jlpt})
         session.add(make_extraction(ids[url], 6, name, facts=facts.model_dump(mode="json")))
 
 
@@ -258,7 +258,7 @@ def specialty_postings(session, make_posting):
     for hours_ago, (name, specialties) in enumerate(cases):
         url = f"https://example.com/{name}"
         ids = save_postings(session, [make_posting(token="kansei-test", id=name, url=url)], now - timedelta(hours=hours_ago))
-        facts = PostingFacts.model_validate(FACTS.model_dump() | {"specialties": specialties})
+        facts = PostingFacts.model_validate(FACTS.model_dump() | {"role_summary": name, "specialties": specialties})
         session.add(make_extraction(ids[url], 6, name, facts=facts.model_dump(mode="json")))
 
 
@@ -397,3 +397,114 @@ def test_no_postings_is_page_1_of_nothing(client):
     body = client.get("/api/postings", params={"token": "kansei-test", "page": "3"}).json()
 
     assert {key: value for key, value in body.items() if key != "checked_at"} == {"postings": [], "total": 0, "page": 1}
+
+
+@pytest.fixture
+def searched_postings(session, make_posting):
+    session.add_all([
+        Board(source="greenhouse", token="op-jobs", name="Orbit Pay"),
+        Board(source="lever", token="zw-careers", name="Zetaworks K.K."),
+        Board(source="greenhouse", token="gjp", name="Google Japan"),
+    ])
+    hrmos = {"source": "hrmos", "token": "kitsune"}
+    cases = [
+        ("orbit-backend", {"token": "op-jobs", "title": "Backend Engineer"}, "Builds payment APIs.", ["Ruby"]),
+        ("orbit-frontend", {"token": "op-jobs", "title": "Frontend Engineer"}, "Builds the dashboard.", ["TypeScript"]),
+        ("quokka", {"token": "quokka", "title": "Senior Backend Engineer"}, "Builds the ledger.", ["Go"]),
+        (
+            "zetaworks",
+            {"source": "lever", "token": "zw-careers", "title": "Django Engineer"},
+            "Maintains the shop.",
+            ["GitHub Actions", "MongoDB"],
+        ),
+        (
+            "umbra",
+            {"source": "url", "token": "careers.example.co.jp", "company_name": "Umbra Labs"},
+            "Builds Kubernetes operators.",
+            ["Python"],
+        ),
+        (
+            "firmware",
+            hrmos | {"title": "オープンポジション", "headline": "Firmware Engineer", "location": ""},
+            "Writes code for cameras.",
+            ["C"],
+        ),
+        ("japanese", hrmos | {"title": "バックエンドエンジニア", "location": "東京都"}, "Builds the recommendation engine.", ["Java"]),
+        ("google", {"token": "gjp", "title": "Site Reliability Engineer"}, "Runs the fleet.", ["C++"]),
+    ]
+    now = datetime.now(UTC)
+    for hours_ago, (name, posting, role_summary, skills) in enumerate(cases):
+        url = f"https://example.com/{name}"
+        ids = save_postings(session, [make_posting(**{"id": name, "url": url} | posting)], now - timedelta(hours=hours_ago))
+        facts = FACTS.model_copy(update={"role_summary": role_summary, "must_have_skills": skills})
+        session.add(make_extraction(ids[url], 6, role_summary, facts=facts.model_dump(mode="json")))
+
+
+def test_a_search_keeps_postings_where_every_word_matches_a_field(client, searched_postings):
+    queries = [
+        "zetaworks", "zw", "quokka", "umbra", "frontend", "firmware", "github", "ledger", "ORBIT", "orbit backend",
+        "kube", "go", "c++", "エンジニア", "recommendation", "  orbit  ", "", "orbit ledger", "nothingmatches",
+    ]
+
+    shown = {
+        query: [
+            row["posting"]["url"].removeprefix("https://example.com/")
+            for row in client.get("/api/postings", params={"q": query}).json()["postings"]
+            if row["posting"]["url"].startswith("https://example.com/")
+        ]
+        for query in queries
+    }
+
+    assert shown == {
+        "zetaworks": ["zetaworks"],
+        "zw": ["zetaworks"],
+        "quokka": ["quokka"],
+        "umbra": ["umbra"],
+        "frontend": ["orbit-frontend"],
+        "firmware": ["firmware"],
+        "github": ["zetaworks"],
+        "ledger": ["quokka"],
+        "ORBIT": ["orbit-backend", "orbit-frontend"],
+        "orbit backend": ["orbit-backend"],
+        "kube": ["umbra"],
+        "go": ["quokka", "google"],
+        "c++": ["google"],
+        "エンジニア": ["japanese"],
+        "recommendation": ["japanese"],
+        "  orbit  ": ["orbit-backend", "orbit-frontend"],
+        "": ["orbit-backend", "orbit-frontend", "quokka", "zetaworks", "umbra", "firmware", "japanese", "google"],
+        "orbit ledger": [],
+        "nothingmatches": [],
+    }
+
+
+def test_a_search_combines_with_my_japanese_and_specialty(client, japanese_postings, specialty_postings):
+    searches = [
+        {"q": "basic"},
+        {"q": "basic", "japanese": "basic"},
+        {"q": "native", "japanese": "business"},
+        {"q": "stated", "japanese": "none"},
+        {"q": "ml", "specialty": "data"},
+        {"q": "fullstack", "specialty": "backend"},
+        {"q": "backend", "specialty": "frontend"},
+    ]
+
+    shown = [
+        [
+            row["posting"]["url"].removeprefix("https://example.com/")
+            for row in client.get("/api/postings", params={"token": "kansei-test"} | search).json()["postings"]
+        ]
+        for search in searches
+    ]
+
+    assert shown == [["basic"], ["basic"], [], ["not-stated"], ["data-ml"], ["fullstack"], []]
+
+
+def test_a_search_is_paged_and_counted_after_the_candidate_check(client, paged_postings):
+    body = client.get("/api/postings", params={"token": "kansei-test", "q": "older", "page": "2"}).json()
+
+    assert (
+        body["total"],
+        body["page"],
+        [row["posting"]["url"].removeprefix("https://example.com/") for row in body["postings"]],
+    ) == (60, 2, [f"older-{n}" for n in range(9, -1, -1)])

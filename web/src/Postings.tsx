@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
-import { type Filters, filtersToSearch, postingsUrl, readFilters } from "./filters";
+import { type Filters, filtersToSearch, postingsUrl, querySearch, readFilters } from "./filters";
 import Dropdown from "./Dropdown";
 import { JAPANESE_OPTIONS, type JapaneseRequirement } from "./japanese";
 import { lastPage, pageNumbers, pageRange, readPage } from "./pages";
@@ -34,7 +34,9 @@ export default function Postings({ followingOnly = false, tracking, following }:
     const [loaded, setLoaded] = useState<{ url: string; body: PostingsPage } | undefined>(undefined)
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
-    const filters = readFilters(searchParams, followingOnly && following ? following.keys : undefined)
+    const read = readFilters(searchParams, followingOnly && following ? following.keys : undefined)
+    // The Following page has no search box, so a stray `q` mustn't narrow it unseen.
+    const filters = followingOnly ? { ...read, query: '' } : read
     const url = postingsUrl(followingOnly, filters, readPage(searchParams))
     const [failed, setFailed] = useState(false)
     const [now] = useState(Date.now)
@@ -120,6 +122,9 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 <h2>Postings ({total})</h2>
                 {checkedAt && !followingOnly && <span className="muted">checked {checkedAgo(checkedAt, now)}</span>}
             </div>
+            {!followingOnly && (
+                <SearchBox query={filters.query} onSearch={(typed) => navigate(`?${querySearch(filters, typed)}`, { replace: true })} />
+            )}
             <div className="filters">
                 <Dropdown label="My Japanese" options={JAPANESE_OPTIONS} value={filters.japanese} onChange={(japanese) => setFilters({ japanese })} />
                 <SpecialtyFilter selected={filters.specialties} onChange={(specialties) => setFilters({ specialties })} />
@@ -137,6 +142,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                     />
                 ))}
             </ul>
+            {shown.length === 0 && filters.query !== '' && <p className="muted">No postings match.</p>}
             {last > 1 && (
                 <nav className="pager" aria-label="Pages">
                     {page > 1 ? pageLink(page - 1, 'Prev') : <span className="muted">Prev</span>}
@@ -148,6 +154,51 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 </nav>
             )}
         </section>
+    )
+}
+
+function SearchBox({ query, onSearch }: { query: string; onSearch: (typed: string) => void }) {
+    const [typed, setTyped] = useState(query)
+    const [applied, setApplied] = useState(query)
+    const input = useRef<HTMLInputElement>(null)
+    // A link can change the query too, as the Postings link clears it.
+    if (query !== applied) {
+        setApplied(query)
+        setTyped(query)
+    }
+
+    function submit(event: SubmitEvent<HTMLFormElement>) {
+        event.preventDefault()
+        onSearch(typed)
+    }
+
+    function clear() {
+        setTyped('')
+        if (query !== '') onSearch('')
+        input.current?.focus()
+    }
+
+    return (
+        <form className="company-search postings-search" role="search" onSubmit={submit}>
+            <label className="company-search-field">
+                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+                    <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                    <path d="M13 13l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <input
+                    ref={input}
+                    type="search"
+                    aria-label="Search postings"
+                    placeholder="Company, title or skill"
+                    value={typed}
+                    onChange={(event) => setTyped(event.target.value)}
+                />
+                {(typed !== '' || query !== '') && (
+                    <button type="button" className="search-clear" aria-label="Clear search" onClick={clear}>✕</button>
+                )}
+            </label>
+            <button className="company-search-go">Search</button>
+        </form>
     )
 }
 

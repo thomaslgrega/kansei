@@ -32,6 +32,7 @@ from kansei.db import (
 from kansei.japanese import JapaneseRequirement, japanese_requirement, passes_japanese
 from kansei.llm import PostingFacts, prompt_snapshot
 from kansei.ratelimit import PROBE_PER_USER, Now, rate_limit
+from kansei.search import matches_search
 from kansei.sources import (
     SLUG,
     SOURCES,
@@ -105,7 +106,7 @@ PAGE_SIZE = 50
 CANDIDATE_COLUMNS = (Posting.id, Posting.source, Posting.token, Posting.title, Posting.headline, Posting.location)
 
 
-def filtered_postings(japanese: str, specialty: str | None) -> Select[tuple[Posting, dict, str]]:
+def filtered_postings(japanese: str, specialty: str | None, q: str = "") -> Select[tuple[Posting, dict, str]]:
     # Not yet candidates: is_candidate runs in Python on the rows.
     prompt_sha, _ = prompt_snapshot()
     newest = (
@@ -123,6 +124,7 @@ def filtered_postings(japanese: str, specialty: str | None) -> Select[tuple[Post
             Posting.listed,
             passes_japanese(requirement, japanese),
             passes_specialty(newest.c.facts, specialty),
+            matches_search(newest.c.facts, q),
         )
     )
 
@@ -140,10 +142,11 @@ def list_postings(
     following: bool = False,
     japanese: str = "any",
     specialty: str | None = None,
+    q: str = "",
     page: str = "1",
     cookie: SessionCookie = None,
 ) -> PostingsPage:
-    statement = filtered_postings(japanese, specialty).order_by(Posting.first_seen_at.desc(), Posting.id.desc())
+    statement = filtered_postings(japanese, specialty, q).order_by(Posting.first_seen_at.desc(), Posting.id.desc())
     if source is not None:
         statement = statement.where(Posting.source == source)
     if token is not None:

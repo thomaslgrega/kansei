@@ -1276,6 +1276,28 @@ li {
   outline: none;
 }
 
+.postings-search {
+  margin: 0.75rem 0 1rem;
+}
+
+.postings-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-clear {
+  padding: 0.25rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-clear:hover {
+  color: CanvasText;
+}
+
 .company-search-go {
   height: 2.75rem;
   padding: 0 1.1rem;
