@@ -1,4 +1,4 @@
-import { loginHref, type Place } from './loginRedirect'
+import { loginHref, signupHref, type Place } from './loginRedirect'
 
 export type NavLink = {
     label: string
@@ -16,7 +16,7 @@ export function navLinks(loggedIn: boolean, place: Place): NavLink[] {
     })
 
     if (!loggedIn) {
-        return [link('Log in', loginHref(place), 'link', '/login'), link('Sign up', '/signup', 'button')]
+        return [link('Log in', loginHref(place), 'link', '/login'), link('Sign up', signupHref(place), 'button', '/signup')]
     }
     return [link('Postings', '/'), link('Following', '/following'), link('Tracker', '/tracker')]
 }

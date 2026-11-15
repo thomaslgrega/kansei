@@ -1,13 +1,15 @@
 import { expect, test } from 'vitest'
-import { afterSignup, authSwitchHref, loginHref, returnTo } from './loginRedirect'
+import { afterSignup, authSwitchHref, loginHref, returnTo, signupHref } from './loginRedirect'
 
-test('the login link remembers the page it was followed from', () => {
+test('the login and signup links remember the page they were followed from', () => {
     const pages = [
         { pathname: '/', search: '', hash: '' },
         { pathname: '/tracker', search: '', hash: '' },
         { pathname: '/tracker', search: '?status=applied', hash: '#12' },
         { pathname: '/login', search: '?next=%2Ftracker', hash: '' },
         { pathname: '/login', search: '', hash: '' },
+        { pathname: '/signup', search: '?next=%2Ffollowing%3Fadd%3DStripe', hash: '' },
+        { pathname: '/signup', search: '', hash: '' },
     ]
 
     expect(pages.map(loginHref)).toEqual([
@@ -16,6 +18,17 @@ test('the login link remembers the page it was followed from', () => {
         '/login?next=%2Ftracker%3Fstatus%3Dapplied%2312',
         '/login?next=%2Ftracker',
         '/login',
+        '/login?next=%2Ffollowing%3Fadd%3DStripe',
+        '/login',
+    ])
+    expect(pages.map(signupHref)).toEqual([
+        '/signup',
+        '/signup?next=%2Ftracker',
+        '/signup?next=%2Ftracker%3Fstatus%3Dapplied%2312',
+        '/signup?next=%2Ftracker',
+        '/signup',
+        '/signup?next=%2Ffollowing%3Fadd%3DStripe',
+        '/signup',
     ])
 })
 
