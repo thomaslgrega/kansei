@@ -42,8 +42,8 @@ touch the database take the `session` fixture, which rolls back.
   issue (`12-cap-counts-uncached`), and commit there.
 - Commit subjects are plain imperative sentences, like `Track postings per user`.
 - Open the PR with `gh pr create`, with `Closes #N` in the body.
-- After `Closes #N`, the PR body has only these `###` sections, in this order, each a list of
-  one-line items, leaving out any that are empty:
+- After `Closes #N`, the PR body has one sentence on how the change works and where, then only
+  these `###` sections, in this order, each a list of one-line items, leaving out any that are empty:
   - `### Choices`: what the issue left open, and what you picked
   - `### Assumptions`: about inputs or data
   - `### Not tested`: what you didn't run or test
