@@ -24,11 +24,11 @@ test('the chips start with the Japanese requirement, then remote policy, seniori
         { kind: 'japanese', label: 'Business Japanese', requirement: 'business' },
         { kind: 'fact', label: 'Hybrid' },
         { kind: 'fact', label: 'Senior' },
-        { kind: 'skill', label: 'Go' },
-        { kind: 'skill', label: 'Kubernetes' },
-        { kind: 'skill', label: 'PostgreSQL' },
-        { kind: 'skill', label: 'gRPC' },
-        { kind: 'skill', label: 'Terraform' },
+        { kind: 'skill', label: 'Go', marked: false },
+        { kind: 'skill', label: 'Kubernetes', marked: false },
+        { kind: 'skill', label: 'PostgreSQL', marked: false },
+        { kind: 'skill', label: 'gRPC', marked: false },
+        { kind: 'skill', label: 'Terraform', marked: false },
         { kind: 'more', label: '+2' },
     ])
 })
@@ -38,11 +38,11 @@ test('facts that are not stated get no chip, and five skills need no count', () 
 
     expect(chips).toEqual([
         { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
-        { kind: 'skill', label: 'Go' },
-        { kind: 'skill', label: 'Kubernetes' },
-        { kind: 'skill', label: 'PostgreSQL' },
-        { kind: 'skill', label: 'gRPC' },
-        { kind: 'skill', label: 'Terraform' },
+        { kind: 'skill', label: 'Go', marked: false },
+        { kind: 'skill', label: 'Kubernetes', marked: false },
+        { kind: 'skill', label: 'PostgreSQL', marked: false },
+        { kind: 'skill', label: 'gRPC', marked: false },
+        { kind: 'skill', label: 'Terraform', marked: false },
     ])
 })
 
@@ -83,12 +83,54 @@ test('the full chips list every skill with no count', () => {
     expect(chips).toEqual([
         { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
         { kind: 'fact', label: 'Remote' },
-        { kind: 'skill', label: 'Go' },
-        { kind: 'skill', label: 'Kubernetes' },
-        { kind: 'skill', label: 'PostgreSQL' },
-        { kind: 'skill', label: 'gRPC' },
-        { kind: 'skill', label: 'Terraform' },
-        { kind: 'skill', label: 'AWS' },
-        { kind: 'skill', label: 'Kafka' },
+        { kind: 'skill', label: 'Go', marked: false },
+        { kind: 'skill', label: 'Kubernetes', marked: false },
+        { kind: 'skill', label: 'PostgreSQL', marked: false },
+        { kind: 'skill', label: 'gRPC', marked: false },
+        { kind: 'skill', label: 'Terraform', marked: false },
+        { kind: 'skill', label: 'AWS', marked: false },
+        { kind: 'skill', label: 'Kafka', marked: false },
+    ])
+})
+
+test('a skill the query matches moves into view past the first five, marked, and the count drops by one', () => {
+    const chips = postingChips(facts({ must_have_skills: SKILLS }), 'not_stated', 'kafka engineer')
+
+    expect(chips).toEqual([
+        { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
+        { kind: 'skill', label: 'Go', marked: false },
+        { kind: 'skill', label: 'Kubernetes', marked: false },
+        { kind: 'skill', label: 'PostgreSQL', marked: false },
+        { kind: 'skill', label: 'gRPC', marked: false },
+        { kind: 'skill', label: 'Kafka', marked: true },
+        { kind: 'more', label: '+2' },
+    ])
+})
+
+test('a matched skill already in view is marked in place, and every matched skill shows', () => {
+    const skills = ['AWS Lambda', 'Go', 'Kubernetes', 'PostgreSQL', 'gRPC', 'Terraform', 'AWS', 'Amazon AWS']
+
+    expect([
+        postingChips(facts({ must_have_skills: skills.slice(0, 6) }), 'not_stated', 'go'),
+        postingChips(facts({ must_have_skills: skills }), 'not_stated', 'aws'),
+    ]).toEqual([
+        [
+            { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
+            { kind: 'skill', label: 'AWS Lambda', marked: false },
+            { kind: 'skill', label: 'Go', marked: true },
+            { kind: 'skill', label: 'Kubernetes', marked: false },
+            { kind: 'skill', label: 'PostgreSQL', marked: false },
+            { kind: 'skill', label: 'gRPC', marked: false },
+            { kind: 'more', label: '+1' },
+        ],
+        [
+            { kind: 'japanese', label: 'Japanese not stated', requirement: 'not_stated' },
+            { kind: 'skill', label: 'AWS Lambda', marked: true },
+            { kind: 'skill', label: 'Go', marked: false },
+            { kind: 'skill', label: 'Kubernetes', marked: false },
+            { kind: 'skill', label: 'AWS', marked: true },
+            { kind: 'skill', label: 'Amazon AWS', marked: true },
+            { kind: 'more', label: '+3' },
+        ],
     ])
 })

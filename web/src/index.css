@@ -9,6 +9,7 @@
   --accent-hover: light-dark(#9a3412, #fdba74);
   --on-accent: light-dark(white, #14181f);
   --error: light-dark(#b42318, #f97066);
+  --mark: light-dark(#fde68a, #5c4a12);
 }
 
 body {
@@ -566,6 +567,16 @@ li {
 .chip.skill {
   font-family: ui-monospace, monospace;
   font-size: 0.74rem;
+}
+
+.chip.marked,
+.posting mark {
+  background: var(--mark);
+  color: inherit;
+}
+
+.posting mark {
+  border-radius: 0.2rem;
 }
 
 .chip.more {

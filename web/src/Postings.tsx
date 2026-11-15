@@ -148,6 +148,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                         japaneseRequirement={japanese_requirement}
                         actions={tracking && <TrackToggle posting={posting} tracking={tracking} />}
                         companyAction={companyAction(posting)}
+                        query={filters.query}
                     />
                 ))}
             </ul>
