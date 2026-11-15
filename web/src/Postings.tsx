@@ -86,6 +86,8 @@ export default function Postings({ followingOnly = false, tracking, following }:
     const narrowed = !followingOnly && loaded.body.board !== null && boardKey(loaded.body.board) === filters.board
         ? loaded.body.board
         : null
+    // Rows still shown from the previous search are marked by the query they were found with.
+    const loadedQuery = new URL(loaded.url, window.location.origin).searchParams.get('q') ?? ''
 
     function companyAction(posting: Posting) {
         if (!following || !posting.has_board) return null
@@ -148,7 +150,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                         japaneseRequirement={japanese_requirement}
                         actions={tracking && <TrackToggle posting={posting} tracking={tracking} />}
                         companyAction={companyAction(posting)}
-                        query={filters.query}
+                        query={loadedQuery}
                     />
                 ))}
             </ul>

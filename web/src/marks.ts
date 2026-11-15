@@ -12,9 +12,13 @@ function wordPattern(word: string): RegExp {
     return new RegExp(`(?<![0-9a-z\\u00c0-\\u024f_])${escape(word)}`, 'giu')
 }
 
+function queryWords(query: string): string[] {
+    return query.split(/\s+/).filter(Boolean)
+}
+
 export function markQuery(text: string, query: string): Segment[] {
     const marked = new Array<boolean>(text.length).fill(false)
-    for (const word of query.split(/\s+/).filter(Boolean)) {
+    for (const word of queryWords(query)) {
         for (const match of text.matchAll(wordPattern(word))) marked.fill(true, match.index, match.index + match[0].length)
     }
     const segments: Segment[] = []
@@ -28,8 +32,6 @@ export function markQuery(text: string, query: string): Segment[] {
 }
 
 export function matchesSkill(skill: string, query: string): boolean {
-    const skillWords = skill.toLowerCase().split(' ')
-    return query.split(/\s+/).filter(Boolean).some((word) =>
-        JAPANESE.test(word) ? skill.toLowerCase().includes(word.toLowerCase()) : skillWords.includes(word.toLowerCase()),
-    )
+    const lower = skill.toLowerCase()
+    return queryWords(query.toLowerCase()).some((word) => (JAPANESE.test(word) ? lower.includes(word) : lower.split(' ').includes(word)))
 }

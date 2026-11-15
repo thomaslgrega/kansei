@@ -44,9 +44,8 @@ function chipsUpTo(facts: ChipFacts, requirement: JapaneseRequirement, maxSkills
         if (label) chips.push({ kind: 'fact', label })
     }
     const skills = facts.must_have_skills.map((skill) => ({ kind: 'skill' as const, label: skill, marked: matchesSkill(skill, query) }))
-    // Matched skills always show, and the first unmatched ones fill what's left.
-    let room = maxSkills - skills.filter((skill) => skill.marked).length
-    const shown = skills.filter((skill) => skill.marked || room-- > 0)
+    const fillers = skills.filter((skill) => !skill.marked).slice(0, maxSkills - skills.filter((skill) => skill.marked).length)
+    const shown = skills.filter((skill) => skill.marked || fillers.includes(skill))
     chips.push(...shown)
     const rest = skills.length - shown.length
     if (rest > 0) chips.push({ kind: 'more', label: `+${rest}` })
