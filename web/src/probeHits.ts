@@ -30,5 +30,5 @@ export function hitName(hit: Hit): string {
 
 export function followedNotice(hit: Hit): string {
     const name = hitName(hit)
-    return hit.state === 'not_on_kansei' ? `Added ${name}. Its jobs will appear after the next update.` : `Following ${name}.`
+    return hit.state === 'not_on_kansei' ? `Added ${name}. Its jobs will appear for everyone after the next update, and you're following it.` : `Following ${name}.`
 }
