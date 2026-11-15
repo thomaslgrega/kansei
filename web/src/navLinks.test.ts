@@ -12,11 +12,19 @@ test('logged out, shows Log in and Sign up, marking the one whose page is open',
     ])
     expect(navLinks(false, at('/login', '?next=%2Ftracker'))).toEqual([
         { label: 'Log in', to: '/login?next=%2Ftracker', look: 'link', current: true },
-        { label: 'Sign up', to: '/signup', look: 'button', current: false },
+        { label: 'Sign up', to: '/signup?next=%2Ftracker', look: 'button', current: false },
     ])
     expect(navLinks(false, at('/signup'))).toEqual([
-        { label: 'Log in', to: '/login?next=%2Fsignup', look: 'link', current: false },
+        { label: 'Log in', to: '/login', look: 'link', current: false },
         { label: 'Sign up', to: '/signup', look: 'button', current: true },
+    ])
+    expect(navLinks(false, at('/signup', '?next=%2Ffollowing%3Fadd%3DStripe'))).toEqual([
+        { label: 'Log in', to: '/login?next=%2Ffollowing%3Fadd%3DStripe', look: 'link', current: false },
+        { label: 'Sign up', to: '/signup?next=%2Ffollowing%3Fadd%3DStripe', look: 'button', current: true },
+    ])
+    expect(navLinks(false, at('/tracker', '?stage=applied'))).toEqual([
+        { label: 'Log in', to: '/login?next=%2Ftracker%3Fstage%3Dapplied', look: 'link', current: false },
+        { label: 'Sign up', to: '/signup?next=%2Ftracker%3Fstage%3Dapplied', look: 'button', current: false },
     ])
 })
 
