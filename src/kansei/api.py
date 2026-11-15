@@ -186,7 +186,7 @@ def list_postings(
     )
 
 
-def asked_board(session: Session, source: str | None, token: str | None) -> AskedBoard | None:
+def asked_board(session: Session, source: BoardSource | None, token: str | None) -> AskedBoard | None:
     if source is None or token is None:
         return None
     board = session.scalar(select(Board).where(Board.source == source, Board.token == token))

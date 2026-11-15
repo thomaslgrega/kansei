@@ -83,7 +83,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
     const total = loaded.body.total - (rows.length - shown.length)
     const last = lastPage(total)
     // The last answer's board, kept while the next page of it loads.
-    const asked = !followingOnly && loaded.body.board !== null && boardKey(loaded.body.board) === filters.board
+    const narrowed = !followingOnly && loaded.body.board !== null && boardKey(loaded.body.board) === filters.board
         ? loaded.body.board
         : null
 
@@ -135,8 +135,8 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 <Dropdown label="My Japanese" options={JAPANESE_OPTIONS} value={filters.japanese} onChange={(japanese) => setFilters({ japanese })} />
                 <SpecialtyFilter selected={filters.specialties} onChange={(specialties) => setFilters({ specialties })} />
             </div>
-            {asked && (
-                <ShowingOnly company={asked.company} onShowAll={() => navigate(`?${showAllSearch(filters)}`, { replace: true })} />
+            {narrowed && (
+                <ShowingOnly company={narrowed.company} onShowAll={() => navigate(`?${showAllSearch(filters)}`, { replace: true })} />
             )}
             {filters.specialties?.length === 0 && <p className="muted">No specialties selected.</p>}
             <ul className="postings">
@@ -151,7 +151,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                     />
                 ))}
             </ul>
-            {served !== null && shown.length === 0 && (filters.query !== '' || asked !== null) && <p className="muted">No postings match.</p>}
+            {served !== null && shown.length === 0 && (filters.query !== '' || narrowed !== null) && <p className="muted">No postings match.</p>}
             {last > 1 && (
                 <nav className="pager" aria-label="Pages">
                     {page > 1 ? pageLink(page - 1, 'Prev') : <span className="muted">Prev</span>}

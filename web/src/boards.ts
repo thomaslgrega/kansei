@@ -16,6 +16,7 @@ export function parseBoardKey(key: string): { source: string; token: string } {
     return { source: key.slice(0, colon), token: key.slice(colon + 1) }
 }
 
+// BoardSource in db.py; the API refuses any other.
 const SOURCES = ['greenhouse', 'lever', 'ashby', 'hrmos']
 
 export function isBoardKey(key: string): boolean {
