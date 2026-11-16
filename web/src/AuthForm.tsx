@@ -99,7 +99,7 @@ export default function AuthForm({ mode, loggedIn, onAuthenticated }: Props) {
             </form>
             <p className="auth-switch">
                 <span className="muted">{copy.switchPrompt}</span>{' '}
-                <Link to={authSwitchHref(signup ? '/login' : '/signup', next)}>{copy.switchLink}</Link>
+                <Link to={authSwitchHref(signup ? '/login' : '/signup', next)} replace>{copy.switchLink}</Link>
             </p>
         </main>
     )
