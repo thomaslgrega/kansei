@@ -1,13 +1,14 @@
 import { type SubmitEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
-import { type Filters, filtersToSearch, postingsUrl, querySearch, readFilters } from "./filters";
+import { correctedSearch, type Filters, filtersToSearch, postingsUrl, querySearch, readFilters, showAllSearch } from "./filters";
 import Dropdown from "./Dropdown";
 import { JAPANESE_OPTIONS, type JapaneseRequirement } from "./japanese";
 import { lastPage, pageNumbers, pageRange, readPage } from "./pages";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo } from "./checked";
 import type { TrackControls } from "./tracked";
+import ShowingOnly from "./ShowingOnly";
 import SpecialtyFilter from "./SpecialtyFilter";
 import UntrackConfirm from "./UntrackConfirm";
 
@@ -17,11 +18,14 @@ type Row = {
     japanese_requirement: JapaneseRequirement
 }
 
+type AskedBoard = { source: string; token: string; company: string; removed: boolean }
+
 type PostingsPage = {
     postings: Row[]
     total: number
     page: number
     checked_at: string | null
+    board: AskedBoard | null
 }
 
 type Props = {
@@ -64,10 +68,8 @@ export default function Postings({ followingOnly = false, tracking, following }:
     }, [url, followsSignature])
 
     // Only an answer to the URL now shown may correct it, not one for the page just left.
-    const served = loaded?.url === url ? loaded.body.page : null
-    const corrected = served !== null && searchParams.get('page') !== (served === 1 ? null : String(served))
-        ? filtersToSearch(filters, served)
-        : null
+    const served = loaded?.url === url ? loaded.body : null
+    const corrected = served !== null ? correctedSearch(searchParams, filters, served) : null
     useEffect(() => {
         if (corrected !== null) navigate(`?${corrected}`, { replace: true })
     }, [corrected, navigate])
@@ -80,6 +82,10 @@ export default function Postings({ followingOnly = false, tracking, following }:
     const shown = followingOnly && following ? rows.filter(({ posting }) => following.keys.has(boardKey(posting))) : rows
     const total = loaded.body.total - (rows.length - shown.length)
     const last = lastPage(total)
+    // The last answer's board, kept while the next page of it loads.
+    const narrowed = !followingOnly && loaded.body.board !== null && boardKey(loaded.body.board) === filters.board
+        ? loaded.body.board
+        : null
 
     function companyAction(posting: Posting) {
         if (!following || !posting.has_board) return null
@@ -129,6 +135,9 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 <Dropdown label="My Japanese" options={JAPANESE_OPTIONS} value={filters.japanese} onChange={(japanese) => setFilters({ japanese })} />
                 <SpecialtyFilter selected={filters.specialties} onChange={(specialties) => setFilters({ specialties })} />
             </div>
+            {narrowed && (
+                <ShowingOnly company={narrowed.company} onShowAll={() => navigate(`?${showAllSearch(filters)}`, { replace: true })} />
+            )}
             {filters.specialties?.length === 0 && <p className="muted">No specialties selected.</p>}
             <ul className="postings">
                 {shown.map(({ posting, facts, japanese_requirement }) => (
@@ -142,7 +151,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
                     />
                 ))}
             </ul>
-            {served !== null && shown.length === 0 && filters.query !== '' && <p className="muted">No postings match.</p>}
+            {served !== null && shown.length === 0 && (filters.query !== '' || narrowed !== null) && <p className="muted">No postings match.</p>}
             {last > 1 && (
                 <nav className="pager" aria-label="Pages">
                     {page > 1 ? pageLink(page - 1, 'Prev') : <span className="muted">Prev</span>}

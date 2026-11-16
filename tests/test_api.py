@@ -396,7 +396,12 @@ def test_checked_is_the_newest_board_posting_whatever_the_filters_ignoring_paste
 def test_no_postings_is_page_1_of_nothing(client):
     body = client.get("/api/postings", params={"token": "kansei-test", "page": "3"}).json()
 
-    assert {key: value for key, value in body.items() if key != "checked_at"} == {"postings": [], "total": 0, "page": 1}
+    assert {key: value for key, value in body.items() if key != "checked_at"} == {
+        "postings": [],
+        "total": 0,
+        "page": 1,
+        "board": None,
+    }
 
 
 @pytest.fixture
@@ -510,3 +515,52 @@ def test_a_search_is_paged_and_counted_after_the_candidate_check(client, paged_p
         body["page"],
         [row["posting"]["url"].removeprefix("https://example.com/") for row in body["postings"]],
     ) == (60, 2, [f"older-{n}" for n in range(9, -1, -1)])
+
+
+def test_the_postings_answer_names_the_board_asked_for_and_whether_it_was_removed(client, session):
+    session.add_all([
+        Board(source="greenhouse", token="kansei-test", name="Kansei Test K.K."),
+        Board(source="lever", token="kansei-unnamed"),
+        Board(source="ashby", token="kansei-removed", name="Removed Co", status="removed"),
+    ])
+    asked = [
+        {},
+        {"source": "greenhouse", "token": "kansei-test"},
+        {"source": "lever", "token": "kansei-unnamed"},
+        {"source": "ashby", "token": "kansei-removed"},
+        {"source": "greenhouse", "token": "kansei-missing"},
+        {"source": "lever", "token": "kansei-test"},
+        {"token": "kansei-test"},
+    ]
+
+    boards = [client.get("/api/postings", params=params).json()["board"] for params in asked]
+
+    assert boards == [
+        None,
+        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "removed": False},
+        {"source": "lever", "token": "kansei-unnamed", "company": "kansei-unnamed", "removed": False},
+        {"source": "ashby", "token": "kansei-removed", "company": "Removed Co", "removed": True},
+        None,
+        None,
+        None,
+    ]
+
+
+def test_a_board_narrows_the_postings_for_a_visitor_who_does_not_follow_it(client, session, make_posting, log_in_as):
+    session.add_all([Board(source="greenhouse", token="kansei-test"), Board(source="ashby", token="kansei-test")])
+    ids = save_postings(
+        session,
+        [make_posting(token="kansei-test"), make_posting(source="ashby", token="kansei-test", id="2", url="https://example.com/2")],
+        datetime.now(UTC),
+    )
+    session.add_all(make_extraction(posting_id, 6, url) for url, posting_id in ids.items())
+    board = {"source": "ashby", "token": "kansei-test"}
+
+    logged_out = client.get("/api/postings", params=board).json()
+    log_in_as("ada@example.com")
+    logged_in = client.get("/api/postings", params=board).json()
+
+    assert [[row["posting"]["url"] for row in body["postings"]] for body in (logged_out, logged_in)] == [
+        ["https://example.com/2"],
+        ["https://example.com/2"],
+    ]

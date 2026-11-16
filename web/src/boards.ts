@@ -16,6 +16,14 @@ export function parseBoardKey(key: string): { source: string; token: string } {
     return { source: key.slice(0, colon), token: key.slice(colon + 1) }
 }
 
+// BoardSource in db.py; the API refuses any other.
+const SOURCES = ['greenhouse', 'lever', 'ashby', 'hrmos']
+
+export function isBoardKey(key: string): boolean {
+    const { source, token } = parseBoardKey(key)
+    return key.includes(':') && SOURCES.includes(source) && token !== ''
+}
+
 export function followsKey(followed: Set<string>): string {
     return [...followed].sort().join(' ')
 }

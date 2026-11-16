@@ -1,15 +1,16 @@
-import { parseBoardKey } from './boards'
+import { isBoardKey, parseBoardKey } from './boards'
 import { type JapaneseChoice, readJapaneseChoice } from './japanese'
 import { readSpecialties, type Selected, specialtiesParam } from './specialty'
 
 export type Filters = { japanese: JapaneseChoice; specialties: Selected; board: string | null; query: string }
 
-export function readFilters(params: URLSearchParams, followed: ReadonlySet<string> = new Set()): Filters {
+// The Following page passes the followed boards and takes only those; the postings page takes any board that parses.
+export function readFilters(params: URLSearchParams, followed?: ReadonlySet<string>): Filters {
     const company = params.get('company')
     return {
         japanese: readJapaneseChoice(params.get('japanese')),
         specialties: readSpecialties(params.get('specialty')),
-        board: company !== null && followed.has(company) ? company : null,
+        board: company !== null && (followed ? followed.has(company) : isBoardKey(company)) ? company : null,
         query: params.get('q')?.trim() ?? '',
     }
 }
@@ -34,8 +35,23 @@ export function filtersToSearch(filters: Filters, page = 1): string {
     return toSearch(filterParams(filters, page))
 }
 
+// The box searches every company, so a search leaves the company view.
 export function querySearch(filters: Filters, typed: string): string {
-    return filtersToSearch({ ...filters, query: typed.trim() })
+    return filtersToSearch({ ...filters, query: typed.trim(), board: null })
+}
+
+export function showAllSearch(filters: Filters): string {
+    return filtersToSearch({ ...filters, board: null })
+}
+
+export type Served = { page: number; board: { source: string; token: string } | null }
+
+// The postings answer names the board asked for only when kansei has it.
+export function correctedSearch(params: URLSearchParams, filters: Filters, served: Served): string | null {
+    const dropBoard = params.has('company') && (filters.board === null || served.board === null)
+    const wrongPage = params.get('page') !== (served.page === 1 ? null : String(served.page))
+    if (!dropBoard && !wrongPage) return null
+    return filtersToSearch({ ...filters, board: dropBoard ? null : filters.board }, served.page)
 }
 
 export function boardClickSearch(filters: Filters, clicked: string, managing: boolean): string | null {

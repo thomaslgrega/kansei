@@ -95,11 +95,20 @@ class PostingWithFacts(BaseModel):
     japanese_requirement: JapaneseRequirement
 
 
+class AskedBoard(BaseModel):
+    source: BoardSource
+    token: str
+    company: str
+    removed: bool
+
+
 class PostingsPage(BaseModel):
     postings: list[PostingWithFacts]
     total: int
     page: int
     checked_at: datetime | None
+    # The board `source` and `token` asked for, or none when kansei doesn't have it.
+    board: AskedBoard | None
 
 
 PAGE_SIZE = 50
@@ -173,7 +182,17 @@ def list_postings(
         total=len(candidates),
         page=served,
         checked_at=session.scalar(select(func.max(Posting.last_seen_at)).where(Posting.source != "url")),
+        board=asked_board(session, source, token),
     )
+
+
+def asked_board(session: Session, source: BoardSource | None, token: str | None) -> AskedBoard | None:
+    if source is None or token is None:
+        return None
+    board = session.scalar(select(Board).where(Board.source == source, Board.token == token))
+    if board is None:
+        return None
+    return AskedBoard(source=board.source, token=board.token, company=board.company, removed=board.status == "removed")
 
 
 def page_to_serve(page: str, total: int) -> int:
