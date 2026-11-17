@@ -93,7 +93,7 @@ test('the full chips list every skill with no count', () => {
     ])
 })
 
-test('a skill the query matches moves into view past the first five, marked, and the count drops by one', () => {
+test('a skill the query matches past the first five moves into view, marked, pushing out the last unmatched one so the count stays', () => {
     const chips = postingChips(facts({ must_have_skills: SKILLS }), 'not_stated', 'kafka engineer')
 
     expect(chips).toEqual([
