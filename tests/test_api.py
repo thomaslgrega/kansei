@@ -401,6 +401,8 @@ def test_no_postings_is_page_1_of_nothing(client):
         "total": 0,
         "page": 1,
         "board": None,
+        "matched_boards": [],
+        "filtered_out": False,
     }
 
 
@@ -505,6 +507,51 @@ def test_a_search_combines_with_my_japanese_and_specialty(client, japanese_posti
     ]
 
     assert shown == [["basic"], ["basic"], [], ["not-stated"], ["data-ml"], ["fullstack"], []]
+
+
+def test_filtered_out_says_the_japanese_or_specialty_filters_hide_every_match(client, japanese_postings):
+    searches = [
+        {"q": "native", "japanese": "business"},
+        {"q": "native", "specialty": "frontend"},
+        {"specialty": "frontend"},
+        {"q": "native"},
+        {"q": "basic", "japanese": "business"},
+        {"q": "nothingmatches", "japanese": "business"},
+    ]
+
+    answers = [
+        (body["total"], body["filtered_out"])
+        for body in (client.get("/api/postings", params={"token": "kansei-test"} | search).json() for search in searches)
+    ]
+
+    assert answers == [(0, True), (0, True), (0, True), (1, False), (1, False), (0, False)]
+
+
+def test_a_search_names_the_boards_matching_it_exact_ones_first(client, session):
+    session.add_all([
+        Board(source="lever", token="kansei-orbital", name="Kansei Orbital"),
+        Board(source="greenhouse", token="kansei-orbit", name="Kansei Orbit"),
+        Board(source="ashby", token="kansei-gone", status="removed"),
+        Board(source="ashby", token="kansei-orb", name="Orb", status="removed"),
+    ])
+    queries = ["kansei orbit backend", "kansei-gone", "kansei orb", ""]
+
+    matched = {query: client.get("/api/postings", params={"q": query}).json()["matched_boards"] for query in queries}
+
+    assert matched == {
+        "kansei orbit backend": [
+            {"source": "greenhouse", "token": "kansei-orbit", "company": "Kansei Orbit", "exact": True, "removed": False},
+        ],
+        "kansei-gone": [
+            {"source": "ashby", "token": "kansei-gone", "company": "kansei-gone", "exact": True, "removed": True},
+        ],
+        "kansei orb": [
+            {"source": "ashby", "token": "kansei-orb", "company": "Orb", "exact": True, "removed": True},
+            {"source": "greenhouse", "token": "kansei-orbit", "company": "Kansei Orbit", "exact": False, "removed": False},
+            {"source": "lever", "token": "kansei-orbital", "company": "Kansei Orbital", "exact": False, "removed": False},
+        ],
+        "": [],
+    }
 
 
 def test_a_search_is_paged_and_counted_after_the_candidate_check(client, paged_postings):

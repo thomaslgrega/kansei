@@ -1559,11 +1559,13 @@ li {
 }
 
 .following-hint,
-.following-selected {
+.following-selected,
+.companies-line {
   margin: 0 0 0.75rem;
   font-size: 0.9em;
 }
 
-.filters + .following-selected {
+.filters + .following-selected,
+.filters + .companies-line {
   margin-top: 0.75rem;
 }

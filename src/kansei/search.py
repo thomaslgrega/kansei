@@ -1,4 +1,5 @@
 import re
+from typing import Literal
 
 from sqlalchemy import (
     ColumnElement,
@@ -39,3 +40,28 @@ def matches_word(word: str, texts: list[ColumnElement[str]], skill: ColumnElemen
         *(text.regexp_match(starts_a_word, "i") for text in texts),
         exists().where(func.lower(literal(word)) == any_(skill_words)),
     )
+
+
+BoardMatch = Literal["exact", "partial"]
+
+
+def board_match(q: str, company: str, token: str) -> BoardMatch | None:
+    query = words(q)
+    if not query:
+        return None
+    names = [name for name in (words(company), words(token)) if name]
+    if any(query[i:i + len(name)] == name for name in names for i in range(len(query))):
+        return "exact"
+    *whole, start = query
+    if any(
+        name[i:i + len(whole)] == whole and len(name) > i + len(whole) and name[i + len(whole)].startswith(start)
+        for name in names
+        for i in range(len(name))
+    ):
+        return "partial"
+    return None
+
+
+def words(text: str) -> list[str]:
+    # + and # stay in a word, so "c++" is not "c".
+    return re.findall(r"[\w+#]+", text.lower())
