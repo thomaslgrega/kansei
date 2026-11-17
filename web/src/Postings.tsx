@@ -1,4 +1,4 @@
-import { type SubmitEvent, useEffect, useRef, useState } from "react";
+import { Fragment, type SubmitEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
 import { correctedSearch, type Filters, filtersToSearch, postingsUrl, querySearch, readFilters, showAllSearch } from "./filters";
@@ -7,6 +7,7 @@ import { JAPANESE_OPTIONS, type JapaneseRequirement } from "./japanese";
 import { lastPage, pageNumbers, pageRange, readPage } from "./pages";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo } from "./checked";
+import { addCompanyHref, companiesLine, companyHref, emptyMessage, type MatchedBoard } from "./companies";
 import type { TrackControls } from "./tracked";
 import ShowingOnly from "./ShowingOnly";
 import SpecialtyFilter from "./SpecialtyFilter";
@@ -26,6 +27,8 @@ type PostingsPage = {
     page: number
     checked_at: string | null
     board: AskedBoard | null
+    companies: MatchedBoard[]
+    filtered_out: boolean
 }
 
 type Props = {
@@ -88,6 +91,9 @@ export default function Postings({ followingOnly = false, tracking, following }:
         : null
     // Rows still shown from the previous search are marked by the query they were found with.
     const loadedQuery = new URL(loaded.url, window.location.origin).searchParams.get('q') ?? ''
+    // The last answer's companies, kept while the next page of the same search loads.
+    const companies = !followingOnly && filters.query !== '' && loadedQuery === filters.query ? loaded.body.companies : null
+    const empty = !followingOnly && served !== null ? emptyMessage(filters, served, narrowed !== null) : null
 
     function companyAction(posting: Posting) {
         if (!following || !posting.has_board) return null
@@ -140,6 +146,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
             {narrowed && (
                 <ShowingOnly company={narrowed.company} onShowAll={() => navigate(`?${showAllSearch(filters)}`, { replace: true })} />
             )}
+            {companies !== null && <CompaniesLine companies={companies} filters={filters} />}
             {filters.specialties?.length === 0 && <p className="muted">No specialties selected.</p>}
             <ul className="postings">
                 {shown.map(({ posting, facts, japanese_requirement }) => (
@@ -154,7 +161,13 @@ export default function Postings({ followingOnly = false, tracking, following }:
                     />
                 ))}
             </ul>
-            {served !== null && shown.length === 0 && (filters.query !== '' || narrowed !== null) && <p className="muted">No postings match.</p>}
+            {empty?.kind === 'filtered' && (
+                <p className="muted">
+                    No jobs match your filters · <Link to={empty.clear} replace>Clear filters</Link>
+                </p>
+            )}
+            {empty?.kind === 'query' && <p className="muted">No jobs match "{empty.query}".</p>}
+            {empty?.kind === 'plain' && <p className="muted">No postings match.</p>}
             {last > 1 && (
                 <nav className="pager" aria-label="Pages">
                     {page > 1 ? pageLink(page - 1, 'Prev') : <span className="muted">Prev</span>}
@@ -166,6 +179,50 @@ export default function Postings({ followingOnly = false, tracking, following }:
                 </nav>
             )}
         </section>
+    )
+}
+
+function CompaniesLine({ companies, filters }: { companies: MatchedBoard[]; filters: Filters }) {
+    const line = companiesLine(companies)
+    const query = filters.query
+    if (line.kind === 'one') {
+        const { company } = line.board
+        return (
+            <p className="companies-line">
+                {company} is on kansei · <Link to={companyHref(filters, line.board)}>Only {company}'s jobs →</Link>
+            </p>
+        )
+    }
+    if (line.kind === 'none') {
+        return (
+            <p className="companies-line">
+                {line.ending.kind === 'add' ? (
+                    <>
+                        No company called "{query}" on kansei.{' '}
+                        <Link to={addCompanyHref(query)}>Add it, and its jobs show up here for everyone →</Link>
+                    </>
+                ) : (
+                    `${line.ending.company} was removed from kansei.`
+                )}
+            </p>
+        )
+    }
+    return (
+        <p className="companies-line">
+            Companies matching "{query}":{' '}
+            {line.boards.map((board, index) => (
+                <Fragment key={boardKey(board)}>
+                    {index > 0 && ', '}
+                    <Link to={companyHref(filters, board)}>{board.company} →</Link>
+                </Fragment>
+            ))}
+            {line.ending?.kind === 'add' && (
+                <>
+                    {' '}Not the {query} you meant? <Link to={addCompanyHref(query)}>Add it to kansei →</Link>
+                </>
+            )}
+            {line.ending?.kind === 'removed' && ` ${line.ending.company} was removed from kansei.`}
+        </p>
     )
 }
 

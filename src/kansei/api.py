@@ -9,7 +9,7 @@ import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import ColumnElement, Select, delete, func, select, true, tuple_
+from sqlalchemy import ColumnElement, Row, Select, delete, func, select, true, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -32,7 +32,7 @@ from kansei.db import (
 from kansei.japanese import JapaneseRequirement, japanese_requirement, passes_japanese
 from kansei.llm import PostingFacts, prompt_snapshot
 from kansei.ratelimit import PROBE_PER_USER, Now, rate_limit
-from kansei.search import matches_search
+from kansei.search import board_match, matches_search
 from kansei.sources import (
     SLUG,
     SOURCES,
@@ -102,6 +102,14 @@ class AskedBoard(BaseModel):
     removed: bool
 
 
+class MatchedBoard(BaseModel):
+    source: BoardSource
+    token: str
+    company: str
+    exact: bool
+    removed: bool
+
+
 class PostingsPage(BaseModel):
     postings: list[PostingWithFacts]
     total: int
@@ -109,6 +117,9 @@ class PostingsPage(BaseModel):
     checked_at: datetime | None
     # The board `source` and `token` asked for, or none when kansei doesn't have it.
     board: AskedBoard | None
+    companies: list[MatchedBoard]
+    # No postings, though some would show without the Japanese and specialty filters.
+    filtered_out: bool
 
 
 PAGE_SIZE = 50
@@ -155,20 +166,22 @@ def list_postings(
     page: str = "1",
     cookie: SessionCookie = None,
 ) -> PostingsPage:
-    statement = filtered_postings(japanese, specialty, q).order_by(Posting.first_seen_at.desc(), Posting.id.desc())
-    if source is not None:
-        statement = statement.where(Posting.source == source)
-    if token is not None:
-        statement = statement.where(Posting.token == token)
-    if following:
-        statement = statement.where(on_followed_boards(current_user(session, cookie).id))
-    # is_candidate runs in Python, so the few columns it needs come first for every posting, and facts for the page after.
-    candidates = [
-        row
-        for row in session.execute(statement.with_only_columns(*CANDIDATE_COLUMNS))
-        if is_candidate(row)
-    ]
+    user_id = current_user(session, cookie).id if following else None
+
+    def narrowed(japanese: str, specialty: str | None) -> Select[tuple[Posting, dict, str]]:
+        statement = filtered_postings(japanese, specialty, q).order_by(Posting.first_seen_at.desc(), Posting.id.desc())
+        if source is not None:
+            statement = statement.where(Posting.source == source)
+        if token is not None:
+            statement = statement.where(Posting.token == token)
+        if user_id is not None:
+            statement = statement.where(on_followed_boards(user_id))
+        return statement
+
+    statement = narrowed(japanese, specialty)
+    candidates = candidate_rows(session, statement)
     served = page_to_serve(page, len(candidates))
+    filters_set = japanese != "any" or specialty is not None
     shown = [row.id for row in candidates[(served - 1) * PAGE_SIZE:served * PAGE_SIZE]]
     return PostingsPage(
         postings=[
@@ -183,7 +196,29 @@ def list_postings(
         page=served,
         checked_at=session.scalar(select(func.max(Posting.last_seen_at)).where(Posting.source != "url")),
         board=asked_board(session, source, token),
+        companies=matched_boards(session, q),
+        filtered_out=not candidates and filters_set and bool(candidate_rows(session, narrowed("any", None))),
     )
+
+
+def candidate_rows(session: Session, statement: Select[tuple[Posting, dict, str]]) -> list[Row]:
+    # is_candidate runs in Python, so the few columns it needs come first for every posting, and facts for the page after.
+    return [row for row in session.execute(statement.with_only_columns(*CANDIDATE_COLUMNS)) if is_candidate(row)]
+
+
+def matched_boards(session: Session, q: str) -> list[MatchedBoard]:
+    matched = [
+        MatchedBoard(
+            source=board.source,
+            token=board.token,
+            company=board.company,
+            exact=match == "exact",
+            removed=board.status == "removed",
+        )
+        for board in session.scalars(select(Board))
+        if (match := board_match(q, board.company, board.token))
+    ]
+    return sorted(matched, key=lambda board: (not board.exact, board.company.lower(), board.source, board.token))
 
 
 def asked_board(session: Session, source: BoardSource | None, token: str | None) -> AskedBoard | None:
