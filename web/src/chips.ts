@@ -1,4 +1,5 @@
 import { type JapaneseRequired, type JapaneseRequirement, japaneseBadge } from './japanese'
+import { matchesSkill } from './marks'
 
 export type ChipFacts = {
     japanese_required: JapaneseRequired
@@ -9,7 +10,8 @@ export type ChipFacts = {
 
 export type Chip =
     | { kind: 'japanese'; label: string; requirement: JapaneseRequirement }
-    | { kind: 'fact' | 'skill' | 'more'; label: string }
+    | { kind: 'skill'; label: string; marked: boolean }
+    | { kind: 'fact' | 'more'; label: string }
 
 const REMOTE_POLICIES = new Map([
     ['remote', 'Remote'],
@@ -27,22 +29,25 @@ const SENIORITIES = new Map([
 
 const MAX_SKILLS = 5
 
-export function postingChips(facts: ChipFacts, requirement: JapaneseRequirement): Chip[] {
-    return chipsUpTo(facts, requirement, MAX_SKILLS)
+export function postingChips(facts: ChipFacts, requirement: JapaneseRequirement, query = ''): Chip[] {
+    return chipsUpTo(facts, requirement, MAX_SKILLS, query)
 }
 
 export function allPostingChips(facts: ChipFacts, requirement: JapaneseRequirement): Chip[] {
-    return chipsUpTo(facts, requirement, Infinity)
+    return chipsUpTo(facts, requirement, Infinity, '')
 }
 
-function chipsUpTo(facts: ChipFacts, requirement: JapaneseRequirement, maxSkills: number): Chip[] {
+function chipsUpTo(facts: ChipFacts, requirement: JapaneseRequirement, maxSkills: number, query: string): Chip[] {
     const label = japaneseBadge(requirement, facts.japanese_required)
     const chips: Chip[] = [{ kind: 'japanese', label, requirement }]
     for (const label of [REMOTE_POLICIES.get(facts.remote_policy), SENIORITIES.get(facts.seniority)]) {
         if (label) chips.push({ kind: 'fact', label })
     }
-    for (const skill of facts.must_have_skills.slice(0, maxSkills)) chips.push({ kind: 'skill', label: skill })
-    const rest = facts.must_have_skills.length - maxSkills
+    const skills = facts.must_have_skills.map((skill) => ({ kind: 'skill' as const, label: skill, marked: matchesSkill(skill, query) }))
+    const fillers = skills.filter((skill) => !skill.marked).slice(0, maxSkills - skills.filter((skill) => skill.marked).length)
+    const shown = skills.filter((skill) => skill.marked || fillers.includes(skill))
+    chips.push(...shown)
+    const rest = skills.length - shown.length
     if (rest > 0) chips.push({ kind: 'more', label: `+${rest}` })
     return chips
 }
