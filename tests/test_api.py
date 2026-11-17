@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from kansei import save_postings, sha256
+from kansei.api import why_empty
 from kansei.config import settings
 from kansei.db import Board, Extraction
 from kansei.llm import PostingFacts, prompt_snapshot
@@ -584,9 +585,9 @@ def test_the_postings_answer_names_the_board_asked_for_and_whether_it_was_remove
 
     assert boards == [
         None,
-        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "removed": False},
-        {"source": "lever", "token": "kansei-unnamed", "company": "kansei-unnamed", "removed": False},
-        {"source": "ashby", "token": "kansei-removed", "company": "Removed Co", "removed": True},
+        {"source": "greenhouse", "token": "kansei-test", "company": "Kansei Test K.K.", "removed": False, "why_empty": "just_added"},
+        {"source": "lever", "token": "kansei-unnamed", "company": "kansei-unnamed", "removed": False, "why_empty": "just_added"},
+        {"source": "ashby", "token": "kansei-removed", "company": "Removed Co", "removed": True, "why_empty": "removed"},
         None,
         None,
         None,
@@ -610,4 +611,68 @@ def test_a_board_narrows_the_postings_for_a_visitor_who_does_not_follow_it(clien
     assert [[row["posting"]["url"] for row in body["postings"]] for body in (logged_out, logged_in)] == [
         ["https://example.com/2"],
         ["https://example.com/2"],
+    ]
+
+
+def test_a_board_with_nothing_shown_says_why_from_its_status_when_it_was_added_checked_and_its_candidates():
+    checked = datetime(2026, 11, 17, 3, tzinfo=UTC)
+    before, after = checked - timedelta(days=30), checked + timedelta(minutes=5)
+    cases = [
+        ("active", before, checked, 3, 2),
+        ("active", after, checked, 0, 0),
+        ("active", after, None, 0, 0),
+        ("active", before, checked, 0, 0),
+        ("active", checked, checked, 0, 0),
+        ("active", before, checked, 3, 0),
+        ("removed", before, checked, 0, 0),
+        ("removed", after, checked, 0, 0),
+        ("removed", before, checked, 2, 0),
+        ("removed", before, checked, 2, 2),
+    ]
+
+    assert [why_empty(*case) for case in cases] == [
+        None,
+        "just_added",
+        "just_added",
+        "nothing_to_show",
+        "nothing_to_show",
+        "filtered_out",
+        "removed",
+        "removed",
+        "filtered_out",
+        None,
+    ]
+
+
+def test_the_postings_answer_says_why_a_board_shows_nothing(client, session, make_posting):
+    now = datetime.now(UTC)
+    session.add_all([
+        Board(source="greenhouse", token="kansei-new", created_at=now + timedelta(minutes=5)),
+        Board(source="greenhouse", token="kansei-pending", created_at=now - timedelta(days=30)),
+        Board(source="greenhouse", token="kansei-test", created_at=now - timedelta(days=30)),
+        Board(source="greenhouse", token="kansei-gone", status="removed", created_at=now - timedelta(days=30)),
+    ])
+    ids = save_postings(session, [
+        make_posting(token="kansei-test", id="1", url="https://example.com/1"),
+        make_posting(token="kansei-pending", id="2", url="https://example.com/2"),
+    ], now)
+    session.add(make_extraction(ids["https://example.com/1"], 6, "Backend."))
+    asked = [
+        {"token": "kansei-new"},
+        {"token": "kansei-pending"},
+        {"token": "kansei-test"},
+        {"token": "kansei-test", "specialty": "frontend"},
+        {"token": "kansei-test", "specialty": "backend", "q": "nowhere"},
+        {"token": "kansei-gone"},
+    ]
+
+    bodies = [client.get("/api/postings", params={"source": "greenhouse", **params}).json() for params in asked]
+
+    assert [(body["total"], body["board"]["why_empty"]) for body in bodies] == [
+        (0, "just_added"),
+        (0, "nothing_to_show"),
+        (1, None),
+        (0, "filtered_out"),
+        (0, "filtered_out"),
+        (0, "removed"),
     ]

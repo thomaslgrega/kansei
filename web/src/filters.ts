@@ -59,16 +59,28 @@ export function servedQuery(url: string): string {
     return new URLSearchParams(url.split('?')[1]).get('q') ?? ''
 }
 
-export type EmptyMessage = { kind: 'filtered'; clear: string } | { kind: 'query'; query: string } | { kind: 'plain' } | null
+// WhyEmpty in api.py.
+export type WhyEmpty = 'just_added' | 'nothing_to_show' | 'filtered_out' | 'removed'
+
+export type EmptyMessage =
+    | { kind: 'just_added' | 'nothing_to_show' | 'removed'; company: string }
+    | { kind: 'filtered'; clear: string; company: string | null }
+    | { kind: 'query'; query: string }
+    | { kind: 'plain' }
+    | null
 
 export function emptyMessage(
     filters: Filters,
     served: { total: number; filtered_out: boolean },
-    narrowed: boolean,
+    narrowed: { company: string; why_empty: WhyEmpty | null } | null,
 ): EmptyMessage {
     if (served.total > 0) return null
+    const why = narrowed?.why_empty
+    // The board's own reason holds whatever the filters and search are.
+    if (narrowed && why && why !== 'filtered_out') return { kind: why, company: narrowed.company }
     if (served.filtered_out) {
-        return { kind: 'filtered', clear: `?${filtersToSearch({ ...filters, japanese: 'any', specialties: null })}` }
+        const clear = `?${filtersToSearch({ ...filters, japanese: 'any', specialties: null })}`
+        return { kind: 'filtered', clear, company: narrowed?.company ?? null }
     }
     if (filters.query !== '') return { kind: 'query', query: filters.query }
     return narrowed ? { kind: 'plain' } : null

@@ -22,6 +22,7 @@ from kansei.config import settings
 from kansei.db import (
     Board,
     BoardSource,
+    BoardStatus,
     Extraction,
     Follow,
     Posting,
@@ -95,11 +96,15 @@ class PostingWithFacts(BaseModel):
     japanese_requirement: JapaneseRequirement
 
 
+WhyEmpty = Literal["just_added", "nothing_to_show", "filtered_out", "removed"]
+
+
 class AskedBoard(BaseModel):
     source: BoardSource
     token: str
     company: str
     removed: bool
+    why_empty: WhyEmpty | None
 
 
 class MatchedBoard(BaseModel):
@@ -183,6 +188,7 @@ def list_postings(
     served = page_to_serve(page, len(candidates))
     filters_set = japanese != "any" or specialty is not None
     shown = [row.id for row in candidates[(served - 1) * PAGE_SIZE:served * PAGE_SIZE]]
+    checked_at = session.scalar(select(func.max(Posting.last_seen_at)).where(Posting.source != "url"))
     return PostingsPage(
         postings=[
             PostingWithFacts(
@@ -194,8 +200,8 @@ def list_postings(
         ],
         total=len(candidates),
         page=served,
-        checked_at=session.scalar(select(func.max(Posting.last_seen_at)).where(Posting.source != "url")),
-        board=asked_board(session, source, token),
+        checked_at=checked_at,
+        board=asked_board(session, source, token, checked_at, len(candidates)),
         matched_boards=matched_boards(session, q),
         filtered_out=not candidates and filters_set and bool(candidate_rows(session, postings_under("any", None))),
     )
@@ -223,13 +229,39 @@ def matched_boards(session: Session, q: str) -> list[MatchedBoard]:
     return sorted(matched, key=lambda board: (not board.exact, board.company.lower(), board.source, board.token))
 
 
-def asked_board(session: Session, source: BoardSource | None, token: str | None) -> AskedBoard | None:
+def asked_board(
+    session: Session, source: BoardSource | None, token: str | None, checked_at: datetime | None, matching: int
+) -> AskedBoard | None:
     if source is None or token is None:
         return None
     board = session.scalar(select(Board).where(Board.source == source, Board.token == token))
     if board is None:
         return None
-    return AskedBoard(source=board.source, token=board.token, company=board.company, removed=board.status == "removed")
+    # The filters and search can only hide candidates, so with some matching there's no need to count them all.
+    unfiltered = filtered_postings("any", None).where(Posting.source == source, Posting.token == token)
+    listed = matching or len(candidate_rows(session, unfiltered))
+    return AskedBoard(
+        source=board.source,
+        token=board.token,
+        company=board.company,
+        removed=board.status == "removed",
+        why_empty=why_empty(board.status, board.created_at, checked_at, listed, matching),
+    )
+
+
+def why_empty(
+    status: BoardStatus, added_at: datetime, checked_at: datetime | None, listed: int, matching: int
+) -> WhyEmpty | None:
+    """`listed` counts the board's listed candidates past extraction; `matching`, those the filters and search keep."""
+    if matching:
+        return None
+    if listed:
+        return "filtered_out"
+    if status == "removed":
+        return "removed"
+    if checked_at is None or added_at > checked_at:
+        return "just_added"
+    return "nothing_to_show"
 
 
 def page_to_serve(page: str, total: int) -> int:
