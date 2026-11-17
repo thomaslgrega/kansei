@@ -63,4 +63,5 @@ def board_match(q: str, company: str, token: str) -> BoardMatch | None:
 
 
 def words(text: str) -> list[str]:
-    return re.findall(r"\w+", text.lower())
+    # + and # stay in a word, so "c++" is not "c".
+    return re.findall(r"[\w+#]+", text.lower())

@@ -21,25 +21,10 @@ export function companiesLine(companies: MatchedBoard[]): CompaniesLine {
     return { kind: 'matching', boards, ending: exact ? null : ending }
 }
 
-export function companyHref(filters: Filters, board: { source: string; token: string }): string {
+export function boardHref(filters: Filters, board: { source: string; token: string }): string {
     return `/?${filtersToSearch({ ...filters, query: '', board: boardKey(board) })}`
 }
 
 export function addCompanyHref(query: string): string {
     return `/following?${new URLSearchParams({ add: query })}`
-}
-
-export type EmptyMessage = { kind: 'filtered'; clear: string } | { kind: 'query'; query: string } | { kind: 'plain' } | null
-
-export function emptyMessage(
-    filters: Filters,
-    served: { total: number; filtered_out: boolean },
-    narrowed: boolean,
-): EmptyMessage {
-    if (served.total > 0) return null
-    if (served.filtered_out) {
-        return { kind: 'filtered', clear: `?${filtersToSearch({ ...filters, japanese: 'any', specialties: null })}` }
-    }
-    if (filters.query !== '') return { kind: 'query', query: filters.query }
-    return narrowed ? { kind: 'plain' } : null
 }

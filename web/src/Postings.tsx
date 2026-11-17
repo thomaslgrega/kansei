@@ -1,13 +1,13 @@
 import { Fragment, type SubmitEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
-import { correctedSearch, type Filters, filtersToSearch, postingsUrl, querySearch, readFilters, showAllSearch } from "./filters";
+import { correctedSearch, emptyMessage, type Filters, filtersToSearch, postingsUrl, querySearch, readFilters, servedQuery, showAllSearch } from "./filters";
 import Dropdown from "./Dropdown";
 import { JAPANESE_OPTIONS, type JapaneseRequirement } from "./japanese";
 import { lastPage, pageNumbers, pageRange, readPage } from "./pages";
 import PostingRow, { type Facts, type Posting } from "./PostingRow";
 import { checkedAgo } from "./checked";
-import { addCompanyHref, companiesLine, companyHref, emptyMessage, type MatchedBoard } from "./companies";
+import { addCompanyHref, boardHref, companiesLine, type MatchedBoard } from "./companies";
 import type { TrackControls } from "./tracked";
 import ShowingOnly from "./ShowingOnly";
 import SpecialtyFilter from "./SpecialtyFilter";
@@ -27,7 +27,7 @@ type PostingsPage = {
     page: number
     checked_at: string | null
     board: AskedBoard | null
-    companies: MatchedBoard[]
+    matched_boards: MatchedBoard[]
     filtered_out: boolean
 }
 
@@ -90,9 +90,9 @@ export default function Postings({ followingOnly = false, tracking, following }:
         ? loaded.body.board
         : null
     // Rows still shown from the previous search are marked by the query they were found with.
-    const loadedQuery = new URL(loaded.url, window.location.origin).searchParams.get('q') ?? ''
+    const loadedQuery = servedQuery(loaded.url)
     // The last answer's companies, kept while the next page of the same search loads.
-    const companies = !followingOnly && filters.query !== '' && loadedQuery === filters.query ? loaded.body.companies : null
+    const matched = !followingOnly && filters.query !== '' && loadedQuery === filters.query ? loaded.body.matched_boards : null
     const empty = !followingOnly && served !== null ? emptyMessage(filters, served, narrowed !== null) : null
 
     function companyAction(posting: Posting) {
@@ -146,7 +146,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
             {narrowed && (
                 <ShowingOnly company={narrowed.company} onShowAll={() => navigate(`?${showAllSearch(filters)}`, { replace: true })} />
             )}
-            {companies !== null && <CompaniesLine companies={companies} filters={filters} />}
+            {matched !== null && <CompaniesLine matched={matched} filters={filters} />}
             {filters.specialties?.length === 0 && <p className="muted">No specialties selected.</p>}
             <ul className="postings">
                 {shown.map(({ posting, facts, japanese_requirement }) => (
@@ -182,14 +182,14 @@ export default function Postings({ followingOnly = false, tracking, following }:
     )
 }
 
-function CompaniesLine({ companies, filters }: { companies: MatchedBoard[]; filters: Filters }) {
-    const line = companiesLine(companies)
+function CompaniesLine({ matched, filters }: { matched: MatchedBoard[]; filters: Filters }) {
+    const line = companiesLine(matched)
     const query = filters.query
     if (line.kind === 'one') {
         const { company } = line.board
         return (
             <p className="companies-line">
-                {company} is on kansei · <Link to={companyHref(filters, line.board)}>Only {company}'s jobs →</Link>
+                {company} is on kansei · <Link to={boardHref(filters, line.board)}>Only {company}'s jobs →</Link>
             </p>
         )
     }
@@ -213,7 +213,7 @@ function CompaniesLine({ companies, filters }: { companies: MatchedBoard[]; filt
             {line.boards.map((board, index) => (
                 <Fragment key={boardKey(board)}>
                     {index > 0 && ', '}
-                    <Link to={companyHref(filters, board)}>{board.company} →</Link>
+                    <Link to={boardHref(filters, board)}>{board.company} →</Link>
                 </Fragment>
             ))}
             {line.ending?.kind === 'add' && (

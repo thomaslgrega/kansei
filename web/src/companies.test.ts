@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { addCompanyHref, companiesLine, companyHref, emptyMessage, type MatchedBoard } from './companies'
+import { addCompanyHref, boardHref, companiesLine, type MatchedBoard } from './companies'
 import type { Filters } from './filters'
 
 function board(company: string, exact: boolean, removed = false): MatchedBoard {
@@ -40,7 +40,7 @@ test('picks the companies line for each case', () => {
 const filters: Filters = { japanese: 'business', specialties: ['backend', 'ml'], board: null, query: 'stripe backend' }
 
 test('a company link opens its company view, keeping the filters and dropping the search', () => {
-    expect([companyHref(filters, stripe), companyHref({ ...filters, japanese: 'any', specialties: null }, removedStripes)]).toEqual([
+    expect([boardHref(filters, stripe), boardHref({ ...filters, japanese: 'any', specialties: null }, removedStripes)]).toEqual([
         '/?japanese=business&specialty=backend,ml&company=greenhouse:stripe',
         '/?company=greenhouse:stripes-inc',
     ])
@@ -51,27 +51,5 @@ test('the add link opens Following with the search to add', () => {
         '/following?add=stripe',
         '/following?add=woven+by+toyota',
         '/following?add=a%26b',
-    ])
-})
-
-test('picks the empty message from the answer', () => {
-    const cases = [
-        { filters, served: { total: 3, filtered_out: false }, narrowed: false },
-        { filters, served: { total: 0, filtered_out: true }, narrowed: false },
-        { filters: { ...filters, query: '', board: 'greenhouse:stripe' }, served: { total: 0, filtered_out: true }, narrowed: true },
-        { filters, served: { total: 0, filtered_out: false }, narrowed: false },
-        { filters, served: { total: 0, filtered_out: false }, narrowed: true },
-        { filters: { ...filters, query: '' }, served: { total: 0, filtered_out: false }, narrowed: true },
-        { filters: { ...filters, query: '' }, served: { total: 0, filtered_out: false }, narrowed: false },
-    ]
-
-    expect(cases.map(({ filters, served, narrowed }) => emptyMessage(filters, served, narrowed))).toEqual([
-        null,
-        { kind: 'filtered', clear: '?q=stripe+backend' },
-        { kind: 'filtered', clear: '?company=greenhouse:stripe' },
-        { kind: 'query', query: 'stripe backend' },
-        { kind: 'query', query: 'stripe backend' },
-        { kind: 'plain' },
-        null,
     ])
 })

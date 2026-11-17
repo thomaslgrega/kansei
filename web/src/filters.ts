@@ -54,6 +54,26 @@ export function correctedSearch(params: URLSearchParams, filters: Filters, serve
     return filtersToSearch({ ...filters, board: dropBoard ? null : filters.board }, served.page)
 }
 
+// The `q` an answer was fetched for, from its postings URL.
+export function servedQuery(url: string): string {
+    return new URLSearchParams(url.split('?')[1]).get('q') ?? ''
+}
+
+export type EmptyMessage = { kind: 'filtered'; clear: string } | { kind: 'query'; query: string } | { kind: 'plain' } | null
+
+export function emptyMessage(
+    filters: Filters,
+    served: { total: number; filtered_out: boolean },
+    narrowed: boolean,
+): EmptyMessage {
+    if (served.total > 0) return null
+    if (served.filtered_out) {
+        return { kind: 'filtered', clear: `?${filtersToSearch({ ...filters, japanese: 'any', specialties: null })}` }
+    }
+    if (filters.query !== '') return { kind: 'query', query: filters.query }
+    return narrowed ? { kind: 'plain' } : null
+}
+
 export function boardClickSearch(filters: Filters, clicked: string, managing: boolean): string | null {
     if (managing) return null
     return filtersToSearch({ ...filters, board: filters.board === clicked ? null : clicked })

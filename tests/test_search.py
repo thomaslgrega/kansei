@@ -8,10 +8,11 @@ def test_a_board_matches_exactly_when_the_query_holds_its_name_or_token_and_part
         ("Woven by Toyota", "woven-by-toyota"),
         ("Zetaworks K.K.", "zw-careers"),
         ("ビジョナル株式会社", "visional"),
+        ("Cookpad", "cookpad"),
     ]
     queries = [
         "stripe", "STRIPE backend", "woven by toyota", "toyota", "woven by toy", "zw-careers", "zw careers", "zw",
-        "ビジョナル", "visional エンジニア", "tripe", "backend", "",
+        "ビジョナル", "visional エンジニア", "tripe", "backend", "c++", "c#", "",
     ]
 
     matched = {
@@ -32,5 +33,7 @@ def test_a_board_matches_exactly_when_the_query_holds_its_name_or_token_and_part
         "visional エンジニア": {"ビジョナル株式会社": "exact"},
         "tripe": {},
         "backend": {},
+        "c++": {},
+        "c#": {},
         "": {},
     }

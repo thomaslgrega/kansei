@@ -3,12 +3,14 @@ import {
     boardClickSearch,
     correctedSearch,
     droppedBoardSearch,
+    emptyMessage,
     type Filters,
     filtersToSearch,
     newCountsUrl,
     postingsUrl,
     querySearch,
     readFilters,
+    servedQuery,
     showAllSearch,
 } from './filters'
 
@@ -267,5 +269,37 @@ test('the postings URL asks for the search, and the new counts URL leaves it out
     expect([postingsUrl(false, filters, 2), newCountsUrl(filters)]).toEqual([
         '/api/postings?q=%E3%82%A8%E3%83%B3%E3%82%B8%E3%83%8B%E3%82%A2+kube&japanese=none&page=2',
         '/api/me/follows/new?japanese=none',
+    ])
+})
+
+test('reads the search an answer was fetched for', () => {
+    expect(['/api/postings?q=stripe+backend&page=2', '/api/postings?japanese=basic', '/api/postings'].map(servedQuery)).toEqual([
+        'stripe backend',
+        '',
+        '',
+    ])
+})
+
+const searched: Filters = { japanese: 'business', specialties: ['backend', 'ml'], board: null, query: 'stripe backend' }
+
+test('picks the empty message from the answer', () => {
+    const cases = [
+        { filters: searched, served: { total: 3, filtered_out: false }, narrowed: false },
+        { filters: searched, served: { total: 0, filtered_out: true }, narrowed: false },
+        { filters: { ...searched, query: '', board: 'greenhouse:stripe' }, served: { total: 0, filtered_out: true }, narrowed: true },
+        { filters: searched, served: { total: 0, filtered_out: false }, narrowed: false },
+        { filters: searched, served: { total: 0, filtered_out: false }, narrowed: true },
+        { filters: { ...searched, query: '' }, served: { total: 0, filtered_out: false }, narrowed: true },
+        { filters: { ...searched, query: '' }, served: { total: 0, filtered_out: false }, narrowed: false },
+    ]
+
+    expect(cases.map(({ filters, served, narrowed }) => emptyMessage(filters, served, narrowed))).toEqual([
+        null,
+        { kind: 'filtered', clear: '?q=stripe+backend' },
+        { kind: 'filtered', clear: '?company=greenhouse:stripe' },
+        { kind: 'query', query: 'stripe backend' },
+        { kind: 'query', query: 'stripe backend' },
+        { kind: 'plain' },
+        null,
     ])
 })

@@ -401,7 +401,7 @@ def test_no_postings_is_page_1_of_nothing(client):
         "total": 0,
         "page": 1,
         "board": None,
-        "companies": [],
+        "matched_boards": [],
         "filtered_out": False,
     }
 
@@ -536,9 +536,9 @@ def test_a_search_names_the_boards_matching_it_exact_ones_first(client, session)
     ])
     queries = ["kansei orbit backend", "kansei-gone", "kansei orb", ""]
 
-    companies = {query: client.get("/api/postings", params={"q": query}).json()["companies"] for query in queries}
+    matched = {query: client.get("/api/postings", params={"q": query}).json()["matched_boards"] for query in queries}
 
-    assert companies == {
+    assert matched == {
         "kansei orbit backend": [
             {"source": "greenhouse", "token": "kansei-orbit", "company": "Kansei Orbit", "exact": True, "removed": False},
         ],

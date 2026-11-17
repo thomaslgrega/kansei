@@ -117,7 +117,7 @@ class PostingsPage(BaseModel):
     checked_at: datetime | None
     # The board `source` and `token` asked for, or none when kansei doesn't have it.
     board: AskedBoard | None
-    companies: list[MatchedBoard]
+    matched_boards: list[MatchedBoard]
     # No postings, though some would show without the Japanese and specialty filters.
     filtered_out: bool
 
@@ -168,7 +168,7 @@ def list_postings(
 ) -> PostingsPage:
     user_id = current_user(session, cookie).id if following else None
 
-    def narrowed(japanese: str, specialty: str | None) -> Select[tuple[Posting, dict, str]]:
+    def postings_under(japanese: str, specialty: str | None) -> Select[tuple[Posting, dict, str]]:
         statement = filtered_postings(japanese, specialty, q).order_by(Posting.first_seen_at.desc(), Posting.id.desc())
         if source is not None:
             statement = statement.where(Posting.source == source)
@@ -178,7 +178,7 @@ def list_postings(
             statement = statement.where(on_followed_boards(user_id))
         return statement
 
-    statement = narrowed(japanese, specialty)
+    statement = postings_under(japanese, specialty)
     candidates = candidate_rows(session, statement)
     served = page_to_serve(page, len(candidates))
     filters_set = japanese != "any" or specialty is not None
@@ -196,8 +196,8 @@ def list_postings(
         page=served,
         checked_at=session.scalar(select(func.max(Posting.last_seen_at)).where(Posting.source != "url")),
         board=asked_board(session, source, token),
-        companies=matched_boards(session, q),
-        filtered_out=not candidates and filters_set and bool(candidate_rows(session, narrowed("any", None))),
+        matched_boards=matched_boards(session, q),
+        filtered_out=not candidates and filters_set and bool(candidate_rows(session, postings_under("any", None))),
     )
 
 
@@ -207,6 +207,8 @@ def candidate_rows(session: Session, statement: Select[tuple[Posting, dict, str]
 
 
 def matched_boards(session: Session, q: str) -> list[MatchedBoard]:
+    if not q.strip():
+        return []
     matched = [
         MatchedBoard(
             source=board.source,
