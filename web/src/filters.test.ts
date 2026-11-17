@@ -12,6 +12,7 @@ import {
     readFilters,
     servedQuery,
     showAllSearch,
+    type WhyEmpty,
 } from './filters'
 
 test('reads both filters from the query string and ignores sales', () => {
@@ -282,24 +283,33 @@ test('reads the search an answer was fetched for', () => {
 
 const searched: Filters = { japanese: 'business', specialties: ['backend', 'ml'], board: null, query: 'stripe backend' }
 
-test('picks the empty message from the answer', () => {
+const stripe = (why_empty: WhyEmpty | null) => ({ company: 'Stripe', why_empty })
+
+test('picks the empty message from the answer and the narrowed board', () => {
+    const narrowedFilters = { ...searched, query: '', board: 'greenhouse:stripe' }
     const cases = [
-        { filters: searched, served: { total: 3, filtered_out: false }, narrowed: false },
-        { filters: searched, served: { total: 0, filtered_out: true }, narrowed: false },
-        { filters: { ...searched, query: '', board: 'greenhouse:stripe' }, served: { total: 0, filtered_out: true }, narrowed: true },
-        { filters: searched, served: { total: 0, filtered_out: false }, narrowed: false },
-        { filters: searched, served: { total: 0, filtered_out: false }, narrowed: true },
-        { filters: { ...searched, query: '' }, served: { total: 0, filtered_out: false }, narrowed: true },
-        { filters: { ...searched, query: '' }, served: { total: 0, filtered_out: false }, narrowed: false },
+        { filters: searched, served: { total: 3, filtered_out: false }, narrowed: null },
+        { filters: searched, served: { total: 0, filtered_out: true }, narrowed: null },
+        { filters: narrowedFilters, served: { total: 0, filtered_out: true }, narrowed: stripe('filtered_out') },
+        { filters: searched, served: { total: 0, filtered_out: false }, narrowed: null },
+        { filters: { ...searched, board: 'greenhouse:stripe' }, served: { total: 0, filtered_out: false }, narrowed: stripe('filtered_out') },
+        { filters: narrowedFilters, served: { total: 0, filtered_out: false }, narrowed: stripe(null) },
+        { filters: { ...searched, query: '' }, served: { total: 0, filtered_out: false }, narrowed: null },
+        { filters: narrowedFilters, served: { total: 0, filtered_out: false }, narrowed: stripe('just_added') },
+        { filters: { ...searched, board: 'greenhouse:stripe' }, served: { total: 0, filtered_out: false }, narrowed: stripe('nothing_to_show') },
+        { filters: narrowedFilters, served: { total: 0, filtered_out: false }, narrowed: stripe('removed') },
     ]
 
     expect(cases.map(({ filters, served, narrowed }) => emptyMessage(filters, served, narrowed))).toEqual([
         null,
-        { kind: 'filtered', clear: '?q=stripe+backend' },
-        { kind: 'filtered', clear: '?company=greenhouse:stripe' },
+        { kind: 'filtered', clear: '?q=stripe+backend', company: null },
+        { kind: 'filtered', clear: '?company=greenhouse:stripe', company: 'Stripe' },
         { kind: 'query', query: 'stripe backend' },
         { kind: 'query', query: 'stripe backend' },
         { kind: 'plain' },
         null,
+        { kind: 'just_added', company: 'Stripe' },
+        { kind: 'nothing_to_show', company: 'Stripe' },
+        { kind: 'removed', company: 'Stripe' },
     ])
 })

@@ -1,7 +1,7 @@
 import { Fragment, type SubmitEvent, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { boardKey, type FollowControls, followsKey } from "./boards";
-import { correctedSearch, emptyMessage, type Filters, filtersToSearch, postingsUrl, querySearch, readFilters, servedQuery, showAllSearch } from "./filters";
+import { correctedSearch, emptyMessage, type Filters, filtersToSearch, postingsUrl, querySearch, readFilters, servedQuery, showAllSearch, type WhyEmpty } from "./filters";
 import Dropdown from "./Dropdown";
 import { JAPANESE_OPTIONS, type JapaneseRequirement } from "./japanese";
 import { lastPage, pageNumbers, pageRange, readPage } from "./pages";
@@ -19,7 +19,7 @@ type Row = {
     japanese_requirement: JapaneseRequirement
 }
 
-type AskedBoard = { source: string; token: string; company: string; removed: boolean }
+type AskedBoard = { source: string; token: string; company: string; removed: boolean; why_empty: WhyEmpty | null }
 
 type PostingsPage = {
     postings: Row[]
@@ -93,7 +93,7 @@ export default function Postings({ followingOnly = false, tracking, following }:
     const loadedQuery = servedQuery(loaded.url)
     // The last answer's companies, kept while the next page of the same search loads.
     const matched = !followingOnly && filters.query !== '' && loadedQuery === filters.query ? loaded.body.matched_boards : null
-    const empty = !followingOnly && served !== null ? emptyMessage(filters, served, narrowed !== null) : null
+    const empty = !followingOnly && served !== null ? emptyMessage(filters, served, narrowed) : null
 
     function companyAction(posting: Posting) {
         if (!following || !posting.has_board) return null
@@ -161,9 +161,17 @@ export default function Postings({ followingOnly = false, tracking, following }:
                     />
                 ))}
             </ul>
+            {empty?.kind === 'just_added' && (
+                <p className="muted">{empty.company} was added after the last update. Its jobs will appear after the next one.</p>
+            )}
+            {empty?.kind === 'nothing_to_show' && (
+                <p className="muted">kansei reads {empty.company}'s board, but has no Japan engineering jobs to show from it right now.</p>
+            )}
+            {empty?.kind === 'removed' && <p className="muted">{empty.company} was removed from kansei.</p>}
             {empty?.kind === 'filtered' && (
                 <p className="muted">
-                    No jobs match your filters · <Link to={empty.clear} replace>Clear filters</Link>
+                    {empty.company === null ? 'No jobs' : `No ${empty.company} jobs`} match your filters ·{' '}
+                    <Link to={empty.clear} replace>Clear filters</Link>
                 </p>
             )}
             {empty?.kind === 'query' && <p className="muted">No jobs match "{empty.query}".</p>}
